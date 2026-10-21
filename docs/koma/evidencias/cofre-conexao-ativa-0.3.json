@@ -1,0 +1,9 @@
+{
+  "status": 200,
+  "bridge": {
+    "available": true,
+    "message": "Conexão com o KPassword verificada, sem enviar textos nem consumir cota. Credenciais e modelos serão conferidos na primeira tradução."
+  },
+  "message": null,
+  "providerCalls": 0
+}

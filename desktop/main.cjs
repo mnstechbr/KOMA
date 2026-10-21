@@ -1,0 +1,112 @@
+const { app, BrowserWindow, dialog, Menu, shell, session } = require('electron')
+// Rótulos do menu da janela nos idiomas da interface.
+const MENU_LABELS = {
+  en: { 'Biblioteca': 'Library', 'Preferências': 'Settings', 'Abrir pasta de diagnóstico': 'Open diagnostics folder', 'Sair': 'Quit', 'Editar': 'Edit', 'Desfazer': 'Undo', 'Refazer': 'Redo', 'Recortar': 'Cut', 'Copiar': 'Copy', 'Colar': 'Paste', 'Selecionar tudo': 'Select all', 'Exibir': 'View', 'Recarregar': 'Reload', 'Tela cheia': 'Full screen' },
+  es: { 'Biblioteca': 'Biblioteca', 'Preferências': 'Preferencias', 'Abrir pasta de diagnóstico': 'Abrir carpeta de diagnóstico', 'Sair': 'Salir', 'Editar': 'Editar', 'Desfazer': 'Deshacer', 'Refazer': 'Rehacer', 'Recortar': 'Cortar', 'Copiar': 'Copiar', 'Colar': 'Pegar', 'Selecionar tudo': 'Seleccionar todo', 'Exibir': 'Ver', 'Recarregar': 'Recargar', 'Tela cheia': 'Pantalla completa' },
+}
+const fs = require('node:fs')
+const path = require('node:path')
+const os = require('node:os')
+const { startBackend } = require('./backend.cjs')
+const { allowedExternalLink } = require('./external-links.cjs')
+const { desktopPaths, bundledNode } = require('./paths.cjs')
+
+const { configDir, dataDir, logDir } = desktopPaths(process.env, process.platform, os.homedir())
+for (const dir of [configDir, dataDir, logDir]) fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
+app.setName('KOMA')
+if (process.platform === 'linux') app.setDesktopName('koma.desktop')
+app.setPath('userData', configDir)
+app.commandLine.appendSwitch('lang', 'pt-BR')
+
+let window
+let backend
+let quitting = false
+let logFd
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus() }
+  })
+  app.on('window-all-closed', () => app.quit())
+  process.on('SIGTERM', () => app.quit())
+  process.on('SIGINT', () => app.quit())
+  app.on('before-quit', (event) => {
+    if (quitting) return
+    event.preventDefault()
+    quitting = true
+    void (async () => {
+      if (backend) await backend.stop()
+      if (logFd !== undefined) fs.closeSync(logFd)
+      app.quit()
+    })()
+  })
+
+  void app.whenReady().then(async () => {
+    const logFile = path.join(logDir, 'backend.log')
+    if (fs.existsSync(logFile) && fs.statSync(logFile).size > 5 * 1024 * 1024) {
+      fs.copyFileSync(logFile, `${logFile}.1`)
+      fs.truncateSync(logFile)
+    }
+    logFd = fs.openSync(logFile, 'a', 0o600)
+    const bundleRoot = path.resolve(__dirname, '../../..')
+    backend = await startBackend({
+      nodePath: bundledNode(bundleRoot, process.platform), serverDir: path.join(bundleRoot, 'server'), dataDir, logFd,
+      automation: process.env.KOMA_AUTOMATION_DISABLED !== '1',
+    })
+    if (quitting) { await backend.stop(); return }
+    backend.child.once('exit', () => {
+      if (!quitting) { dialog.showErrorBox('KOMA', 'O serviço local encerrou. Abra o KOMA novamente. Seus arquivos permanecem salvos.'); app.quit() }
+    })
+    session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+    session.defaultSession.setPermissionCheckHandler(() => false)
+    const localSession = await backend.bootstrap()
+    await session.defaultSession.cookies.set({
+      url: backend.url, name: 'koma-session', value: localSession.sessionToken,
+      httpOnly: true, secure: false, sameSite: 'lax', path: '/',
+    })
+    const language = ['pt-BR', 'en', 'es'].includes(localSession.language) ? localSession.language : 'pt-BR'
+    await session.defaultSession.cookies.set({ url: backend.url, name: 'koma-lang', value: language, secure: false, sameSite: 'lax', path: '/' })
+    const label = (text) => (MENU_LABELS[language] || {})[text] || text
+    if (quitting) return
+    window = new BrowserWindow({
+      title: 'KOMA', width: 1360, height: 900, minWidth: 800, minHeight: 600,
+      backgroundColor: '#101013', show: false, icon: path.join(__dirname, 'koma.png'),
+      webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true },
+    })
+    const sameOrigin = (url) => { try { return new URL(url).origin === backend.url } catch { return false } }
+    window.webContents.on('will-navigate', (event, url) => { if (!sameOrigin(url)) { event.preventDefault(); if (allowedExternalLink(url)) void shell.openExternal(url) } })
+    window.webContents.setWindowOpenHandler(({ url }) => { if (allowedExternalLink(url)) void shell.openExternal(url); return { action: 'deny' } })
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      { label: 'KOMA', submenu: [
+        { label: label('Biblioteca'), click: () => window.loadURL(`${backend.url}/inicio/secoes`) },
+        { label: label('Preferências'), click: () => window.loadURL(`${backend.url}/inicio/preferencias`) },
+        { label: label('Abrir pasta de diagnóstico'), click: () => shell.openPath(logDir) },
+        { type: 'separator' }, { label: label('Sair'), accelerator: 'CmdOrCtrl+Q', click: () => app.quit() },
+      ] },
+      { label: label('Editar'), submenu: [
+        { label: label('Desfazer'), role: 'undo' }, { label: label('Refazer'), role: 'redo' }, { type: 'separator' },
+        { label: label('Recortar'), role: 'cut' }, { label: label('Copiar'), role: 'copy' }, { label: label('Colar'), role: 'paste' },
+        { label: label('Selecionar tudo'), role: 'selectAll' },
+      ] },
+      { label: label('Exibir'), submenu: [{ label: label('Recarregar'), role: 'reload' }, { label: label('Tela cheia'), role: 'togglefullscreen' }] },
+    ]))
+    await window.loadURL(backend.url)
+    if (quitting) return
+    window.show()
+    // Usado somente pela verificação automatizada do pacote, sem habilitar IPC no renderer.
+    if (process.env.KOMA_DESKTOP_TEST === '1') {
+      await require('./window-checks.cjs').runWindowChecks(window, logDir)
+      app.quit()
+    }
+  }).catch(async (error) => {
+    if (process.env.KOMA_DESKTOP_TEST === '1') {
+      fs.writeFileSync(path.join(logDir, 'window-test-error.txt'), error.message)
+      if (backend) await backend.stop()
+      app.exit(1)
+      return
+    }
+    if (!quitting) dialog.showErrorBox('Não foi possível abrir o KOMA', `${error.message}\nDiagnóstico: ${logDir}`)
+    app.quit()
+  })
+}

@@ -1,0 +1,18 @@
+'use client'
+import { BookOpen, GitFork, Github, HardDrive, Linkedin } from 'lucide-react'
+import { KOMA_BASE_PROJECT, KOMA_BASE_URL, KOMA_CREATOR, KOMA_CREATOR_ROLE, KOMA_GITHUB, KOMA_LINKEDIN } from '@/lib/koma-brand'
+import { useT } from '@/components/i18n'
+
+export function KomaAbout() {
+  const { t } = useT()
+  return <div data-koma-about>
+    <header className="koma-page-head"><div><p className="koma-eyebrow">{t('Seu universo, quadro a quadro')}</p><h1>{t('Sobre o KOMA')}</h1><p>{t('Sua biblioteca pessoal de mangás, manhwas e manhuas, com descoberta de obras e preparação da leitura em português brasileiro.')}</p></div></header>
+    <div className="koma-prose">
+      <section className="koma-panel flex flex-col gap-3 p-7"><p className="koma-eyebrow">{t('Criador')}</p><h2 className="koma-section-title">{KOMA_CREATOR}</h2><p className="font-semibold !text-[var(--ink)]">{t(KOMA_CREATOR_ROLE)}</p><p>{t('O KOMA nasceu da visão de {name}: escolher uma obra e deixar o aplicativo organizar a coleta, a tradução e a leitura. Um projeto pessoal com identidade própria, desenvolvido a partir dessa direção e de tecnologias open source.', { name: KOMA_CREATOR })}</p><div className="koma-actions"><a href={KOMA_LINKEDIN} target="_blank" rel="noreferrer" className="koma-outline-button"><Linkedin size={18} aria-hidden="true" />{t('LinkedIn de {name}', { name: KOMA_CREATOR })}</a><a href={KOMA_GITHUB} target="_blank" rel="noreferrer" className="koma-outline-button"><Github size={18} aria-hidden="true" />{t('GitHub de {name}', { name: KOMA_CREATOR })}</a></div></section>
+      <section className="koma-box flex flex-col gap-3"><h2><BookOpen size={22} aria-hidden="true" />{t('Da escolha à leitura')}</h2><p>{t('Adicione uma obra, acompanhe a preparação dos capítulos e atualize a biblioteca quando quiser buscar novidades. Importe também arquivos do seu computador. Os originais são preservados, e trechos que exigem conferência ficam sinalizados.')}</p></section>
+      <section className="koma-box flex flex-col gap-3"><h2><HardDrive size={22} aria-hidden="true" />{t('Biblioteca no seu computador')}</h2><p>{t('Imagens, OCR, biblioteca e progresso ficam no seu computador. A pesquisa e a coleta consultam fontes externas. A tradução e a revisão podem enviar diálogos aos provedores que você autorizar, usando suas credenciais pelo KPassword. Não é necessário criar uma conta no KOMA.')}</p></section>
+      <section className="koma-box flex flex-col gap-3" data-koma-origin><h2><GitFork size={22} aria-hidden="true" />{t('Origem do projeto')}</h2><p>{t('O KOMA foi baseado no projeto open source {project}, distribuído sob a licença MIT. Dele vieram a base da detecção de balões, do OCR e da importação de arquivos. A biblioteca de obras, a coleta em várias fontes, a tradução por KPassword e assinaturas, o leitor e o aplicativo desktop foram desenvolvidos para o KOMA, que é software livre sob a licença AGPL-3.0.', { project: KOMA_BASE_PROJECT })}</p><div className="koma-actions"><a href={KOMA_BASE_URL} target="_blank" rel="noreferrer" className="koma-outline-button"><Github size={18} aria-hidden="true" />{t('Ver {project} no GitHub', { project: KOMA_BASE_PROJECT })}</a></div></section>
+      <details className="koma-details"><summary>{t('Licenças e componentes')}</summary><div><p>{t('O KOMA usa componentes open source. As licenças e os avisos de autoria desses componentes são preservados nos arquivos LICENSE e THIRD-PARTY-NOTICES do pacote. A autoria do KOMA é apresentada acima; esses avisos documentam a origem dos componentes.')}</p><p>{t('Fontes tipográficas: Dela Gothic One e IBM Plex Sans, ambas sob a SIL Open Font License 1.1.')}</p></div></details>
+    </div>
+  </div>
+}

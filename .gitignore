@@ -1,0 +1,71 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+bun.lock
+# Next.js
+.next/
+out/
+
+# Build
+dist/
+build/
+
+# Env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Misc
+.vercel
+.turbo
+
+# Local backend runtime (SQLite + arquivos de seções)
+storage/*
+!storage/.gitkeep
+
+# Caches gerais
+.cache/
+
+# Rascunho local do paper JOSS
+paper/
+CITATION.cff
+
+# Memória de agentes locais
+.claude/memory/
+
+# Arquivos/config locais de agentes (Claude/Codex)
+.claude/
+.codex
+
+/security/
+
+# Artefatos e dados de validação KOMA
+desktop/node_modules/
+artifacts/
+
+# Modelos baixados por scripts/fetch-desktop-resources.mjs (hash fixado), grandes demais para o repositório.
+/models/comic-text-detector.onnx
+/models/lama_fp32.onnx

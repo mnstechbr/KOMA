@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "app/koma-tinta.css"
+        ],
+        "createdAt": "2026-10-19T23:29:36.348Z",
+        "reason": "Claude triage: 3px ink borders are comic-panel gutters (nav rail divider, cover/body divider) from the Tinta prototype Jean approved, not accent tabs"
+      }
+    ]
+  }
+}
