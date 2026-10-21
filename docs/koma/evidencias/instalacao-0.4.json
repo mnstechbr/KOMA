@@ -1,0 +1,9 @@
+{
+  "database_integrity": true,
+  "existing_users_preserved": true,
+  "existing_sections_preserved": true,
+  "kpassword_settings_preserved": true,
+  "schema_5_applied": true,
+  "no_test_works_in_personal_library": true,
+  "optional_legacy_instance_key_preserved": true
+}

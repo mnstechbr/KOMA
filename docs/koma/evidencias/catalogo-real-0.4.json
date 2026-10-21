@@ -1,0 +1,17 @@
+{
+  "checks": 10,
+  "source": "MangaDex",
+  "query": "Eminence in Shadow",
+  "sourceId": "77bee52c-d2d6-44ad-a33a-1734c1fe696a",
+  "title": "The Eminence in Shadow",
+  "chapters": 100,
+  "languages": [
+    "pt-br",
+    "id",
+    "en",
+    "vi",
+    "zh-hk"
+  ],
+  "modelCalls": 0,
+  "temporaryData": "/tmp/koma-catalogo-real-ovYCku"
+}

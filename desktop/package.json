@@ -1,0 +1,12 @@
+{
+  "name": "koma-desktop",
+  "productName": "KOMA",
+  "version": "0.4.55",
+  "private": true,
+  "description": "Biblioteca pessoal de mangás e tradução em português brasileiro",
+  "license": "AGPL-3.0-or-later",
+  "main": "main.cjs",
+  "devDependencies": {
+    "electron": "44.9.0"
+  }
+}

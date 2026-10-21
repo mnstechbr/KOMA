@@ -1,0 +1,35 @@
+{
+  "about": "Páginas da biblioteca local que já tiveram cada tipo de erro. KOMA_QUALITY=1 KOMA_QUALITY_SET=tests/quality-pages.json npx vitest run tests/quality.real.test.ts",
+  "pages": [
+    { "image": 42268, "why": "balão com palavras lado a lado lido em 4 falas e fora de ordem", "expect": ["TO GATHER", "AND DIG", "THIS TRAP"] },
+    { "image": 42291, "why": "palavras da mesma fileira perdidas (MORE, ENOUGH)", "expect": ["I HAD MORE", "THAN ENOUGH"] },
+    { "image": 42609, "why": "ordem de leitura de letra estilizada", "expect": ["TO UTTERLY"] },
+    { "image": 42538, "why": "última linha de leitura incerta perdida; borda da nuvem do YES! apagada", "expect": ["OLD!"] },
+    { "image": 36203, "why": "efeito sonoro ao lado partia a fala em duas", "expect": ["BECAUSE IT'S EXTERNAL?"] },
+    { "image": 42960, "why": "recado do grupo de tradução traduzido como fala", "absent": ["DIVE DEEPER", "DEAR READERS"] },
+    { "image": 42466, "why": "cartão de nome roxo" },
+    { "image": 42340, "why": "letra grande com degradê sobre fundo claro" },
+    { "image": 33765, "why": "letra com brilho sobre fundo listrado", "allow": ["borrão"] },
+    { "image": 42643, "why": "letra pincelada branca sobre círculo escuro" },
+    { "image": 42649, "why": "balão cortado pela borda da imagem" },
+    { "image": 8947, "why": "mangá: balões encostados não podem virar uma fala só", "absent": ["HE'S PECTED", "WHOA! HE'S"], "allow": ["borrão", "contorno", "miúda", "fora do balão"] },
+    { "image": 8940, "why": "mangá: balões encostados não podem virar uma fala só", "absent": ["LET THE THEN"], "allow": ["borrão", "contorno", "miúda", "fora do balão"] },
+    { "image": 8921, "why": "mangá: balões encostados não podem virar uma fala só; texto miúdo numa linha só quando o miolo vaza", "absent": ["NOW AL-"] },
+    { "image": 8923, "why": "balão branco com borda de espinhos densos virava borrão preto" },
+    { "image": 42431, "why": "letra enorme contornada (YO!) num balão pequeno não era apagada" },
+    { "image": 42795, "why": "balão em degradê com letra clara no alto" },
+    { "image": 33173, "why": "balão claro com letra brilhante no alto" },
+    { "image": 42417, "why": "fala em balão encostado em outro era pulada no desenho (PLEASE HURRY)", "expect": ["PLEASE"], "allow": ["borrão"] },
+    { "image": 42526, "why": "fala curta gritada (NO.) era descartada", "expect": ["NO."] },
+    { "image": 42572, "why": "última linha fora da caixa do balão virava fala separada", "expect": ["DEMONIC ENERGY"] }
+  ],
+  "joins": [
+    { "upper": 42191, "lower": 42195, "why": "AN EARTHQUAKE!! cortado" },
+    { "upper": 42385, "lower": 42387, "why": "WE'RE FALLING cortado" },
+    { "upper": 42421, "lower": 42424, "why": "NOW WE'RE / READ- cortado" },
+    { "upper": 42464, "lower": 42466, "why": "I DID IT!! cortado" },
+    { "upper": 42543, "lower": 42549, "why": "HE INTENDS TO END THIS RIGHT / HERE!" },
+    { "upper": 42713, "lower": 42720, "why": "cartão de nome cortado" },
+    { "upper": 42774, "lower": 42776, "why": "IF YOU / CAN STOP THEM, linha cortada não achada" }
+  ]
+}

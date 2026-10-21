@@ -1,0 +1,17 @@
+{
+  "title": "KOMA | Biblioteca pessoal e tradução de mangás",
+  "text": "Ir para o conteúdo\nKOMA\nコマ\n\nSEU UNIVERSO, QUADRO A QUADRO.\n\nMinha biblioteca\nProcessamento\nPreferências\nBiblioteca neste computador\nSobre o KOMA\nSUA COLEÇÃO PESSOAL\nLEITURA EM PT-BR\n\nSUA COLEÇÃO PESSOAL\n\nMinha biblioteca.\nAdicionar obra\n4\nobras\n4\nde 4 capítulos prontos\nAtualizar biblioteca\n\nSuas obras\nVer favoritos\nPronto para ler\n\nMANGÁ\n\nLinhas do amanhã\n\n1 de 1 capítulos prontos\n\nPronto para ler\n\nMANGÁ\n\nFragmentos da noite\n\n1 de 1 capítulos prontos\n\nPronto para ler\n\nMANGÁ\n\nDo outro lado\n\n1 de 1 capítulos prontos\n\nPronto para ler\n\nMANGÁ\n\nCidade de papel\n\n1 de 1 capítulos prontos\n\nImportar arquivos do computador (opcional)\nAtualize as obras quando quiser buscar novos capítulos.",
+  "url": "http://127.0.0.1:39679/inicio/secoes",
+  "checks": [
+    "biblioteca aberta sem cadastro",
+    "favorito da obra salvo pela interface",
+    "busca local por título e limpeza do filtro",
+    "biblioteca de obras em janela estreita",
+    "obra abre a lista de capítulos e a leitura traduzida",
+    "original preservado acessível no leitor",
+    "progresso de leitura salvo pela interface",
+    "ação principal abre busca por obra, sem cadastro de capítulos",
+    "busca real distingue Eminence in Shadow dos derivados e abre capa/sinopse",
+    "adicionar obra grava biblioteca e abre acompanhamento sem importar capítulos"
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "status": 503,
+  "bridge": null,
+  "message": "A sessão do KPassword está indisponível. Ative a ponte e tente novamente.",
+  "providerCalls": 0
+}

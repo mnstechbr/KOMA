@@ -1,0 +1,34 @@
+KOMA — Jean Vitor, idealizador e desenvolvedor full stack
+https://www.linkedin.com/in/jean-vitor-16a19642a/
+
+O KOMA inclui código da base translate-manga-br:
+https://github.com/marco0antonio0/translate-manga-br
+Copyright (c) 2026 Manga Translator Local contributors
+Licença MIT, preservada no fim de LICENSE.
+
+O KOMA como um todo é distribuído sob a GNU Affero General Public License v3.0 ou
+posterior (AGPL-3.0-or-later), texto completo em LICENSE.
+
+Os direitos sobre código de terceiros permanecem com seus respectivos autores.
+As adições e modificações do KOMA são identificadas no arquivo LICENSE.
+
+Node.js: licença incluída em runtime/LICENSE-Node.
+Electron e Chromium: avisos incluídos na pasta electron/ do pacote.
+Demais bibliotecas mantêm seus arquivos de licença nas dependências distribuídas.
+A proveniência dos modelos e a base de desenvolvimento estão documentadas em
+docs/koma/BASELINE.md e scripts/fetch-desktop-resources.mjs no projeto-fonte.
+Detector de balões (models/yolo.onnx): veio do translate-manga-br; os metadados do
+arquivo indicam treino com Ultralytics e a licença AGPL-3.0 (https://ultralytics.com/license),
+a mesma do KOMA.
+OCR coreano: modelo korean_PP-OCRv5_mobile_rec (PaddleOCR, Apache-2.0), convertido para ONNX
+por monkt/paddleocr-onnx (HuggingFace); SHA-256 fixado em scripts/fetch-desktop-resources.mjs.
+Fontes tipográficas da interface (public/fonts/koma), SIL Open Font License 1.1:
+Dela Gothic One, Copyright 2020 The Dela Gothic Project Authors (subconjunto latino e コマ);
+IBM Plex Sans, Copyright © 2017 IBM Corp. (subconjunto latino). https://openfontlicense.org
+Apagamento do texto original (baixados por scripts/fetch-desktop-resources.mjs, SHA-256 fixado):
+- models/lama_fp32.onnx: LaMa (Samsung Research / advimman/lama), convertido para ONNX por
+  Carve/LaMa-ONNX (HuggingFace), licença Apache-2.0.
+- models/comic-text-detector.onnx: comic-text-detector (dmMaze), convertido para ONNX por
+  mayocream/comic-text-detector-onnx (HuggingFace). O cartão do modelo indica Apache-2.0 e o
+  repositório de origem é GPL-3.0, compatível com a AGPL-3.0 do KOMA.
+

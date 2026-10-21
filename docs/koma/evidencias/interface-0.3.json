@@ -1,0 +1,19 @@
+{
+  "title": "KOMA | Biblioteca pessoal e tradução de mangás",
+  "text": "Ir para o conteúdo\nKOMA\nコマ\n\nSEU UNIVERSO, QUADRO A QUADRO.\n\nMinha biblioteca\nProcessamento\nPreferências\nBiblioteca neste computador\nSobre o KOMA\nSUA COLEÇÃO PESSOAL\nLEITURA EM PT-BR\n\nUM QUADRO. INFINITAS HISTÓRIAS.\n\nMinha biblioteca.\nAdicionar capítulo\n\nDE VOLTA À SUA HISTÓRIA\n\nCidade de papel\n\n1 página disponível no seu computador. Abra a leitura e encontre seu próximo capítulo favorito.\n\nContinuar lendo\nExplorar coleção\nKOMA\nEDIÇÃO PESSOAL / 01\n4\ncapítulos\n4\npáginas\n2\nfavoritos\nNO SEU DISCO. NO SEU RITMO.\n\nA SUA SELEÇÃO\n\nEntre páginas e mundos\nTodos\n4\nFavoritos\n2\nNão lidos\n3\nLidos\n1\nBuscar na biblioteca\nOrdenar biblioteca\nMais recentes\nTítulo: A–Z\nMais antigos\nAbrir leitura\n\nIDIOMA AUTOMÁTICO\n\nLinhas do amanhã\n\n1 página\n·\nNa sua biblioteca\n\nAbrir leitura\nLido\n\nIDIOMA AUTOMÁTICO\n\nFragmentos da noite\n\n1 página\n·\nLeitura concluída\n\nAbrir leitura\n\nIDIOMA AUTOMÁTICO\n\nDo outro lado\n\n1 página\n·\nNa sua biblioteca\n\nAbrir leitura\n\nIDIOMA AUTOMÁTICO\n\nCidade de papel\n\n1 página\n·\nNa sua biblioteca\n\nKOMA / BIBLIOTECA PESSOAL\nHistórias para ficar.",
+  "url": "http://127.0.0.1:42989/inicio/secoes",
+  "checks": [
+    "biblioteca aberta sem cadastro",
+    "favorito alterado pela interface",
+    "busca filtra os capítulos",
+    "limpeza dos filtros restaura a coleção",
+    "filtros de leitura respondem à interação",
+    "janela estreita sem rolagem horizontal",
+    "capítulo abre no leitor preservado",
+    "retorno do leitor à biblioteca",
+    "provedor e modelo salvos pela interface sem API key",
+    "revogação pela interface bloqueia o motor no backend",
+    "configuração do cofre sem campo de API key",
+    "preferências do cofre cabem em janela estreita"
+  ]
+}

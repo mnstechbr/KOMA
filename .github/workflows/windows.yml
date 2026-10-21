@@ -1,0 +1,110 @@
+name: Windows
+
+# Gera o instalador do KOMA para Windows 11 e testa num Windows real:
+# instala em silêncio, abre o app com a verificação automática da janela,
+# confere que o serviço local fecha junto e desinstala preservando a biblioteca.
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # Modelos de OCR ficam no Git LFS (o repositório público não tem o
+          # histórico do projeto original para baixá-los de lá).
+          lfs: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24.18.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache models and Windows runtimes
+        uses: actions/cache@v4
+        with:
+          path: |
+            models
+            artifacts/runtimes/win32-x64
+          key: windows-resources-${{ hashFiles('scripts/fetch-desktop-resources.mjs', 'scripts/build-windows.mjs', 'scripts/desktop-models.mjs') }}
+
+      - name: Download OCR models
+        run: npm run desktop:resources
+
+      - name: Build
+        run: npm run build
+
+      - name: Build installer
+        run: npm run desktop:windows
+
+      - name: Install silently
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem artifacts/KOMA-Setup-*.exe | Select-Object -First 1
+          $process = Start-Process $setup.FullName -ArgumentList '/S' -PassThru
+          if (-not $process.WaitForExit(300000)) { throw 'O instalador não terminou.' }
+          if ($process.ExitCode -ne 0) { throw "Instalador saiu com código $($process.ExitCode)." }
+          if (-not (Test-Path "$env:LOCALAPPDATA\Programs\KOMA\electron\KOMA.exe")) { throw 'KOMA.exe não foi instalado.' }
+          if (-not (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\KOMA.lnk")) { throw 'Atalho do Menu Iniciar ausente.' }
+
+      - name: Open installed KOMA
+        shell: pwsh
+        env:
+          KOMA_DESKTOP_TEST: '1'
+          KOMA_AUTOMATION_DISABLED: '1'
+        run: |
+          $env:KOMA_DATA_DIR = "$env:RUNNER_TEMP\koma\library"
+          $env:KOMA_CONFIG_DIR = "$env:RUNNER_TEMP\koma\config"
+          $env:KOMA_STATE_DIR = "$env:RUNNER_TEMP\koma\state"
+          $process = Start-Process "$env:LOCALAPPDATA\Programs\KOMA\electron\KOMA.exe" -PassThru
+          if (-not $process.WaitForExit(180000)) { Stop-Process -Id $process.Id -Force; throw 'O KOMA não concluiu a verificação da janela.' }
+          $logs = "$env:RUNNER_TEMP\koma\state\logs"
+          if (Test-Path "$logs\window-test-error.txt") { Get-Content "$logs\window-test-error.txt"; throw 'A verificação da janela falhou.' }
+          if (-not (Test-Path "$logs\window-test.json")) { Get-Content "$logs\backend.log" -ErrorAction SilentlyContinue; throw 'A janela não registrou o resultado.' }
+          Get-Content "$logs\window-test.json"
+          Start-Sleep -Seconds 3
+          $left = Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$env:LOCALAPPDATA\Programs\KOMA\*" }
+          if ($left) { throw 'O serviço local continuou aberto depois de fechar o KOMA.' }
+          if (-not (Test-Path "$env:RUNNER_TEMP\koma\library\local.sqlite")) { throw 'A biblioteca não foi criada.' }
+
+      - name: Uninstall
+        shell: pwsh
+        run: |
+          $library = "$env:LOCALAPPDATA\KOMA\library"
+          New-Item -ItemType Directory -Force $library | Out-Null
+          Set-Content "$library\marca.txt" 'preservar'
+          Start-Process "$env:LOCALAPPDATA\Programs\KOMA\Desinstalar KOMA.exe" -ArgumentList '/S'
+          # O desinstalador do NSIS se copia para a pasta temporária e segue sozinho.
+          for ($i = 0; $i -lt 60 -and (Test-Path "$env:LOCALAPPDATA\Programs\KOMA\electron"); $i++) { Start-Sleep -Seconds 2 }
+          if (Test-Path "$env:LOCALAPPDATA\Programs\KOMA\electron") { throw 'A desinstalação não removeu o KOMA.' }
+          if (Test-Path "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\KOMA.lnk") { throw 'O atalho continuou no Menu Iniciar.' }
+          if (-not (Test-Path "$library\marca.txt")) { throw 'A desinstalação apagou a biblioteca.' }
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: KOMA-Setup-windows
+          path: artifacts/KOMA-Setup-*.exe
+          if-no-files-found: error
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: koma-windows-logs
+          path: ${{ runner.temp }}/koma/state/logs
+          if-no-files-found: ignore

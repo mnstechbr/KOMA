@@ -1,0 +1,329 @@
+/* KOMA desktop · direção "Tinta": papel claro, tinta preta, retícula de mangá e vermelho de carimbo.
+   Tudo fica sob .koma-desktop; a versão web mantém o tema anterior. */
+@font-face { font-family: 'IBM Plex Sans'; font-style: normal; font-weight: 400 700; font-display: swap; src: url('/fonts/koma/ibm-plex-sans-latin.woff2') format('woff2'); }
+/* Subconjunto com latim, acentos do português e コマ. Outros caracteres caem na fonte do sistema. */
+@font-face { font-family: 'Dela Gothic One'; font-style: normal; font-weight: 400; font-display: swap; src: url('/fonts/koma/dela-gothic-one-subset.woff2') format('woff2'); }
+
+.koma-desktop {
+  --paper: #f3eee6; --paper-2: #fbf8f3; --paper-3: #e8e1d6; --ink: #141414; --ink-2: #3b3a38; --ink-3: #4a4845;
+  --red: #c62a43; --red-ink: #a3233a; --red-soft: #f6dde1;
+  --font-display: 'Dela Gothic One', 'Arial Black', sans-serif;
+  --font-body: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  /* Tokens do shadcn remapeados para as telas que ainda usam utilitários Tailwind. */
+  --background: var(--paper); --foreground: var(--ink); --card: var(--paper-2); --card-foreground: var(--ink);
+  --popover: var(--paper-2); --popover-foreground: var(--ink); --primary: var(--red); --primary-foreground: #fff;
+  --secondary: var(--paper-3); --secondary-foreground: var(--ink); --muted: var(--paper-3); --muted-foreground: var(--ink-3);
+  --accent: var(--paper-3); --accent-foreground: var(--ink); --destructive: var(--red); --destructive-foreground: #fff;
+  --border: var(--ink); --input: var(--ink); --ring: var(--red); --radius: 4px;
+  display: flex; min-height: 100vh; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.5;
+}
+/* Telas de leitura mantêm o fundo escuro e nenhum efeito. */
+.koma-desktop.is-reading {
+  --background: #1a1918; --foreground: #f3eee6; --card: #242220; --card-foreground: #f3eee6; --popover: #242220; --popover-foreground: #f3eee6;
+  --muted: #2e2c2a; --muted-foreground: #c9c2b8; --secondary: #2e2c2a; --secondary-foreground: #f3eee6; --accent: #2e2c2a; --accent-foreground: #f3eee6;
+  --border: #4a4744; --input: #4a4744;
+  background: #1a1918; color: #f3eee6;
+}
+.koma-desktop :is(button, a, input, select, textarea, summary):focus-visible { outline: 3px solid var(--red); outline-offset: 3px; }
+.koma-skip-link { position: fixed; left: 20px; top: -100px; z-index: 100; padding: 12px 20px; background: var(--ink); color: var(--paper); font-weight: 700; }
+.koma-skip-link:focus { top: 15px; }
+.koma-desktop .koma-display { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.01em; }
+
+/* Trilho lateral */
+.koma-rail { position: fixed; inset: 0 auto 0 0; width: 104px; z-index: 40; display: flex; flex-direction: column; align-items: center; gap: 22px; padding: 26px 0 20px; background: var(--paper); border-right: 3px solid var(--ink); }
+.koma-wordmark { font-family: var(--font-display); font-size: 24px; line-height: 1; writing-mode: vertical-rl; letter-spacing: .08em; display: flex; align-items: center; gap: 8px; }
+.koma-wordmark span { color: var(--red); writing-mode: horizontal-tb; display: flex; flex-direction: column; align-items: center; letter-spacing: 0; }
+.koma-wordmark b { font-weight: 400; }
+.koma-rail nav { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.koma-rail nav a, .koma-rail-bottom a { width: 76px; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; border: 2px solid transparent; border-radius: 4px; font-size: 12px; font-weight: 600; line-height: 1.15; text-align: center; color: var(--ink); transition: background .15s, border-color .15s; }
+.koma-rail nav a:hover, .koma-rail-bottom a:hover { border-color: var(--ink); }
+.koma-rail nav a[aria-current=page] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.koma-rail nav a.is-add { border-color: var(--ink); }
+.koma-rail-bottom { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.koma-local-dot { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--ink-3); text-align: center; max-width: 84px; line-height: 1.2; }
+.koma-local-dot::before { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #3f7d4e; border: 2px solid var(--ink); }
+.koma-main-column { margin-left: 104px; min-width: 0; flex: 1; position: relative; z-index: 1; }
+.is-reading .koma-main-column { margin-left: 0; }
+.koma-content { padding: 36px 48px 64px; margin: 0 auto; max-width: 1560px; }
+.is-reading .koma-content { padding: 0; max-width: none; }
+
+/* Entrada de tela: tinta se espalhando a partir do trilho. */
+.koma-page-enter { animation: koma-ink-spread .42s cubic-bezier(.2,.7,.2,1); }
+@keyframes koma-ink-spread { from { clip-path: circle(0% at 0 0); } to { clip-path: circle(150% at 0 0); } }
+
+/* Fundo vivo: retícula + lente + gota de nanquim. */
+.koma-ink-layer { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; contain: strict; }
+.koma-ink-paper { position: absolute; inset: 0; background-image: radial-gradient(#1414141a 1.2px, transparent 1.4px); background-size: 10px 10px; }
+.koma-ink-lens, .koma-ink-core { position: absolute; left: 0; top: 0; border-radius: 50%; opacity: 0; will-change: transform, opacity; transition: opacity .6s ease; }
+.koma-ink-lens { background-image: radial-gradient(#141414 3.2px, transparent 3.4px); background-size: 10px 10px; -webkit-mask-image: radial-gradient(closest-side, #000 0%, #0008 45%, transparent 100%); mask-image: radial-gradient(closest-side, #000 0%, #0008 45%, transparent 100%); }
+.koma-ink-core { background-image: radial-gradient(#c62a43 2px, transparent 2.2px); background-size: 10px 10px; -webkit-mask-image: radial-gradient(closest-side, #000 0%, transparent 100%); mask-image: radial-gradient(closest-side, #000 0%, transparent 100%); }
+.koma-ink-layer.is-live .koma-ink-lens, .koma-ink-layer.is-live .koma-ink-core { opacity: 1; }
+.koma-ink-canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .6s ease; }
+.koma-ink-layer.is-live .koma-ink-canvas { opacity: 1; }
+/* Ponteiro sobre conteúdo (texto, botões, capas, quadros): o efeito recua. */
+.koma-ink-layer.is-live.is-muted :is(.koma-ink-lens, .koma-ink-core, .koma-ink-canvas) { opacity: 0; transition-duration: .2s; }
+
+/* Tipografia de página */
+.koma-eyebrow { font-size: 13px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--red-ink); }
+.koma-page-head { display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 28px; }
+.koma-page-head h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(32px, 3.2vw, 46px); line-height: 1.05; }
+.koma-page-head p { color: var(--ink-2); margin-top: 8px; max-width: 70ch; }
+.koma-page-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.koma-section-title { font-family: var(--font-display); font-weight: 400; font-size: 26px; line-height: 1.15; }
+.koma-muted { color: var(--ink-3); }
+.koma-note { font-size: 14px; color: var(--ink-3); }
+
+/* Botões */
+.koma-button, .koma-outline-button, .koma-dark-button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 48px; padding: 0 20px; border-radius: 4px; border: 2px solid var(--ink); font-size: 15px; font-weight: 700; line-height: 1.2; white-space: nowrap; transition: transform .12s, box-shadow .12s, background .12s; }
+.koma-button { background: var(--red); color: #fff; box-shadow: 4px 4px 0 var(--ink); }
+.koma-button:hover { transform: translate(-1px,-1px); box-shadow: 5px 5px 0 var(--ink); }
+.koma-button:active { transform: translate(3px,3px); box-shadow: 1px 1px 0 var(--ink); }
+.koma-dark-button { background: var(--ink); color: var(--paper); }
+.koma-dark-button:hover { background: #2b2a28; }
+.koma-outline-button { background: var(--paper); color: var(--ink); font-weight: 600; }
+.koma-outline-button:hover { background: var(--paper-2); }
+.koma-outline-button[aria-pressed=true] { background: var(--ink); color: var(--paper); }
+/* Desabilitado sem transparência: o fundo vivo nunca aparece através do botão. */
+.koma-desktop:not(.is-reading) :is(.koma-button, .koma-outline-button, .koma-dark-button, .koma-icon-button, .koma-pill):disabled { cursor: not-allowed; transform: none; box-shadow: none; color: color-mix(in srgb, currentColor 55%, var(--paper)); background-image: linear-gradient(#f3eee68c, #f3eee68c); }
+.koma-icon-button { width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--ink); border-radius: 4px; background: var(--paper); color: var(--ink); }
+.koma-icon-button:hover { background: var(--paper-2); }
+.koma-icon-button[aria-pressed=true] { background: var(--red); color: #fff; }
+.koma-text-link { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; color: var(--ink); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; text-decoration-color: transparent; transition: text-decoration-color .15s; }
+.koma-text-link:hover { text-decoration-color: var(--red); }
+.koma-back { margin-bottom: 22px; }
+.koma-pill { min-height: 44px; padding: 0 16px; border: 2px solid var(--ink); border-radius: 999px; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; background: var(--paper); }
+.koma-pill[aria-pressed=true] { background: var(--ink); color: var(--paper); }
+.koma-pill span { font-size: 12px; opacity: .75; }
+
+/* Busca */
+.koma-search { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border: 2px solid var(--ink); border-radius: 4px; background: var(--paper-2); color: var(--ink); }
+.koma-search input { flex: 1; min-width: 0; width: 280px; background: transparent; border: 0; outline: none; font-size: 15px; color: var(--ink); }
+.koma-search input::placeholder { color: var(--ink-3); }
+.koma-search:focus-within { box-shadow: 4px 4px 0 var(--red); }
+
+/* Quadro com borda grossa e sombra dura */
+.koma-panel { border: 3px solid var(--ink); background: var(--paper-2); box-shadow: 8px 8px 0 var(--ink); }
+.koma-box { border: 3px solid var(--ink); background: var(--paper-2); padding: 22px; }
+.koma-alert { border: 3px solid var(--ink); background: var(--red-soft); padding: 14px 18px; font-size: 15px; }
+.koma-status { font-size: 15px; min-height: 1px; }
+.koma-status:empty { display: none; }
+
+/* Carimbo vermelho */
+.koma-stamp { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border: 2px solid var(--ink); background: var(--red); color: #fff; font-size: 12px; font-weight: 700; letter-spacing: .04em; transform: rotate(-4deg); white-space: nowrap; }
+.koma-stamp.is-ink { background: var(--ink); }
+.koma-stamp.is-paper { background: var(--paper-2); color: var(--ink); }
+
+/* Barra de progresso em pincelada */
+.koma-brush { position: relative; height: 14px; border: 2px solid var(--ink); background: var(--paper-2); overflow: hidden; }
+.koma-brush > span { position: absolute; inset: 0; transform-origin: left center; background: repeating-linear-gradient(100deg, var(--ink) 0 7px, #2b2a28 7px 9px, var(--ink) 9px 15px); -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 14px), #0009 calc(100% - 7px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 14px), #0009 calc(100% - 7px), transparent); transition: transform .6s cubic-bezier(.2,.7,.2,1); }
+.koma-brush.is-red > span { background: repeating-linear-gradient(100deg, var(--red) 0 7px, #b2243b 7px 9px, var(--red) 9px 15px); }
+
+/* Continuar lendo */
+.koma-continue { display: grid; grid-template-columns: 240px minmax(0,1fr); margin-bottom: 40px; }
+.koma-continue-cover { position: relative; min-height: 300px; border-right: 3px solid var(--ink); background: var(--ink); overflow: hidden; }
+.koma-continue-cover img { object-fit: cover; }
+.koma-continue-body { padding: 28px 32px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.koma-continue-body h2 { font-family: var(--font-display); font-weight: 400; font-size: clamp(26px, 2.6vw, 38px); line-height: 1.1; overflow-wrap: anywhere; }
+.koma-continue-body p { font-size: 17px; color: var(--ink-2); }
+.koma-continue-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: auto; padding-top: 6px; }
+
+/* Grade de capas */
+.koma-shelf-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+.koma-shelf-head h2 { font-size: 22px; font-weight: 700; }
+.koma-shelf-head h2 span { font-weight: 400; color: var(--ink-3); }
+.koma-filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.koma-book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 30px 24px; }
+.koma-book { min-width: 0; display: flex; flex-direction: column; gap: 8px; animation: koma-reveal .35s both; }
+.koma-book-cover { position: relative; aspect-ratio: 3/4; border: 3px solid var(--ink); background: var(--ink); overflow: hidden; transition: box-shadow .2s, transform .2s; }
+.koma-book-cover > a { position: absolute; inset: 0; display: block; }
+.koma-book-cover img { object-fit: cover; filter: grayscale(.85) contrast(1.05); transition: filter .24s ease; }
+.koma-book-cover::after { content: ''; position: absolute; inset: 0; pointer-events: none; background-image: radial-gradient(#00000055 1.4px, transparent 1.6px); background-size: 7px 7px; transition: opacity .24s ease; }
+.koma-book:is(:hover, :focus-within) .koma-book-cover { box-shadow: 6px 6px 0 var(--ink); transform: translate(-2px,-2px); }
+.koma-book:is(:hover, :focus-within) .koma-book-cover img { filter: none; }
+.koma-book:is(:hover, :focus-within) .koma-book-cover::after { opacity: 0; }
+.koma-book-cover .koma-stamp { position: absolute; right: 10px; bottom: 12px; z-index: 2; }
+.koma-favorite { position: absolute; right: 8px; top: 8px; z-index: 2; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border: 2px solid var(--ink); border-radius: 50%; background: var(--paper-2); color: var(--ink); }
+.koma-favorite[aria-pressed=true] { background: var(--red); color: #fff; }
+.koma-favorite:disabled { opacity: .6; }
+.koma-book-kind { font-size: 12px; font-weight: 700; letter-spacing: .16em; color: var(--red-ink); margin-top: 4px; }
+.koma-book h3 { font-size: 17px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.koma-book h3 a:hover { color: var(--red-ink); }
+.koma-book-meta { font-size: 14px; color: var(--ink-3); }
+.koma-cover-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: linear-gradient(160deg, #3a1622, #8f2337 60%, #e25a46); color: #fff; font-family: var(--font-display); font-size: 40px; }
+.koma-cover-skeleton { aspect-ratio: 3/4; border: 3px solid var(--paper-3); background: var(--paper-2); animation: koma-loading 1.2s ease-in-out infinite alternate; }
+.koma-empty { border: 3px dashed var(--ink); background: var(--paper-2); padding: 48px 28px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+.koma-empty h2, .koma-empty h3 { font-family: var(--font-display); font-weight: 400; font-size: 28px; }
+.koma-empty p { max-width: 52ch; color: var(--ink-2); }
+.koma-library-footer { margin-top: 48px; padding-top: 20px; border-top: 3px solid var(--ink); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 14px; }
+
+/* Obra */
+.koma-work-hero { display: grid; grid-template-columns: 240px minmax(0,1fr) 320px; gap: 40px; align-items: start; margin-bottom: 36px; }
+.koma-work-cover { position: relative; aspect-ratio: 3/4; border: 3px solid var(--ink); box-shadow: 8px 8px 0 var(--ink); background: var(--ink); overflow: hidden; }
+.koma-work-cover img { object-fit: cover; }
+.koma-work-info { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.koma-work-info h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(32px, 3.4vw, 52px); line-height: 1.05; overflow-wrap: anywhere; }
+.koma-synopsis { font-size: 17px; line-height: 1.6; color: var(--ink-2); max-width: 68ch; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
+.koma-synopsis.is-open { -webkit-line-clamp: unset; display: block; }
+.koma-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+.koma-prep { display: flex; flex-direction: column; gap: 16px; }
+.koma-prep h2 { font-size: 14px; letter-spacing: .16em; font-weight: 700; }
+.koma-stats { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px 16px; }
+.koma-stat strong { display: block; font-family: var(--font-display); font-weight: 400; font-size: 32px; line-height: 1.1; }
+.koma-stat span { font-size: 14px; color: var(--ink-3); }
+.koma-chips { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 0; }
+.koma-chips li { border: 2px solid var(--ink); padding: 5px 10px; font-size: 13px; font-weight: 600; }
+.koma-chips li.is-main { background: var(--ink); color: var(--paper); }
+.koma-details { border: 3px solid var(--ink); background: var(--paper-2); }
+.koma-details > summary { cursor: pointer; padding: 16px 20px; font-weight: 700; font-size: 16px; list-style: none; display: flex; justify-content: space-between; gap: 12px; }
+.koma-details > summary::-webkit-details-marker { display: none; }
+.koma-details > summary::after { content: '+'; font-family: var(--font-display); font-size: 20px; line-height: 1; }
+.koma-details[open] > summary::after { content: '−'; }
+.koma-details > div { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 12px; font-size: 15px; }
+/* Subcaixa dentro de uma seção das Preferências (Avançado, Testar). */
+.koma-subdetails { border-top: 2px solid var(--line, color-mix(in srgb, var(--ink) 20%, transparent)); padding-top: 10px; }
+.koma-subdetails > summary { cursor: pointer; font-weight: 600; font-size: 14px; list-style: none; display: flex; gap: 8px; align-items: center; }
+.koma-subdetails > summary::-webkit-details-marker { display: none; }
+.koma-subdetails > summary::before { content: '+'; font-family: var(--font-display); font-size: 16px; line-height: 1; }
+.koma-subdetails[open] > summary::before { content: '−'; }
+.koma-pref-title { font-family: var(--font-display); font-weight: 400; font-size: 22px; line-height: 1.15; }
+.koma-pref-list { display: flex; flex-direction: column; gap: 12px; }
+.koma-pref-sub { font-weight: 700; font-size: 16px; }
+.koma-input { min-height: 48px; padding: 0 14px; border: 2px solid var(--ink); border-radius: 4px; background: var(--paper); color: var(--ink); font-size: 15px; min-width: 0; }
+.koma-input:focus { outline: none; box-shadow: 4px 4px 0 var(--red); }
+
+/* Capítulos como grade de quadrinhos */
+.koma-chapters-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.koma-ranges { display: flex; gap: 6px; flex-wrap: wrap; }
+.koma-ranges button { min-height: 44px; padding: 0 14px; border: 2px solid var(--ink); border-radius: 4px; font-size: 14px; font-weight: 600; background: var(--paper); font-variant-numeric: tabular-nums; }
+.koma-ranges button[aria-pressed=true] { background: var(--ink); color: var(--paper); }
+.koma-panels { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 10px; list-style: none; padding: 0; margin: 0; }
+.koma-panel-cell { height: 72px; border: 2px solid var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; text-align: center; background: var(--paper-2); color: var(--ink); position: relative; transition: transform .12s, box-shadow .12s; }
+.koma-panel-cell strong { font-family: var(--font-display); font-weight: 400; font-size: 20px; line-height: 1; font-variant-numeric: tabular-nums; }
+.koma-panel-cell small { font-size: 12px; font-weight: 700; letter-spacing: .06em; }
+a.koma-panel-cell:hover { transform: translate(-2px,-2px); box-shadow: 4px 4px 0 var(--ink); }
+.koma-panel-cell.is-read { background: var(--ink); color: var(--paper); }
+.koma-panel-cell.is-new { background: var(--red); color: #fff; }
+.koma-panel-cell.is-next { box-shadow: 4px 4px 0 var(--red); }
+.koma-panel-cell.is-partial { border-style: dashed; }
+.koma-panel-cell.is-waiting { background: repeating-linear-gradient(135deg, var(--paper) 0 6px, var(--paper-3) 6px 8px); color: var(--ink-3); }
+.koma-panel-cell.is-error { background: var(--red-soft); color: var(--red-ink); }
+/* Capítulo não escolhido ao adicionar a obra: tracejado e clicável para baixar. */
+.koma-panel-cell.is-skipped { background: var(--paper); color: var(--ink-3); border-style: dashed; cursor: pointer; font: inherit; width: 100%; }
+.koma-panel-cell.is-skipped:hover { color: var(--ink); }
+.koma-chapter-choice { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; max-height: 260px; overflow: auto; margin-top: 10px; padding: 0; list-style: none; }
+.koma-chapter-choice label { display: flex; align-items: center; gap: 6px; font-size: 14px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.koma-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; color: var(--ink-3); margin-top: 16px; }
+.koma-legend span { display: inline-flex; align-items: center; gap: 7px; }
+.koma-legend i { width: 16px; height: 16px; border: 2px solid var(--ink); display: inline-block; background: var(--paper-2); }
+.koma-legend i.is-read { background: var(--ink); }
+.koma-legend i.is-new { background: var(--red); }
+.koma-legend i.is-waiting { background: repeating-linear-gradient(135deg, var(--paper) 0 3px, var(--paper-3) 3px 5px); }
+
+/* Processamento */
+.koma-queue { display: flex; flex-direction: column; gap: 18px; }
+.koma-queue-row { display: grid; grid-template-columns: 84px minmax(0,1fr) auto; gap: 20px; align-items: center; border: 3px solid var(--ink); background: var(--paper-2); padding: 14px 18px 14px 14px; }
+.koma-queue-thumb { position: relative; aspect-ratio: 3/4; border: 2px solid var(--ink); background: var(--ink); overflow: hidden; }
+.koma-queue-thumb img { object-fit: cover; }
+.koma-queue-row h2 { font-size: 18px; font-weight: 700; line-height: 1.25; }
+.koma-queue-row p { font-size: 14px; color: var(--ink-3); }
+.koma-queue-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.koma-queue-summary { display: flex; flex-wrap: wrap; gap: 12px 48px; margin-bottom: 26px; }
+
+/* Leitor: só a moldura; as páginas ficam limpas. */
+.koma-reader-bar { position: sticky; top: 0; z-index: 30; display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); align-items: center; gap: 16px; min-height: 64px; padding: 8px 24px; background: var(--paper); color: var(--ink); border-bottom: 3px solid var(--ink); }
+.koma-reader-bar .koma-text-link { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.koma-reader-bar h1 { font-family: var(--font-display); font-weight: 400; font-size: 20px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 46vw; }
+.koma-reader-progress { position: sticky; top: 64px; z-index: 30; height: 6px; background: #3a3836; }
+.koma-reader-progress > span { position: absolute; inset: 0; background: var(--red); transform-origin: left center; transform: scaleX(0); }
+.koma-reader-body { max-width: min(900px, calc(100vw - 240px)); margin: 0 auto; padding: 24px 0 0; }
+.koma-reader-pages { background: #000; border-left: 3px solid #000; border-right: 3px solid #000; animation: koma-page-turn .52s cubic-bezier(.2,.7,.2,1); transform-origin: left center; }
+@keyframes koma-page-turn { from { transform: perspective(1600px) rotateY(-14deg); opacity: .35; } to { transform: none; opacity: 1; } }
+.koma-reader-note { margin: 0 0 14px; border: 2px solid #4a4744; padding: 12px 16px; font-size: 15px; background: #242220; }
+.koma-reader-footer { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; padding: 36px 16px 120px; }
+.is-reading :is(.koma-button, .koma-outline-button):disabled { opacity: .5; cursor: not-allowed; }
+.is-reading .koma-outline-button { color: #f3eee6; border-color: #f3eee6; background: transparent; }
+.is-reading .koma-outline-button:hover { background: #2e2c2a; }
+.is-reading .koma-button { box-shadow: 4px 4px 0 #000; border-color: #000; }
+/* Coluna de controles: vertical, à direita, fora da faixa das páginas. */
+.koma-reader-dock { position: fixed; right: 24px; top: 50%; transform: translateY(-50%); z-index: 40; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.koma-original-toggle { width: 60px; height: 60px; border-radius: 50%; border: 3px solid #f3eee6; background: var(--red); color: #fff; font-size: 12px; font-weight: 700; transform: rotate(-8deg); flex-shrink: 0; box-shadow: 3px 3px 0 #000; }
+.koma-original-toggle[aria-pressed=true] { background: var(--paper-2); color: var(--ink); border-color: var(--ink); }
+.koma-reader-chapters, .koma-scroll-dock { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; background: var(--paper); color: var(--ink); border: 3px solid var(--ink); border-radius: 4px; box-shadow: 4px 4px 0 #000; }
+.koma-reader-chapters .koma-icon-button { width: 44px; height: 44px; border: 0; }
+.koma-reader-chapters .koma-icon-button:hover { background: var(--paper-3); }
+.koma-reader-chapters .is-off { opacity: .3; }
+.koma-scroll-dock > button:not(.koma-scroll-play) { width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 4px; }
+.koma-scroll-dock > button:not(.koma-scroll-play):hover { background: var(--paper-3); }
+.koma-scroll-level { text-align: center; font-variant-numeric: tabular-nums; line-height: 1.1; padding: 2px 0; }
+.koma-scroll-level strong { font-family: var(--font-display); font-weight: 400; font-size: 22px; display: block; }
+.koma-scroll-level small { font-size: 12px; font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
+.koma-scroll-play { width: 48px; height: 48px; margin-top: 4px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--ink); color: var(--paper); }
+.koma-scroll-play[aria-pressed=true] { background: var(--red); color: #fff; }
+.koma-scroll-hint { font-size: 12px; color: #c9c2b8; text-align: center; max-width: 90px; line-height: 1.25; }
+
+/* Busca de obras */
+.koma-result-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+.koma-result { display: flex; gap: 16px; text-align: left; border: 3px solid var(--ink); background: var(--paper-2); padding: 12px; transition: transform .12s, box-shadow .12s; }
+.koma-result:hover, .koma-result:focus-visible { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 var(--ink); }
+.koma-result-thumb { position: relative; width: 96px; flex-shrink: 0; aspect-ratio: 2/3; border: 2px solid var(--ink); background: var(--paper-3); overflow: hidden; }
+.koma-result-thumb img { object-fit: cover; }
+.koma-result-title { font-size: 17px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+.koma-result-meta { font-size: 14px; color: var(--ink-3); }
+.koma-pick { display: grid; grid-template-columns: 240px minmax(0,1fr); gap: 32px; padding: 28px; }
+.koma-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.koma-tags span { border: 2px solid var(--ink); padding: 3px 8px; font-size: 13px; max-width: 100%; overflow-wrap: anywhere; }
+
+/* Tabela (fontes) */
+.koma-table-wrap { overflow-x: auto; border: 3px solid var(--ink); background: var(--paper-2); }
+.koma-table { width: 100%; border-collapse: collapse; font-size: 15px; text-align: left; }
+.koma-table th { background: var(--ink); color: var(--paper); font-size: 13px; letter-spacing: .1em; text-transform: uppercase; padding: 12px 16px; }
+.koma-table td { padding: 14px 16px; border-top: 2px solid var(--ink); vertical-align: top; }
+.koma-table td p { font-size: 14px; color: var(--ink-3); margin-top: 4px; max-width: 46ch; }
+.koma-yes { font-weight: 700; }
+.koma-no { color: var(--ink-3); }
+
+/* Sobre e preferências */
+.koma-prose { display: flex; flex-direction: column; gap: 18px; max-width: 860px; }
+.koma-prose p { font-size: 16px; line-height: 1.7; color: var(--ink-2); }
+.koma-prose h2 { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+.koma-switch { display: flex; align-items: flex-start; gap: 12px; font-size: 15px; cursor: pointer; }
+.koma-switch input { width: 22px; height: 22px; accent-color: var(--red); margin-top: 1px; flex-shrink: 0; }
+/* Utilitários de texto pequenos das telas antigas ficam legíveis no tema claro. */
+.koma-desktop:not(.is-reading) .text-xs { font-size: 13px; line-height: 1.45; }
+
+@keyframes koma-reveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes koma-loading { to { opacity: .5; } }
+
+@media (max-width: 1180px) {
+  .koma-work-hero { grid-template-columns: 200px minmax(0,1fr); }
+  .koma-work-hero > aside { grid-column: 1 / -1; }
+  .koma-content { padding: 30px 32px 56px; }
+}
+@media (max-width: 760px) {
+  .koma-rail { inset: auto 0 0 0; width: 100%; height: auto; flex-direction: row; padding: 6px 10px; border-right: 0; border-top: 3px solid var(--ink); }
+  .koma-rail :is(.koma-wordmark, .koma-rail-bottom) { display: none; }
+  .koma-rail nav { flex-direction: row; justify-content: space-around; width: 100%; margin: 0; }
+  .koma-main-column { margin-left: 0; padding-bottom: 88px; }
+  .koma-content { padding: 24px 16px 48px; }
+  .koma-continue, .koma-work-hero, .koma-pick { grid-template-columns: 1fr; }
+  .koma-continue-cover { min-height: 200px; border-right: 0; border-bottom: 3px solid var(--ink); }
+  .koma-book-grid { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 24px 14px; }
+  .koma-search input { width: 100%; }
+  .koma-queue-row { grid-template-columns: 64px minmax(0,1fr); }
+  .koma-queue-row > :last-child { grid-column: 1 / -1; }
+  .koma-reader-bar { grid-template-columns: minmax(0,1fr); }
+  .koma-reader-body { max-width: calc(100vw - 104px); }
+  .koma-reader-dock { right: 10px; }
+  .koma-reader-bar h1 { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .koma-desktop *, .koma-desktop *::before, .koma-desktop *::after { animation-duration: .12s !important; animation-iteration-count: 1 !important; transition-duration: .12s !important; scroll-behavior: auto !important; }
+  .koma-page-enter, .koma-reader-pages { animation-name: koma-fade !important; }
+}
+@keyframes koma-fade { from { opacity: 0; } to { opacity: 1; } }
+/* Editor de balões do leitor */
+.koma-balloon-spot { position: absolute; border: 2px dashed var(--red); border-radius: 10px; background: rgb(198 42 67 / .08); cursor: pointer; }
+.koma-balloon-spot:hover, .koma-balloon-spot:focus-visible, .koma-balloon-spot.is-on { background: rgb(198 42 67 / .22); border-style: solid; outline: none; }
+.koma-balloon-editor { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 40; width: min(560px, calc(100vw - 32px)); display: flex; flex-direction: column; gap: 8px; padding: 16px; background: var(--paper); border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); }
+.koma-balloon-editor textarea { width: 100%; resize: vertical; font-size: 16px; }

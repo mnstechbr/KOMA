@@ -1,0 +1,47 @@
+{
+  "status": 200,
+  "passed": true,
+  "source": [
+    "Oh, great. Another locked door.",
+    "Stay behind me. I'm not losing anyone else.",
+    "Relax, big guy. I've got this."
+  ],
+  "result": {
+    "translations": [
+      "Ótimo. Outra porta trancada.",
+      "Fique atrás de mim. Não vou perder mais ninguém.",
+      "Relaxa, grandão. Deixa comigo."
+    ],
+    "provider_lang": "kpassword",
+    "provider_model": null,
+    "source_lang": "en",
+    "target_lang": "pt-BR",
+    "steps": [
+      {
+        "stage": "adaptation",
+        "provider": "deepseek",
+        "requestedModel": "deepseek-v4-pro",
+        "actualModel": "deepseek-v4-pro",
+        "durationMs": 6960,
+        "usage": {
+          "inputTokens": 500,
+          "outputTokens": 85,
+          "totalTokens": 585
+        }
+      },
+      {
+        "stage": "review",
+        "provider": "mimo",
+        "requestedModel": "mimo-v2.6-pro",
+        "actualModel": "mimo-v2.6-pro",
+        "durationMs": 6592,
+        "usage": {
+          "inputTokens": 560,
+          "outputTokens": 76,
+          "totalTokens": 636
+        }
+      }
+    ],
+    "prompt_version": "ptbr-scene-v1"
+  }
+}
