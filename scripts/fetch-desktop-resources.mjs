@@ -19,7 +19,11 @@ function validate(data, hash, name) {
 
 for (const name of await fs.readdir(path.join(root, 'models'))) {
   let pointer
-  try { pointer = execFileSync('git', ['show', `${baseline}:models/${name}`], { cwd: root, encoding: 'utf8' }) } catch { continue }
+  try {
+    pointer = execFileSync('git', ['show', `${baseline}:models/${name}`], { cwd: root, encoding: 'utf8' })
+  } catch {
+    continue
+  }
   const hash = pointer.match(/oid sha256:([a-f0-9]{64})/)?.[1]
   const size = Number(pointer.match(/size (\d+)/)?.[1])
   if (!hash) continue
@@ -53,8 +57,16 @@ for (const [name, remote, hash] of koreanModels) {
 // Apagamento do texto original: o detector de letras marca os pixels da letra e o
 // LaMa reconstrói o desenho por baixo. Hash fixado.
 const inpaintModels = [
-  ['comic-text-detector.onnx', 'https://huggingface.co/mayocream/comic-text-detector-onnx/resolve/main/comic-text-detector.onnx', '1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f'],
-  ['lama_fp32.onnx', 'https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx', '1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6'],
+  [
+    'comic-text-detector.onnx',
+    'https://huggingface.co/mayocream/comic-text-detector-onnx/resolve/main/comic-text-detector.onnx',
+    '1a86ace74961413cbd650002e7bb4dcec4980ffa21b2f19b86933372071d718f',
+  ],
+  [
+    'lama_fp32.onnx',
+    'https://huggingface.co/Carve/LaMa-ONNX/resolve/main/lama_fp32.onnx',
+    '1faef5301d78db7dda502fe59966957ec4b79dd64e16f03ed96913c7a4eb68d6',
+  ],
 ]
 for (const [name, url, hash] of inpaintModels) {
   const target = path.join(root, 'models', name)
@@ -74,7 +86,10 @@ if (process.platform === 'linux' && process.arch === 'x64') {
   const baseUrl = `https://nodejs.org/dist/v${nodeVersion}/`
   console.log(`Verificando runtime Node ${nodeVersion}…`)
   const checks = (await download(`${baseUrl}SHASUMS256.txt`)).toString()
-  const hash = checks.split('\n').find((line) => line.endsWith(`  ${archive}`))?.split(/\s+/)[0]
+  const hash = checks
+    .split('\n')
+    .find((line) => line.endsWith(`  ${archive}`))
+    ?.split(/\s+/)[0]
   if (!hash) throw new Error('Checksum do runtime indisponível.')
   const data = await download(`${baseUrl}${archive}`)
   validate(data, hash, archive)

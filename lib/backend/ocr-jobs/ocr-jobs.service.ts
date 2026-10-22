@@ -6,7 +6,6 @@ import type { EnqueueOcrJobResult, OcrJobLookup } from './ocr-jobs.types'
 const OCR_TIMEOUT_SEC = 10
 const QUEUE_KEY = 'local:ocr-queue'
 
-
 export class OcrJobsService {
   constructor(private readonly repository: OcrJobsRepository) {}
 

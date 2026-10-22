@@ -19,11 +19,18 @@ export async function getCover(id: string) {
   validateCatalogId(id)
   const root = path.join(getDataDir(), 'covers')
   const file = path.join(root, `${id}.jpg`)
-  try { return await fs.readFile(file) } catch { /* Buscar apenas a capa da obra validada. */ }
+  try {
+    return await fs.readFile(file)
+  } catch {
+    /* Buscar apenas a capa da obra validada. */
+  }
   const work = await getCatalogWork(id)
-  const data = work.source !== 'mangadex' && work.coverSourceUrl ? await sourceBytes(work.coverSourceUrl,true) : await coverBytes(work)
+  const data = work.source !== 'mangadex' && work.coverSourceUrl ? await sourceBytes(work.coverSourceUrl, true) : await coverBytes(work)
   if (!data) return null
-  const bytes = await sharp(data.bytes, { limitInputPixels: 50000000 }).resize({ width: 320, withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer()
+  const bytes = await sharp(data.bytes, { limitInputPixels: 50000000 })
+    .resize({ width: 320, withoutEnlargement: true })
+    .jpeg({ quality: 85 })
+    .toBuffer()
   await fs.mkdir(root, { recursive: true, mode: 0o700 })
   const temporary = `${file}.${process.pid}.tmp`
   await fs.writeFile(temporary, bytes)

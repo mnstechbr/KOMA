@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     if (!job) {
       return NextResponse.json(
         { job_key: jobKey, status: 'not_found', message: 'Job não encontrado no armazenamento local.' },
-        { status: 404 }
+        { status: 404 },
       )
     }
 

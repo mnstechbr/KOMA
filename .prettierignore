@@ -1,0 +1,13 @@
+node_modules/
+desktop/node_modules/
+.next/
+artifacts/
+build/
+models/
+public/
+storage/
+paper/
+*.md
+package-lock.json
+desktop/package-lock.json
+tests/quality-pages.json

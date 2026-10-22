@@ -4,7 +4,10 @@ const path = require('node:path')
 const parentPid = Number(process.argv[2])
 const serverDir = process.argv[3]
 const child = spawn(process.execPath, [path.join(serverDir, 'server.js')], {
-  cwd: serverDir, env: process.env, stdio: 'inherit', windowsHide: true,
+  cwd: serverDir,
+  env: process.env,
+  stdio: 'inherit',
+  windowsHide: true,
 })
 let stopping = false
 let forceTimer
@@ -15,7 +18,11 @@ function stop() {
   forceTimer = setTimeout(() => child.kill('SIGKILL'), 3500)
 }
 const watcher = setInterval(() => {
-  try { process.kill(parentPid, 0) } catch { stop() }
+  try {
+    process.kill(parentPid, 0)
+  } catch {
+    stop()
+  }
 }, 1000)
 process.on('SIGTERM', stop)
 process.on('SIGINT', stop)
@@ -27,5 +34,5 @@ child.once('error', (error) => {
 child.once('exit', (code) => {
   clearInterval(watcher)
   clearTimeout(forceTimer)
-  process.exitCode = stopping ? 0 : (code || 1)
+  process.exitCode = stopping ? 0 : code || 1
 })

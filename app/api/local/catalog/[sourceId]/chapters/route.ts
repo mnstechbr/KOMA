@@ -11,5 +11,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ sour
     await ensureSources(db)
     const chapters = await catalogChapters((await params).sourceId, request.signal)
     return NextResponse.json({ chapters, total: chapters.length }, { headers: { 'Cache-Control': 'no-store' } })
-  } catch (error) { return sourceFailure(error) }
+  } catch (error) {
+    return sourceFailure(error)
+  }
 }

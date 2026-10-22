@@ -45,33 +45,73 @@ const pin = (hash) => (data) => sha256(data) === hash
 
 // Versões precisam bater com as usadas no build; senão o hash fixado está velho.
 const desktopPkg = JSON.parse(await fs.readFile(path.join(root, 'desktop/package.json'), 'utf8'))
-for (const [name, dir] of [['electron', null], ['better-sqlite3', 'node_modules/better-sqlite3'], ['sharp', 'node_modules/sharp']]) {
+for (const [name, dir] of [
+  ['electron', null],
+  ['better-sqlite3', 'node_modules/better-sqlite3'],
+  ['sharp', 'node_modules/sharp'],
+]) {
   const installed = dir ? await moduleVersion(path.join(root, dir)) : desktopPkg.devDependencies.electron
-  if (installed !== pinned[name].version) throw new Error(`${name} ${installed} instalado, mas o pacote Windows está fixado em ${pinned[name].version}. Atualize o hash em scripts/build-windows.mjs.`)
+  if (installed !== pinned[name].version)
+    throw new Error(
+      `${name} ${installed} instalado, mas o pacote Windows está fixado em ${pinned[name].version}. Atualize o hash em scripts/build-windows.mjs.`,
+    )
 }
 const standalone = path.join(root, '.next/standalone')
-await fs.access(path.join(standalone, 'server.js')).catch(() => { throw new Error('Rode npm run build antes.') })
+await fs.access(path.join(standalone, 'server.js')).catch(() => {
+  throw new Error('Rode npm run build antes.')
+})
 await fs.mkdir(cache, { recursive: true })
 
-const nodeSums = (await (await fetch(`https://nodejs.org/dist/v${nodeVersion}/SHASUMS256.txt`, { signal: AbortSignal.timeout(60000) })).text())
+const nodeSums = await (
+  await fetch(`https://nodejs.org/dist/v${nodeVersion}/SHASUMS256.txt`, { signal: AbortSignal.timeout(60000) })
+).text()
 const nodeZipName = `node-v${nodeVersion}-win-x64.zip`
-const nodeHash = nodeSums.split('\n').find((line) => line.endsWith(`  ${nodeZipName}`))?.split(/\s+/)[0]
+const nodeHash = nodeSums
+  .split('\n')
+  .find((line) => line.endsWith(`  ${nodeZipName}`))
+  ?.split(/\s+/)[0]
 if (!nodeHash) throw new Error('Checksum do Node indisponível.')
 const nodeZip = await fetchVerified(`https://nodejs.org/dist/v${nodeVersion}/${nodeZipName}`, nodeZipName, pin(nodeHash))
-const electronZip = await fetchVerified(`https://github.com/electron/electron/releases/download/v${pinned.electron.version}/electron-v${pinned.electron.version}-win32-x64.zip`, `electron-v${pinned.electron.version}-win32-x64.zip`, pin(pinned.electron.sha256))
-const sqliteTar = await fetchVerified(`https://github.com/WiseLibs/better-sqlite3/releases/download/v${pinned['better-sqlite3'].version}/better-sqlite3-v${pinned['better-sqlite3'].version}-node-v${nodeAbi}-win32-x64.tar.gz`, `better-sqlite3-v${pinned['better-sqlite3'].version}-node-v${nodeAbi}-win32-x64.tar.gz`, pin(pinned['better-sqlite3'].sha256))
-const sharpTar = await fetchVerified(`https://github.com/lovell/sharp/releases/download/v${pinned.sharp.version}/sharp-v${pinned.sharp.version}-napi-v7-win32-x64.tar.gz`, `sharp-v${pinned.sharp.version}-napi-v7-win32-x64.tar.gz`, pin(pinned.sharp.sha256))
+const electronZip = await fetchVerified(
+  `https://github.com/electron/electron/releases/download/v${pinned.electron.version}/electron-v${pinned.electron.version}-win32-x64.zip`,
+  `electron-v${pinned.electron.version}-win32-x64.zip`,
+  pin(pinned.electron.sha256),
+)
+const sqliteTar = await fetchVerified(
+  `https://github.com/WiseLibs/better-sqlite3/releases/download/v${pinned['better-sqlite3'].version}/better-sqlite3-v${pinned['better-sqlite3'].version}-node-v${nodeAbi}-win32-x64.tar.gz`,
+  `better-sqlite3-v${pinned['better-sqlite3'].version}-node-v${nodeAbi}-win32-x64.tar.gz`,
+  pin(pinned['better-sqlite3'].sha256),
+)
+const sharpTar = await fetchVerified(
+  `https://github.com/lovell/sharp/releases/download/v${pinned.sharp.version}/sharp-v${pinned.sharp.version}-napi-v7-win32-x64.tar.gz`,
+  `sharp-v${pinned.sharp.version}-napi-v7-win32-x64.tar.gz`,
+  pin(pinned.sharp.sha256),
+)
 // O libvips usa o hash SHA-512 que o próprio sharp publica no package.json.
 const sharpConfig = JSON.parse(await fs.readFile(path.join(root, 'node_modules/sharp/package.json'), 'utf8')).config
 const vipsIntegrity = sharpConfig.integrity['win32-x64']
-const vipsTar = await fetchVerified(`https://github.com/lovell/sharp-libvips/releases/download/v${sharpConfig.libvips}/libvips-${sharpConfig.libvips}-win32-x64.tar.br`, `libvips-${sharpConfig.libvips}-win32-x64.tar.br`, (data) => `sha512-${crypto.createHash('sha512').update(data).digest('base64')}` === vipsIntegrity)
-const nsisArchive = await fetchVerified(`https://github.com/electron-userland/electron-builder-binaries/releases/download/nsis-${pinned.nsis.version}/nsis-${pinned.nsis.version}.7z`, `nsis-${pinned.nsis.version}.7z`, pin(pinned.nsis.sha256))
+const vipsTar = await fetchVerified(
+  `https://github.com/lovell/sharp-libvips/releases/download/v${sharpConfig.libvips}/libvips-${sharpConfig.libvips}-win32-x64.tar.br`,
+  `libvips-${sharpConfig.libvips}-win32-x64.tar.br`,
+  (data) => `sha512-${crypto.createHash('sha512').update(data).digest('base64')}` === vipsIntegrity,
+)
+const nsisArchive = await fetchVerified(
+  `https://github.com/electron-userland/electron-builder-binaries/releases/download/nsis-${pinned.nsis.version}/nsis-${pinned.nsis.version}.7z`,
+  `nsis-${pinned.nsis.version}.7z`,
+  pin(pinned.nsis.sha256),
+)
 
 const target = path.join(root, 'artifacts', `koma-win32-x64-${version}-${Date.now()}`)
 const work = path.join(target, '.work')
 await fs.mkdir(work, { recursive: true })
-const extract = async (archive, dir) => { await fs.mkdir(dir, { recursive: true }); run('7z', ['x', '-y', `-o${dir}`, archive]) }
-const untar = async (archive, dir) => { await fs.mkdir(dir, { recursive: true }); run(tar, ['-xzf', archive, '-C', dir]) }
+const extract = async (archive, dir) => {
+  await fs.mkdir(dir, { recursive: true })
+  run('7z', ['x', '-y', `-o${dir}`, archive])
+}
+const untar = async (archive, dir) => {
+  await fs.mkdir(dir, { recursive: true })
+  run(tar, ['-xzf', archive, '-C', dir])
+}
 
 // Servidor: mesma lista explícita do pacote Linux (sem storage, .env ou código-fonte).
 const server = path.join(target, 'server')
@@ -88,12 +128,22 @@ await verifyModels(root, path.join(server, 'models'))
 
 // Módulos nativos: código JS do npm, binários win32-x64.
 const nativeDir = (name) => path.join(server, 'node_modules', name)
-const skip = { 'better-sqlite3': /^(build|deps|src)(\/|$)/, sharp: /^(build|vendor|src)(\/|$)/, 'onnxruntime-node': /^bin\/napi-v6\/(linux|darwin)(\/|$)/ }
+const skip = {
+  'better-sqlite3': /^(build|deps|src)(\/|$)/,
+  sharp: /^(build|vendor|src)(\/|$)/,
+  'onnxruntime-node': /^bin\/napi-v6\/(linux|darwin)(\/|$)/,
+}
 for (const name of Object.keys(skip)) {
   await fs.rm(nativeDir(name), { recursive: true, force: true })
   await fs.cp(path.join(root, 'node_modules', name), nativeDir(name), {
     recursive: true,
-    filter: (source) => !skip[name].test(path.relative(path.join(root, 'node_modules', name), source).split(path.sep).join('/')),
+    filter: (source) =>
+      !skip[name].test(
+        path
+          .relative(path.join(root, 'node_modules', name), source)
+          .split(path.sep)
+          .join('/'),
+      ),
   })
 }
 await fs.access(path.join(nativeDir('onnxruntime-node'), 'bin/napi-v6/win32/x64/onnxruntime_binding.node'))
@@ -128,7 +178,18 @@ await fs.rename(path.join(electron, 'electron.exe'), path.join(electron, 'KOMA.e
 await fs.rm(path.join(electron, 'resources/default_app.asar'), { force: true })
 const electronApp = path.join(electron, 'resources/app')
 await fs.mkdir(electronApp, { recursive: true })
-for (const name of ['main.cjs', 'background.cjs', 'mobile-server.cjs', 'external-links.cjs', 'paths.cjs', 'backend.cjs', 'supervisor.cjs', 'window-checks.cjs', 'package.json', 'koma.png']) {
+for (const name of [
+  'main.cjs',
+  'background.cjs',
+  'mobile-server.cjs',
+  'external-links.cjs',
+  'paths.cjs',
+  'backend.cjs',
+  'supervisor.cjs',
+  'window-checks.cjs',
+  'package.json',
+  'koma.png',
+]) {
   await fs.copyFile(path.join(root, 'desktop', name), path.join(electronApp, name))
 }
 
@@ -140,7 +201,10 @@ await fs.copyFile(path.join(nodeDir, `node-v${nodeVersion}-win-x64/LICENSE`), pa
 await fs.copyFile(path.join(root, 'LICENSE'), path.join(target, 'LICENSE'))
 await fs.copyFile(path.join(root, 'THIRD-PARTY-NOTICES'), path.join(target, 'THIRD-PARTY-NOTICES'))
 await fs.copyFile(path.join(root, 'desktop/koma.ico'), path.join(target, 'koma.ico'))
-await fs.writeFile(path.join(target, 'LEIA-ME.txt'), 'KOMA — licença AGPL-3.0-or-later (LICENSE), baseado em translate-manga-br (MIT).\r\nUso pessoal local. Licenças dos modelos em THIRD-PARTY-NOTICES.\r\nDados: %LOCALAPPDATA%\\KOMA\\library. Diagnóstico: %LOCALAPPDATA%\\KOMA\\logs.\r\n')
+await fs.writeFile(
+  path.join(target, 'LEIA-ME.txt'),
+  'KOMA — licença AGPL-3.0-or-later (LICENSE), baseado em translate-manga-br (MIT).\r\nUso pessoal local. Licenças dos modelos em THIRD-PARTY-NOTICES.\r\nDados: %LOCALAPPDATA%\\KOMA\\library. Diagnóstico: %LOCALAPPDATA%\\KOMA\\logs.\r\n',
+)
 
 // O Windows recusa estes caracteres em nomes; o NSIS falharia só na instalação.
 async function checkTree(dir) {
@@ -154,12 +218,16 @@ await checkTree(target)
 
 const nsis = path.join(cache, `nsis-${pinned.nsis.version}`)
 await fs.access(path.join(nsis, 'Include')).catch(() => extract(nsisArchive, nsis))
-const makensis = process.platform === 'win32' ? path.join(nsis, 'Bin/makensis.exe') : path.join(nsis, `${process.platform === 'darwin' ? 'mac' : 'linux'}/makensis`)
+const makensis =
+  process.platform === 'win32'
+    ? path.join(nsis, 'Bin/makensis.exe')
+    : path.join(nsis, `${process.platform === 'darwin' ? 'mac' : 'linux'}/makensis`)
 if (process.platform !== 'win32') await fs.chmod(makensis, 0o755)
 await fs.rm(work, { recursive: true, force: true })
 const output = path.join(root, 'artifacts', `KOMA-Setup-${version}.exe`)
 console.log('Gerando instalador…')
 run(makensis, ['-V2', `-DVERSION=${version}`, `-DBUNDLE=${target}`, `-DOUTFILE=${output}`, path.join(root, 'desktop/windows/koma.nsi')], {
-  env: { ...process.env, NSISDIR: nsis }, stdio: ['ignore', 'inherit', 'inherit'],
+  env: { ...process.env, NSISDIR: nsis },
+  stdio: ['ignore', 'inherit', 'inherit'],
 })
 console.log(`Instalador pronto: ${output}`)

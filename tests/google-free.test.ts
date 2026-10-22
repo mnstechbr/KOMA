@@ -12,17 +12,37 @@ const fakeGoogle = (async (_url: string, init?: RequestInit) => {
 
 describe('Google Tradutor grátis', () => {
   it('junta as linhas do balão e usa o código de idioma do Google', async () => {
-    let seen = ''; let sent = ''
-    const fetcher = (async (url: string, init?: RequestInit) => { seen = url; sent = String(init?.body); return new Response(JSON.stringify(['Olá']), { status: 200 }) }) as unknown as typeof fetch
+    let seen = ''
+    let sent = ''
+    const fetcher = (async (url: string, init?: RequestInit) => {
+      seen = url
+      sent = String(init?.body)
+      return new Response(JSON.stringify(['Olá']), { status: 200 })
+    }) as unknown as typeof fetch
     expect(await translateLineWithGoogle('WE DID\nIT!', 'en', 'pt-br', fetcher)).toBe('Olá')
     expect(new URLSearchParams(sent).getAll('q')).toEqual(['We did it!'])
     expect(new URL(seen).searchParams.get('tl')).toBe('pt')
   })
 
   it('responde no formato que a validação dos modelos aceita', async () => {
-    const body = { messages: [{ content: JSON.stringify({ contextOnly: [], lines: [{ id: 4, text: 'HELLO' }, { id: 5, text: 'BYE' }] }) }] }
+    const body = {
+      messages: [
+        {
+          content: JSON.stringify({
+            contextOnly: [],
+            lines: [
+              { id: 4, text: 'HELLO' },
+              { id: 5, text: 'BYE' },
+            ],
+          }),
+        },
+      ],
+    }
     let calls = 0
-    const counting = (async (url: string, init?: RequestInit) => { calls++; return fakeGoogle(url, init) }) as unknown as typeof fetch
+    const counting = (async (url: string, init?: RequestInit) => {
+      calls++
+      return fakeGoogle(url, init)
+    }) as unknown as typeof fetch
     const reply = readSceneReply(normalizeReply(await runGoogleFree(body, 'en', 'pt-br', counting)), [4, 5])
     expect(calls).toBe(1)
     expect(reply.lines.map((line) => line.text)).toEqual(['PT:Hello', 'PT:Bye'])
@@ -32,8 +52,14 @@ describe('Google Tradutor grátis', () => {
     const lines = Array.from({ length: 150 }, (_, id) => ({ id, text: `LINE ${id} OF A LONG CHAPTER, WITH SOME WORDS.` }))
     const body = { messages: [{ content: JSON.stringify({ contextOnly: [], lines }) }] }
     let calls = 0
-    const counting = (async (url: string, init?: RequestInit) => { calls++; return fakeGoogle(url, init) }) as unknown as typeof fetch
-    const reply = readSceneReply(normalizeReply(await runGoogleFree(body, 'en', 'pt-br', counting)), lines.map((line) => line.id))
+    const counting = (async (url: string, init?: RequestInit) => {
+      calls++
+      return fakeGoogle(url, init)
+    }) as unknown as typeof fetch
+    const reply = readSceneReply(
+      normalizeReply(await runGoogleFree(body, 'en', 'pt-br', counting)),
+      lines.map((line) => line.id),
+    )
     expect(calls).toBe(2)
     expect(reply.lines[149].text).toBe('PT:Line 149 of a long chapter, with some words.')
   })
@@ -56,9 +82,11 @@ describe('caixa do texto enviado ao Google', () => {
 describe('limites do serviço do Google', () => {
   it('tenta de novo depois de um erro 500', async () => {
     let calls = 0
-    const flaky = (async () => { calls++; return calls === 1 ? new Response('', { status: 500 }) : new Response(JSON.stringify(['Oi']), { status: 200 }) }) as unknown as typeof fetch
+    const flaky = (async () => {
+      calls++
+      return calls === 1 ? new Response('', { status: 500 }) : new Response(JSON.stringify(['Oi']), { status: 200 })
+    }) as unknown as typeof fetch
     expect(await translateLineWithGoogle('Hi', 'en', 'pt-br', flaky, [0, 0])).toBe('Oi')
     expect(calls).toBe(2)
   })
 })
-

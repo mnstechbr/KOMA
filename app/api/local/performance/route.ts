@@ -15,9 +15,14 @@ export async function GET() {
 export async function PUT(request: Request) {
   const auth = await requireAdmin()
   if ('response' in auth) return auth.response
-  if (process.env.KOMA_DESKTOP !== '1' || !isTrustedOrigin(request)) return NextResponse.json({ message: 'Ação não autorizada.' }, { status: 403 })
-  const { mode } = await request.json().catch(() => ({})) as { mode?: unknown }
-  try { savePerformanceMode(db, mode) } catch { return NextResponse.json({ message: 'Perfil de desempenho inválido.' }, { status: 400 }) }
+  if (process.env.KOMA_DESKTOP !== '1' || !isTrustedOrigin(request))
+    return NextResponse.json({ message: 'Ação não autorizada.' }, { status: 403 })
+  const { mode } = (await request.json().catch(() => ({}))) as { mode?: unknown }
+  try {
+    savePerformanceMode(db, mode)
+  } catch {
+    return NextResponse.json({ message: 'Perfil de desempenho inválido.' }, { status: 400 })
+  }
   await detectGpu(probeGpu)
   return NextResponse.json(currentPerformance(db))
 }

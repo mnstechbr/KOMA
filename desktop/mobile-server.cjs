@@ -5,25 +5,57 @@ const crypto = require('node:crypto')
 // código de 6 dígitos) vê a biblioteca e o leitor em modo só leitura; todo o resto
 // do serviço local (Preferências, chaves, fila) fica fora de alcance.
 const ALLOWED = [
-  ['GET', /^\/movel(\/[\w-]+)*$/], ['GET', /^\/_next\/static\//], ['GET', /^\/fonts\//], ['GET', /^\/[\w.-]+\.(png|svg|ico|webmanifest)$/],
-  ['GET', /^\/api\/local\/works$/], ['GET', /^\/api\/local\/works\/\d+$/], ['GET', /^\/api\/local\/works\/\d+\/chapters\/\d+$/],
+  ['GET', /^\/movel(\/[\w-]+)*$/],
+  ['GET', /^\/_next\/static\//],
+  ['GET', /^\/fonts\//],
+  ['GET', /^\/[\w.-]+\.(png|svg|ico|webmanifest)$/],
+  ['GET', /^\/api\/local\/works$/],
+  ['GET', /^\/api\/local\/works\/\d+$/],
+  ['GET', /^\/api\/local\/works\/\d+\/chapters\/\d+$/],
   // Marcar como lido é o único pedido que muda alguma coisa.
   ['POST', /^\/api\/local\/works\/\d+\/chapters\/\d+$/],
-  ['GET', /^\/api\/sections\/\d+\/images\/\d+\/(original|translated)\/view$/], ['GET', /^\/api\/local\/catalog\/[\w:-]+\/cover$/],
+  ['GET', /^\/api\/sections\/\d+\/images\/\d+\/(original|translated)\/view$/],
+  ['GET', /^\/api\/local\/catalog\/[\w:-]+\/cover$/],
 ]
 const SESSION_DAYS = 30
 const TEXT = {
-  'pt-BR': { title: 'KOMA no celular', hint: 'Digite o código de 6 dígitos que aparece em Preferências → Ler no celular, no computador.', enter: 'Entrar', wrong: 'Código errado.', locked: 'Muitas tentativas. Espere alguns minutos.' },
-  en: { title: 'KOMA on your phone', hint: 'Enter the 6-digit code shown in Settings → Read on your phone, on the computer.', enter: 'Enter', wrong: 'Wrong code.', locked: 'Too many attempts. Wait a few minutes.' },
-  es: { title: 'KOMA en el móvil', hint: 'Escribe el código de 6 dígitos que aparece en Preferencias → Leer en el móvil, en el ordenador.', enter: 'Entrar', wrong: 'Código incorrecto.', locked: 'Demasiados intentos. Espera unos minutos.' },
+  'pt-BR': {
+    title: 'KOMA no celular',
+    hint: 'Digite o código de 6 dígitos que aparece em Preferências → Ler no celular, no computador.',
+    enter: 'Entrar',
+    wrong: 'Código errado.',
+    locked: 'Muitas tentativas. Espere alguns minutos.',
+  },
+  en: {
+    title: 'KOMA on your phone',
+    hint: 'Enter the 6-digit code shown in Settings → Read on your phone, on the computer.',
+    enter: 'Enter',
+    wrong: 'Wrong code.',
+    locked: 'Too many attempts. Wait a few minutes.',
+  },
+  es: {
+    title: 'KOMA en el móvil',
+    hint: 'Escribe el código de 6 dígitos que aparece en Preferencias → Leer en el móvil, en el ordenador.',
+    enter: 'Entrar',
+    wrong: 'Código incorrecto.',
+    locked: 'Demasiados intentos. Espera unos minutos.',
+  },
 }
 
 /** Só a própria máquina e a rede local (faixas privadas) podem falar com o servidor. */
 function privateAddress(address) {
   const value = String(address || '').replace(/^::ffff:/, '')
-  return value === '127.0.0.1' || value === '::1' || /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(value) || /^f[cd][0-9a-f]{2}:/i.test(value) || /^fe80:/i.test(value)
+  return (
+    value === '127.0.0.1' ||
+    value === '::1' ||
+    /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(value) ||
+    /^f[cd][0-9a-f]{2}:/i.test(value) ||
+    /^fe80:/i.test(value)
+  )
 }
-function allowed(method, pathname) { return ALLOWED.some(([verb, pattern]) => verb === method && pattern.test(pathname)) }
+function allowed(method, pathname) {
+  return ALLOWED.some(([verb, pattern]) => verb === method && pattern.test(pathname))
+}
 
 function loginPage(language, message) {
   const text = TEXT[language] || TEXT['pt-BR']
@@ -48,30 +80,59 @@ function startMobileServer({ port, token, code, backendUrl, sessionToken, langua
     return Boolean(expires && expires > Date.now())
   }
   const send = (response, status, body, type = 'text/html; charset=utf-8') => {
-    response.writeHead(status, { 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer' })
+    response.writeHead(status, {
+      'Content-Type': type,
+      'Cache-Control': 'no-store',
+      'X-Frame-Options': 'DENY',
+      'Referrer-Policy': 'no-referrer',
+    })
     response.end(body)
   }
   const server = http.createServer((request, response) => {
-    if (!privateAddress(request.socket.remoteAddress)) { request.socket.destroy(); return }
+    if (!privateAddress(request.socket.remoteAddress)) {
+      request.socket.destroy()
+      return
+    }
     let url
-    try { url = new URL(request.url || '/', 'http://celular.local') } catch { send(response, 400, 'Bad request'); return }
+    try {
+      url = new URL(request.url || '/', 'http://celular.local')
+    } catch {
+      send(response, 400, 'Bad request')
+      return
+    }
     const ip = String(request.socket.remoteAddress)
     // QR code: o link traz o token comprido; o código de 6 dígitos é para digitar.
     if (request.method === 'GET' && url.pathname === '/' && url.searchParams.get('k')) {
       const given = Buffer.from(url.searchParams.get('k') || '')
       const expected = Buffer.from(token)
-      if (given.length === expected.length && crypto.timingSafeEqual(given, expected)) { newSession(response); response.writeHead(302, { Location: '/movel' }); response.end(); return }
-      send(response, 403, loginPage(language, (TEXT[language] || TEXT['pt-BR']).wrong)); return
+      if (given.length === expected.length && crypto.timingSafeEqual(given, expected)) {
+        newSession(response)
+        response.writeHead(302, { Location: '/movel' })
+        response.end()
+        return
+      }
+      send(response, 403, loginPage(language, (TEXT[language] || TEXT['pt-BR']).wrong))
+      return
     }
     if (request.method === 'POST' && url.pathname === '/entrar') {
       const state = failures.get(ip) || { count: 0, until: 0 }
-      if (state.until > Date.now()) { send(response, 429, loginPage(language, (TEXT[language] || TEXT['pt-BR']).locked)); return }
+      if (state.until > Date.now()) {
+        send(response, 429, loginPage(language, (TEXT[language] || TEXT['pt-BR']).locked))
+        return
+      }
       let body = ''
-      request.on('data', (chunk) => { body += chunk; if (body.length > 200) request.destroy() })
+      request.on('data', (chunk) => {
+        body += chunk
+        if (body.length > 200) request.destroy()
+      })
       request.on('end', () => {
         const typed = new URLSearchParams(body).get('code') || ''
         if (/^\d{6}$/.test(typed) && crypto.timingSafeEqual(Buffer.from(typed), Buffer.from(code))) {
-          failures.delete(ip); newSession(response); response.writeHead(302, { Location: '/movel' }); response.end(); return
+          failures.delete(ip)
+          newSession(response)
+          response.writeHead(302, { Location: '/movel' })
+          response.end()
+          return
         }
         const count = state.count + 1
         failures.set(ip, { count: count >= 5 ? 0 : count, until: count >= 5 ? Date.now() + 10 * 60000 : 0 })
@@ -79,25 +140,52 @@ function startMobileServer({ port, token, code, backendUrl, sessionToken, langua
       })
       return
     }
-    if (!sessionOf(request)) { send(response, 401, loginPage(language)); return }
-    if (url.pathname === '/') { response.writeHead(302, { Location: '/movel' }); response.end(); return }
-    if (!allowed(request.method, url.pathname)) { send(response, 404, 'Not found', 'text/plain; charset=utf-8'); return }
+    if (!sessionOf(request)) {
+      send(response, 401, loginPage(language))
+      return
+    }
+    if (url.pathname === '/') {
+      response.writeHead(302, { Location: '/movel' })
+      response.end()
+      return
+    }
+    if (!allowed(request.method, url.pathname)) {
+      send(response, 404, 'Not found', 'text/plain; charset=utf-8')
+      return
+    }
     // Repassa ao serviço local como se fosse a janela do app (mesma origem e sessão).
     const headers = { ...request.headers, host: backend.host, cookie: `koma-session=${sessionToken}; koma-lang=${language}` }
-    delete headers.origin; delete headers.referer; delete headers['sec-fetch-site']
+    delete headers.origin
+    delete headers.referer
+    delete headers['sec-fetch-site']
     if (request.method === 'POST') headers.origin = backend.origin
-    const forward = http.request({ hostname: backend.hostname, port: backend.port, path: url.pathname + url.search, method: request.method, headers }, (upstream) => {
-      const outgoing = { ...upstream.headers }
-      delete outgoing['set-cookie']
-      response.writeHead(upstream.statusCode || 502, outgoing)
-      upstream.pipe(response)
+    const forward = http.request(
+      { hostname: backend.hostname, port: backend.port, path: url.pathname + url.search, method: request.method, headers },
+      (upstream) => {
+        const outgoing = { ...upstream.headers }
+        delete outgoing['set-cookie']
+        response.writeHead(upstream.statusCode || 502, outgoing)
+        upstream.pipe(response)
+      },
+    )
+    forward.on('error', () => {
+      if (!response.headersSent) send(response, 502, 'KOMA', 'text/plain; charset=utf-8')
+      else response.destroy()
     })
-    forward.on('error', () => { if (!response.headersSent) send(response, 502, 'KOMA', 'text/plain; charset=utf-8'); else response.destroy() })
     request.pipe(forward)
   })
   return new Promise((resolve, reject) => {
     server.once('error', reject)
-    server.listen(port, '0.0.0.0', () => resolve({ port: server.address().port, stop: () => new Promise((done) => { server.close(() => done()); server.closeAllConnections?.() }) }))
+    server.listen(port, '0.0.0.0', () =>
+      resolve({
+        port: server.address().port,
+        stop: () =>
+          new Promise((done) => {
+            server.close(() => done())
+            server.closeAllConnections?.()
+          }),
+      }),
+    )
   })
 }
 

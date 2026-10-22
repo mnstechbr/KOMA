@@ -6,9 +6,10 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: { default: 'KOMA | Biblioteca pessoal e tradução de mangás', template: '%s | KOMA' },
-  description: 'KOMA, projeto de Jean Vitor: biblioteca pessoal de mangás, manhwas e manhuas, com coleta de capítulos e preparação da leitura em português brasileiro.',
+  description:
+    'KOMA, projeto de Jean Vitor: biblioteca pessoal de mangás, manhwas e manhuas, com coleta de capítulos e preparação da leitura em português brasileiro.',
   applicationName: 'KOMA',
-  authors: [{name:'Jean Vitor',url:'https://www.linkedin.com/in/jean-vitor-16a19642a/'}],
+  authors: [{ name: 'Jean Vitor', url: 'https://www.linkedin.com/in/jean-vitor-16a19642a/' }],
   creator: 'Jean Vitor',
 }
 

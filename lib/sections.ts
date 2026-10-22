@@ -135,26 +135,9 @@ const QUEUE_OR_PROCESSING_STATUSES = new Set([
   'traduzindo',
 ])
 
-const COMPLETED_SECTION_STATUSES = new Set([
-  'completed',
-  'done',
-  'finished',
-  'success',
-  'sucesso',
-  'concluido',
-  'concluida',
-  'all_done',
-])
+const COMPLETED_SECTION_STATUSES = new Set(['completed', 'done', 'finished', 'success', 'sucesso', 'concluido', 'concluida', 'all_done'])
 
-const TRANSLATED_IMAGE_STATUSES = new Set([
-  'translated',
-  'done',
-  'completed',
-  'success',
-  'sucesso',
-  'concluido',
-  'concluida',
-])
+const TRANSLATED_IMAGE_STATUSES = new Set(['translated', 'done', 'completed', 'success', 'sucesso', 'concluido', 'concluida'])
 
 export function normalizeStatus(value: string | null | undefined) {
   return String(value ?? '')
@@ -251,8 +234,8 @@ export function getSectionPriorityInfo(priority: number | null | undefined): Sec
 
 export function toErrorMessage(payload: unknown, fallback: string) {
   if (payload && typeof payload === 'object') {
-    const maybeMessage = (payload as { message?: string; error?: string }).message
-      || (payload as { message?: string; error?: string }).error
+    const maybeMessage =
+      (payload as { message?: string; error?: string }).message || (payload as { message?: string; error?: string }).error
     if (maybeMessage) return maybeMessage
   }
   return fallback
@@ -269,21 +252,17 @@ export function buildImageViewUrl(sectionId: number, imageId: number, kind: 'ori
 
 export function getSectionQueueState(
   section: Pick<SectionListItem, 'id' | 'status' | 'internal_status' | 'queued_images_count' | 'processing_images_count'>,
-  detail: Pick<SectionDetail, 'id' | 'images'> | null
+  detail: Pick<SectionDetail, 'id' | 'images'> | null,
 ): QueueState {
   const normalizedStatus = normalizeStatus(section.status)
   const normalizedInternalStatus = normalizeStatus(section.internal_status)
   const statuses = [normalizedStatus, normalizedInternalStatus]
 
-  const hasQueuedOrProcessingCounters =
-    section.queued_images_count > 0 || section.processing_images_count > 0
-  const inQueueOrProcessing =
-    hasQueuedOrProcessingCounters || statuses.some((status) => QUEUE_OR_PROCESSING_STATUSES.has(status))
+  const hasQueuedOrProcessingCounters = section.queued_images_count > 0 || section.processing_images_count > 0
+  const inQueueOrProcessing = hasQueuedOrProcessingCounters || statuses.some((status) => QUEUE_OR_PROCESSING_STATUSES.has(status))
   const completedByStatus = statuses.some((status) => COMPLETED_SECTION_STATUSES.has(status))
   const completedByImages =
-    detail?.id === section.id
-    && detail.images.length > 0
-    && detail.images.every((image) => isImageTranslated(image))
+    detail?.id === section.id && detail.images.length > 0 && detail.images.every((image) => isImageTranslated(image))
 
   return {
     canQueue: !(inQueueOrProcessing || completedByStatus || completedByImages),

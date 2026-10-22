@@ -12,12 +12,13 @@ const TOOLTIP_H_EST = 196
 const TOOLTIP_MOBILE_H = 200
 const GAP = 14
 const MOBILE_BP = 640
-const TRANSITION = 'x 0.35s cubic-bezier(0.4,0,0.2,1), y 0.35s cubic-bezier(0.4,0,0.2,1), width 0.35s cubic-bezier(0.4,0,0.2,1), height 0.35s cubic-bezier(0.4,0,0.2,1), rx 0.35s'
+const TRANSITION =
+  'x 0.35s cubic-bezier(0.4,0,0.2,1), y 0.35s cubic-bezier(0.4,0,0.2,1), width 0.35s cubic-bezier(0.4,0,0.2,1), height 0.35s cubic-bezier(0.4,0,0.2,1), rx 0.35s'
 
 export interface TourStep {
   title: string
   description: string
-  
+
   selector?: string
   tooltipSide?: 'top' | 'bottom' | 'left' | 'right' | 'auto'
 }
@@ -63,10 +64,7 @@ function computeRect(el: Element): Rect {
   }
 }
 
-function resolveDesktopSide(
-  rect: Rect,
-  preferred: TourStep['tooltipSide'],
-): 'top' | 'bottom' | 'left' | 'right' {
+function resolveDesktopSide(rect: Rect, preferred: TourStep['tooltipSide']): 'top' | 'bottom' | 'left' | 'right' {
   const vh = window.innerHeight
   const canBelow = rect.top + rect.height + GAP + TOOLTIP_H_EST < vh
   const canAbove = rect.top - GAP - TOOLTIP_H_EST > 0
@@ -74,11 +72,7 @@ function resolveDesktopSide(
   return canBelow ? 'bottom' : canAbove ? 'top' : 'bottom'
 }
 
-
-function getDesktopTooltipStyle(
-  rect: Rect | null,
-  side: TourStep['tooltipSide'],
-): React.CSSProperties {
+function getDesktopTooltipStyle(rect: Rect | null, side: TourStep['tooltipSide']): React.CSSProperties {
   if (!rect) {
     return {
       position: 'fixed',
@@ -116,7 +110,6 @@ function getDesktopTooltipStyle(
   return { position: 'fixed', top, left, width: TOOLTIP_W }
 }
 
-
 function getArrowStyle(
   rect: Rect,
   side: TourStep['tooltipSide'],
@@ -126,30 +119,17 @@ function getArrowStyle(
   const ARROW = 8
 
   if (resolved === 'bottom') {
-    const arrowLeft = clamp(
-      rect.left + rect.width / 2 - tooltipLeft - ARROW,
-      ARROW,
-      TOOLTIP_W - ARROW * 3,
-    )
+    const arrowLeft = clamp(rect.left + rect.width / 2 - tooltipLeft - ARROW, ARROW, TOOLTIP_W - ARROW * 3)
     return { style: { top: -(ARROW * 2 - 1), left: arrowLeft }, side: 'bottom' }
   }
   if (resolved === 'top') {
-    const arrowLeft = clamp(
-      rect.left + rect.width / 2 - tooltipLeft - ARROW,
-      ARROW,
-      TOOLTIP_W - ARROW * 3,
-    )
+    const arrowLeft = clamp(rect.left + rect.width / 2 - tooltipLeft - ARROW, ARROW, TOOLTIP_W - ARROW * 3)
     return { style: { bottom: -(ARROW * 2 - 1), left: arrowLeft }, side: 'top' }
   }
   return null
 }
 
-export function SpotlightTour({
-  steps,
-  storageKey,
-  open,
-  onClose,
-}: SpotlightTourProps) {
+export function SpotlightTour({ steps, storageKey, open, onClose }: SpotlightTourProps) {
   const [step, setStep] = useState(0)
   const [rect, setRect] = useState<Rect | null>(null)
   const [mounted, setMounted] = useState(false)
@@ -160,10 +140,15 @@ export function SpotlightTour({
   stepRef.current = step
   stepsRef.current = steps
 
-  useEffect(() => { setMounted(true) }, [])
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
-    if (open) { setStep(0); setTooltipKey(k => k + 1) }
+    if (open) {
+      setStep(0)
+      setTooltipKey((k) => k + 1)
+    }
   }, [open])
 
   const captureRect = useCallback((selector: string) => {
@@ -175,10 +160,16 @@ export function SpotlightTour({
   useEffect(() => {
     if (!open) return
     const selector = steps[step]?.selector
-    if (!selector) { setRect(null); return }
+    if (!selector) {
+      setRect(null)
+      return
+    }
 
     const el = document.querySelector(`[data-tour="${selector}"]`)
-    if (!el) { setRect(null); return }
+    if (!el) {
+      setRect(null)
+      return
+    }
 
     if (isMobileViewport()) {
       const r = el.getBoundingClientRect()
@@ -220,14 +211,14 @@ export function SpotlightTour({
       setStep(0)
       onClose()
     } else {
-      setStep(s => s + 1)
-      setTooltipKey(k => k + 1)
+      setStep((s) => s + 1)
+      setTooltipKey((k) => k + 1)
     }
   }, [storageKey, onClose])
 
   const handlePrev = useCallback(() => {
-    setStep(s => Math.max(0, s - 1))
-    setTooltipKey(k => k + 1)
+    setStep((s) => Math.max(0, s - 1))
+    setTooltipKey((k) => k + 1)
   }, [])
 
   const handleSkip = useCallback(() => {
@@ -239,9 +230,18 @@ export function SpotlightTour({
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { e.preventDefault(); handleSkip() }
-      if (e.key === 'ArrowRight') { e.preventDefault(); handleNext() }
-      if (e.key === 'ArrowLeft') { e.preventDefault(); handlePrev() }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        handleSkip()
+      }
+      if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        handleNext()
+      }
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        handlePrev()
+      }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
@@ -261,28 +261,25 @@ export function SpotlightTour({
   const tooltipContent = (
     <div className="rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
       <div className="h-0.75 w-full bg-muted">
-        <div
-          className="h-full bg-primary transition-all duration-500"
-          style={{ width: `${progressPct}%` }}
-        />
+        <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progressPct}%` }} />
       </div>
 
       <div className="p-4 flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start gap-2.5 min-w-0">
-            <div className={cn(
-              'shrink-0 mt-0.5 flex items-center justify-center rounded-full text-[10px] font-bold w-5 h-5',
-              rect ? 'bg-primary text-primary-foreground' : 'bg-primary/20 text-primary',
-            )}>
+            <div
+              className={cn(
+                'shrink-0 mt-0.5 flex items-center justify-center rounded-full text-[10px] font-bold w-5 h-5',
+                rect ? 'bg-primary text-primary-foreground' : 'bg-primary/20 text-primary',
+              )}
+            >
               {rect ? step + 1 : <Sparkles className="h-3 w-3" />}
             </div>
             <div className="min-w-0">
               <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
                 Passo {step + 1} de {steps.length}
               </div>
-              <h3 className="text-sm font-semibold text-foreground leading-snug">
-                {currentStep.title}
-              </h3>
+              <h3 className="text-sm font-semibold text-foreground leading-snug">{currentStep.title}</h3>
             </div>
           </div>
           <button
@@ -294,17 +291,13 @@ export function SpotlightTour({
           </button>
         </div>
 
-        <p className="text-xs text-muted-foreground leading-relaxed pl-7">
-          {currentStep.description}
-        </p>
+        <p className="text-xs text-muted-foreground leading-relaxed pl-7">{currentStep.description}</p>
 
         {!mobile && (
           <div className="pl-7 flex items-center gap-1.5 flex-wrap">
             {(['←', '→', 'Esc'] as const).map((key, i) => (
               <span key={key} className="flex items-center gap-1 text-[10px] text-muted-foreground/55">
-                <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[9px]">
-                  {key}
-                </kbd>
+                <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[9px]">{key}</kbd>
                 <span>{['anterior', 'próximo', 'fechar'][i]}</span>
                 {i < 2 && <span className="mx-0.5 opacity-40">·</span>}
               </span>
@@ -317,7 +310,10 @@ export function SpotlightTour({
             {steps.map((_, i) => (
               <button
                 key={i}
-                onClick={() => { setStep(i); setTooltipKey(k => k + 1) }}
+                onClick={() => {
+                  setStep(i)
+                  setTooltipKey((k) => k + 1)
+                }}
                 className={cn(
                   'h-1.5 rounded-full transition-all duration-300',
                   i === step ? 'w-5 bg-primary' : 'w-1.5 bg-muted-foreground/25 hover:bg-muted-foreground/50',
@@ -329,21 +325,11 @@ export function SpotlightTour({
 
           <div className="flex items-center gap-1.5 shrink-0">
             {!isFirst && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePrev}
-                className="h-8 w-8 p-0"
-                title="Anterior"
-              >
+              <Button variant="outline" size="sm" onClick={handlePrev} className="h-8 w-8 p-0" title="Anterior">
                 <ChevronLeft className="h-4 w-4" />
               </Button>
             )}
-            <Button
-              size="sm"
-              onClick={handleNext}
-              className="h-8 px-3.5 text-xs gap-1.5"
-            >
+            <Button size="sm" onClick={handleNext} className="h-8 px-3.5 text-xs gap-1.5">
               {isLast ? (
                 <>
                   <CheckCircle className="h-3.5 w-3.5" />
@@ -403,13 +389,13 @@ export function SpotlightTour({
             border: '2px solid var(--primary)',
             zIndex: 9999,
             pointerEvents: 'none',
-            transition: 'top 0.35s cubic-bezier(0.4,0,0.2,1), left 0.35s cubic-bezier(0.4,0,0.2,1), width 0.35s cubic-bezier(0.4,0,0.2,1), height 0.35s cubic-bezier(0.4,0,0.2,1)',
+            transition:
+              'top 0.35s cubic-bezier(0.4,0,0.2,1), left 0.35s cubic-bezier(0.4,0,0.2,1), width 0.35s cubic-bezier(0.4,0,0.2,1), height 0.35s cubic-bezier(0.4,0,0.2,1)',
           }}
         />
       )}
 
       {mobile ? (
-        
         <div
           key={tooltipKey}
           className="tour-tooltip-in"
@@ -421,34 +407,31 @@ export function SpotlightTour({
             zIndex: 10000,
             padding: '0 0 env(safe-area-inset-bottom, 0)',
           }}
-          onClick={e => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
         >
           <div className="rounded-t-2xl border-t border-x border-border bg-card shadow-2xl overflow-hidden">
             <div className="flex justify-center pt-2.5 pb-1">
               <div className="w-10 h-1 rounded-full bg-muted-foreground/20" />
             </div>
             <div className="h-0.75 w-full bg-muted">
-              <div
-                className="h-full bg-primary transition-all duration-500"
-                style={{ width: `${progressPct}%` }}
-              />
+              <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progressPct}%` }} />
             </div>
             <div className="p-4 flex flex-col gap-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                  <div className={cn(
-                    'shrink-0 mt-0.5 flex items-center justify-center rounded-full text-[10px] font-bold w-5 h-5',
-                    rect ? 'bg-primary text-primary-foreground' : 'bg-primary/20 text-primary',
-                  )}>
+                  <div
+                    className={cn(
+                      'shrink-0 mt-0.5 flex items-center justify-center rounded-full text-[10px] font-bold w-5 h-5',
+                      rect ? 'bg-primary text-primary-foreground' : 'bg-primary/20 text-primary',
+                    )}
+                  >
                     {rect ? step + 1 : <Sparkles className="h-3 w-3" />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-0.5">
                       Passo {step + 1} de {steps.length}
                     </div>
-                    <h3 className="text-sm font-semibold text-foreground leading-snug">
-                      {currentStep.title}
-                    </h3>
+                    <h3 className="text-sm font-semibold text-foreground leading-snug">{currentStep.title}</h3>
                   </div>
                 </div>
                 <button
@@ -459,16 +442,17 @@ export function SpotlightTour({
                 </button>
               </div>
 
-              <p className="text-sm text-muted-foreground leading-relaxed pl-7">
-                {currentStep.description}
-              </p>
+              <p className="text-sm text-muted-foreground leading-relaxed pl-7">{currentStep.description}</p>
 
               <div className="flex items-center justify-between gap-3 pt-1">
                 <div className="flex items-center gap-2 pl-7">
                   {steps.map((_, i) => (
                     <button
                       key={i}
-                      onClick={() => { setStep(i); setTooltipKey(k => k + 1) }}
+                      onClick={() => {
+                        setStep(i)
+                        setTooltipKey((k) => k + 1)
+                      }}
                       className={cn(
                         'h-1.5 rounded-full transition-all duration-300',
                         i === step ? 'w-6 bg-primary' : 'w-1.5 bg-muted-foreground/25',
@@ -502,13 +486,7 @@ export function SpotlightTour({
           </div>
         </div>
       ) : (
-        
-        <div
-          key={tooltipKey}
-          className="tour-tooltip-in"
-          style={{ ...desktopStyle, zIndex: 10000 }}
-          onClick={e => e.stopPropagation()}
-        >
+        <div key={tooltipKey} className="tour-tooltip-in" style={{ ...desktopStyle, zIndex: 10000 }} onClick={(e) => e.stopPropagation()}>
           {desktopArrow && (
             <div
               style={{

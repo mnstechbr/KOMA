@@ -13,9 +13,12 @@ export type { AggregatorConnector, PageRef } from './aggregator-kit'
 // Publicação oficial em inglês. Só episódios gratuitos aparecem na lista
 // pública; episódios pagos não são obtidos.
 const webtoons: AggregatorConnector = {
-  id: 'webtoons', name: 'WEBTOON (oficial)', official: true,
+  id: 'webtoons',
+  name: 'WEBTOON (oficial)',
+  official: true,
   work: (url) => /^https:\/\/www\.webtoons\.com\/en\/(?!canvas\/)[a-z0-9-]+\/[a-z0-9-]+\/list\?title_no=\d+$/.test(url),
-  owns: (chapterId) => /^https:\/\/www\.webtoons\.com\/en\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+\/viewer\?title_no=\d+&episode_no=\d+$/.test(chapterId),
+  owns: (chapterId) =>
+    /^https:\/\/www\.webtoons\.com\/en\/[a-z0-9-]+\/[a-z0-9-]+\/[a-z0-9-]+\/viewer\?title_no=\d+&episode_no=\d+$/.test(chapterId),
   async search(query, signal) {
     const doc = await html(`https://www.webtoons.com/en/search?keyword=${encodeURIComponent(query)}`, signal)
     const results = new Map<string, string>()
@@ -30,25 +33,28 @@ const webtoons: AggregatorConnector = {
     const items = new Map<string, SourceChapter>()
     for (let page = 1; page <= 200; page++) {
       const doc = await html(`${url}&page=${page}`, signal)
-      let added = 0; let fresh = 0
+      let added = 0
+      let fresh = 0
       for (const item of DomUtils.findAll((node) => node.name === 'li' && hasClass(node, '_episodeItem'), doc.children)) {
         const anchor = DomUtils.findOne((node) => node.name === 'a' && this.owns(node.attribs.href || ''), item.children)
         if (!anchor || items.has(anchor.attribs.href)) continue
         const title = text(DomUtils.findOne((node) => hasClass(node, 'subj'), item.children))
         // Numerar pelo título ("Episode 12"); sem número explícito, não mesclar com outras fontes.
-        items.set(anchor.attribs.href, chapter(anchor.attribs.href, chapterNumber(title), title)); added++
+        items.set(anchor.attribs.href, chapter(anchor.attribs.href, chapterNumber(title), title))
+        added++
         if (!known?.has(anchor.attribs.href)) fresh++
       }
       // A lista vem do mais novo ao mais antigo: página sem episódio novo encerra a procura.
-      if (!added || known?.size && !fresh) break
+      if (!added || (known?.size && !fresh)) break
     }
     return ordered([...items.values()], 'WEBTOON')
   },
   async pages(chapterId, signal) {
     if (!this.owns(chapterId)) throw new SourceError('Capítulo inválido para WEBTOON.')
     const doc = await html(chapterId, signal)
-    const urls = DomUtils.findAll((node) => node.name === 'img' && hasClass(node, '_images'), doc.children)
-      .map((node) => allowedImage(node.attribs['data-url'] || '', chapterId, /^webtoon-phinf\.pstatic\.net$/, 'WEBTOON'))
+    const urls = DomUtils.findAll((node) => node.name === 'img' && hasClass(node, '_images'), doc.children).map((node) =>
+      allowedImage(node.attribs['data-url'] || '', chapterId, /^webtoon-phinf\.pstatic\.net$/, 'WEBTOON'),
+    )
     return pageList(urls, 'WEBTOON')
   },
 }
@@ -87,15 +93,35 @@ export function versionRank(version: { sourceId: string; language: string }, tar
   if (aggregators[0].owns(version.sourceId)) return 20
   return (language === 'en' ? 30 : 60) + sourceRank(version.sourceId)
 }
-export function aggregatorFor(chapterId: string) { return aggregators.find((connector) => connector.owns(chapterId)) }
+export function aggregatorFor(chapterId: string) {
+  return aggregators.find((connector) => connector.owns(chapterId))
+}
 
 /** Títulos conhecidos da obra para pesquisa, do mais ao menos provável. */
-export function searchTitles(metadata: { title?: string; originalTitle?: string; aliases?: Array<{ language: string; title: string }>; description?: string }) {
+export function searchTitles(metadata: {
+  title?: string
+  originalTitle?: string
+  aliases?: Array<{ language: string; title: string }>
+  description?: string
+}) {
   const preferred = ['en', 'ja-ro', 'ko-ro', 'zh-ro', 'und']
   // Nomes que o site só mostra na frase de SEO da descrição também valem para a busca.
-  const aliases = [...(metadata.aliases || []), ...seoTitles(metadata.description || '').titles.map((title) => ({ language: 'und', title }))].sort((a, b) => (preferred.indexOf(a.language) + 1 || 99) - (preferred.indexOf(b.language) + 1 || 99))
-  const titles = [metadata.title, ...aliases.filter((alias) => preferred.includes(alias.language)).map((alias) => alias.title), metadata.originalTitle]
-  return [...new Map(titles.filter((title): title is string => Boolean(title && /[a-z]/i.test(title))).map((title) => [normalizeTitle(title), title.trim()])).values()]
+  const aliases = [
+    ...(metadata.aliases || []),
+    ...seoTitles(metadata.description || '').titles.map((title) => ({ language: 'und', title })),
+  ].sort((a, b) => (preferred.indexOf(a.language) + 1 || 99) - (preferred.indexOf(b.language) + 1 || 99))
+  const titles = [
+    metadata.title,
+    ...aliases.filter((alias) => preferred.includes(alias.language)).map((alias) => alias.title),
+    metadata.originalTitle,
+  ]
+  return [
+    ...new Map(
+      titles
+        .filter((title): title is string => Boolean(title && /[a-z]/i.test(title)))
+        .map((title) => [normalizeTitle(title), title.trim()]),
+    ).values(),
+  ]
 }
 /** Correspondência exata (ignorando artigo inicial e pontuação) com algum título conhecido. */
 export function matchingResult(results: Array<{ title: string; url: string }>, titles: string[]) {
@@ -108,7 +134,10 @@ export async function findOnAggregator(connector: AggregatorConnector, titles: s
     try {
       const match = matchingResult(await connector.search(title, signal), titles)
       if (match) return match
-    } catch (error) { if (signal?.aborted) throw error; lastError = error }
+    } catch (error) {
+      if (signal?.aborted) throw error
+      lastError = error
+    }
   }
   if (lastError) throw lastError
   return null

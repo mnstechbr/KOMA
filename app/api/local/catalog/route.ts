@@ -14,5 +14,7 @@ export async function GET(request: Request) {
     const { results, sources } = await searchAllCatalogs(query, request.signal)
     results.forEach((work) => worksRepository.cache(work))
     return NextResponse.json({ results, sources }, { headers: { 'Cache-Control': 'no-store' } })
-  } catch (error) { return sourceFailure(error) }
+  } catch (error) {
+    return sourceFailure(error)
+  }
 }

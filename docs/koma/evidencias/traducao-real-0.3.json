@@ -1,17 +1,9 @@
 {
   "status": 200,
   "passed": true,
-  "source": [
-    "Oh, great. Another locked door.",
-    "Stay behind me. I'm not losing anyone else.",
-    "Relax, big guy. I've got this."
-  ],
+  "source": ["Oh, great. Another locked door.", "Stay behind me. I'm not losing anyone else.", "Relax, big guy. I've got this."],
   "result": {
-    "translations": [
-      "Ótimo. Outra porta trancada.",
-      "Fique atrás de mim. Não vou perder mais ninguém.",
-      "Relaxa, grandão. Deixa comigo."
-    ],
+    "translations": ["Ótimo. Outra porta trancada.", "Fique atrás de mim. Não vou perder mais ninguém.", "Relaxa, grandão. Deixa comigo."],
     "provider_lang": "kpassword",
     "provider_model": null,
     "source_lang": "en",

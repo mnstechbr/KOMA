@@ -3,11 +3,7 @@ import { contextualTranslation } from '@/lib/backend/kpassword/translation'
 import type { SectionsRepository } from './sections.repository'
 import type { OcrDetection, PendingSectionImage, SectionLangs } from './sections.types'
 
-const SECTION_IMAGE_PROCESSING_CONCURRENCY = Math.max(
-  1,
-  Math.floor(Number(process.env.SECTION_IMAGE_PROCESSING_CONCURRENCY ?? 10) || 10)
-)
-
+const SECTION_IMAGE_PROCESSING_CONCURRENCY = Math.max(1, Math.floor(Number(process.env.SECTION_IMAGE_PROCESSING_CONCURRENCY ?? 10) || 10))
 
 export class SectionsProcessingService {
   constructor(private readonly repository: SectionsRepository) {}
@@ -26,7 +22,7 @@ export class SectionsProcessingService {
             if (!image) return
             await this.processImage(sectionId, image, langs)
           }
-        })
+        }),
       )
 
       const finalStatus = this.repository.countUnresolvedImages(sectionId) === 0 ? 'completed' : 'partial'
@@ -44,7 +40,7 @@ export class SectionsProcessingService {
       const buffer = this.repository.readImageBuffer(image.original_path)
       if (!buffer) throw new Error('Arquivo original não encontrado.')
 
-      const data = await extractTextBoxesNode(buffer) as { detections?: OcrDetection[] }
+      const data = (await extractTextBoxesNode(buffer)) as { detections?: OcrDetection[] }
       const detections = Array.isArray(data.detections) ? data.detections : []
 
       const textsToTranslate: { detIdx: number; text: string }[] = []
@@ -55,7 +51,13 @@ export class SectionsProcessingService {
 
       // Importações usam o mesmo tradutor escolhido nas Preferências para as obras.
       const translations = textsToTranslate.length
-        ? (await contextualTranslation.translate(textsToTranslate.map((t) => t.text), langs.sourceLang, langs.targetLang)).translations
+        ? (
+            await contextualTranslation.translate(
+              textsToTranslate.map((t) => t.text),
+              langs.sourceLang,
+              langs.targetLang,
+            )
+          ).translations
         : []
 
       const translatedByIdx = new Map<number, string>()

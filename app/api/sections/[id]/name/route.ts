@@ -8,10 +8,7 @@ const AUTH_TOKEN_COOKIE = 'koma-session'
 type RouteParams = { params: Promise<{ id: string }> }
 
 function unauthorized() {
-  return NextResponse.json(
-    { message: 'Token inválido ou expirado', error: 'Unauthorized', statusCode: 401 },
-    { status: 401 }
-  )
+  return NextResponse.json({ message: 'Token inválido ou expirado', error: 'Unauthorized', statusCode: 401 }, { status: 401 })
 }
 
 export async function PATCH(request: Request, { params }: RouteParams) {

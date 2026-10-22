@@ -6,7 +6,8 @@ const root = path.resolve(import.meta.dirname, '..')
 const { version } = JSON.parse(await fs.readFile(path.join(root, 'desktop/package.json'), 'utf8'))
 const bundle = (await fs.readFile(path.join(root, 'artifacts/latest-bundle.txt'), 'utf8')).trim()
 const topdir = path.join(root, 'artifacts/rpm')
-for (const dir of ['BUILD', 'BUILDROOT', 'RPMS', 'SOURCES', 'SPECS', 'SRPMS', 'tmp']) await fs.mkdir(path.join(topdir, dir), { recursive: true })
+for (const dir of ['BUILD', 'BUILDROOT', 'RPMS', 'SOURCES', 'SPECS', 'SRPMS', 'tmp'])
+  await fs.mkdir(path.join(topdir, dir), { recursive: true })
 const spec = `Name: koma
 Version: ${version}
 Release: 1%{?dist}
@@ -46,6 +47,20 @@ DESKTOP
 `
 const specPath = path.join(topdir, 'SPECS/koma.spec')
 await fs.writeFile(specPath, spec)
-execFileSync('rpmbuild', ['-bb', '--define', `_topdir ${topdir}`, '--define', '_binary_payload w3.zstdio', '--define', `_tmppath ${path.join(topdir, 'tmp')}`, specPath], {
-  stdio: 'inherit', env: { ...process.env, KOMA_RPM_BUNDLE: bundle },
-})
+execFileSync(
+  'rpmbuild',
+  [
+    '-bb',
+    '--define',
+    `_topdir ${topdir}`,
+    '--define',
+    '_binary_payload w3.zstdio',
+    '--define',
+    `_tmppath ${path.join(topdir, 'tmp')}`,
+    specPath,
+  ],
+  {
+    stdio: 'inherit',
+    env: { ...process.env, KOMA_RPM_BUNDLE: bundle },
+  },
+)

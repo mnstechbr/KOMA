@@ -10,6 +10,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ sou
   const auth = await personalAccess()
   if ('response' in auth) return auth.response
   // A prévia usa a sinopse da fonte no idioma da interface, quando existe.
-  try { await ensureSources(db); return NextResponse.json({ work: localizeMetadata(await getCatalogWork((await params).sourceId), getLanguageSettings(db).ui) }) }
-  catch (error) { return sourceFailure(error) }
+  try {
+    await ensureSources(db)
+    return NextResponse.json({ work: localizeMetadata(await getCatalogWork((await params).sourceId), getLanguageSettings(db).ui) })
+  } catch (error) {
+    return sourceFailure(error)
+  }
 }

@@ -16,15 +16,36 @@ export function chapterLabel(chapter: { number: string | null }, t: Translate = 
   return chapter.number ? t('Cap. {n}', { n: chapter.number }) : t('Especial')
 }
 
-export function WorkCover({ work, sizes, t = portuguese }: { work: Pick<WorkSummary, 'title' | 'coverUrl'>; sizes: string; t?: Translate }) {
-  return work.coverUrl
-    ? <Image src={work.coverUrl} alt={t('Capa de {title}', { title: work.title })} fill sizes={sizes} unoptimized />
-    : <span className="koma-cover-placeholder" aria-hidden="true">コマ</span>
+export function WorkCover({
+  work,
+  sizes,
+  t = portuguese,
+}: {
+  work: Pick<WorkSummary, 'title' | 'coverUrl'>
+  sizes: string
+  t?: Translate
+}) {
+  return work.coverUrl ? (
+    <Image src={work.coverUrl} alt={t('Capa de {title}', { title: work.title })} fill sizes={sizes} unoptimized />
+  ) : (
+    <span className="koma-cover-placeholder" aria-hidden="true">
+      コマ
+    </span>
+  )
 }
 
 export function BrushProgress({ value, max, label, red = false }: { value: number; max: number; label: string; red?: boolean }) {
   const ratio = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0
-  return <div className={`koma-brush ${red ? 'is-red' : ''}`} role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={max} aria-valuenow={value}>
-    <span style={{ transform: `scaleX(${ratio})` }} />
-  </div>
+  return (
+    <div
+      className={`koma-brush ${red ? 'is-red' : ''}`}
+      role="progressbar"
+      aria-label={label}
+      aria-valuemin={0}
+      aria-valuemax={max}
+      aria-valuenow={value}
+    >
+      <span style={{ transform: `scaleX(${ratio})` }} />
+    </div>
+  )
 }

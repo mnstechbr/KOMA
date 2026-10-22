@@ -18,8 +18,10 @@ export class OpenRouterRepository {
   }
 
   setApiKey(apiKey: string) {
-    db.prepare(`INSERT INTO kv_store (key, value, expires_at) VALUES (?, ?, NULL)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = NULL`).run(OPENROUTER_KEY_KV, encryptSecret(apiKey))
+    db.prepare(
+      `INSERT INTO kv_store (key, value, expires_at) VALUES (?, ?, NULL)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = NULL`,
+    ).run(OPENROUTER_KEY_KV, encryptSecret(apiKey))
   }
 
   clear() {

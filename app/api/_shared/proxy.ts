@@ -36,16 +36,10 @@ export async function requireUser(request?: Request) {
 }
 
 export function forbiddenResponse() {
-  return NextResponse.json(
-    { message: 'Acesso negado', error: 'Forbidden', statusCode: 403 },
-    { status: 403 }
-  )
+  return NextResponse.json({ message: 'Acesso negado', error: 'Forbidden', statusCode: 403 }, { status: 403 })
 }
 
-
-export async function requireAdmin(): Promise<
-  { user: NonNullable<Awaited<ReturnType<typeof requireUser>>> } | { response: NextResponse }
-> {
+export async function requireAdmin(): Promise<{ user: NonNullable<Awaited<ReturnType<typeof requireUser>>> } | { response: NextResponse }> {
   const user = await requireUser()
   if (!user) return { response: unauthorizedResponse() }
   if (user.role !== 4) return { response: forbiddenResponse() }

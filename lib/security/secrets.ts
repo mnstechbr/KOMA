@@ -18,8 +18,7 @@ function keyMaterial() {
         if (cachedKey.length === 32) return cachedKey
       }
     }
-  } catch {
-  }
+  } catch {}
 
   const dir = path.dirname(KEY_FILE)
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
@@ -38,12 +37,7 @@ export function encryptSecret(plainText: string) {
   const cipher = crypto.createCipheriv('aes-256-gcm', keyMaterial(), iv)
   const encrypted = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()])
   const tag = cipher.getAuthTag()
-  return [
-    SECRET_VERSION,
-    iv.toString('base64'),
-    tag.toString('base64'),
-    encrypted.toString('base64'),
-  ].join(':')
+  return [SECRET_VERSION, iv.toString('base64'), tag.toString('base64'), encrypted.toString('base64')].join(':')
 }
 
 export function decryptSecret(payload: string) {

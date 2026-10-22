@@ -9,8 +9,12 @@ export default function NotFound() {
       <div className="koma-box max-w-md space-y-4 text-center">
         <p className="koma-section-title">404</p>
         <h1 className="text-xl font-bold">{t('Página não encontrada')}</h1>
-        <p className="text-sm text-muted-foreground">{t('Esta página não existe no KOMA. Volte para a biblioteca e continue a leitura.')}</p>
-        <Link href="/inicio/secoes" className="koma-button">{t('Ir para a biblioteca')}</Link>
+        <p className="text-sm text-muted-foreground">
+          {t('Esta página não existe no KOMA. Volte para a biblioteca e continue a leitura.')}
+        </p>
+        <Link href="/inicio/secoes" className="koma-button">
+          {t('Ir para a biblioteca')}
+        </Link>
       </div>
     </main>
   )

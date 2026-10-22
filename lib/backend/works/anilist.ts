@@ -13,18 +13,40 @@ const API = 'https://graphql.anilist.co'
 // ID público do cliente KOMA no AniList (redirecionamento para a página do token).
 export const DEFAULT_CLIENT_ID = ''
 
-interface Stored { clientId?: string; token?: string; viewer?: string }
+interface Stored {
+  clientId?: string
+  token?: string
+  viewer?: string
+}
 const read = (database: Database.Database, key: string) => {
   const row = database.prepare('SELECT value FROM kv_store WHERE key = ?').get(key) as { value: string } | undefined
-  try { return row ? JSON.parse(row.value) : {} } catch { return {} }
+  try {
+    return row ? JSON.parse(row.value) : {}
+  } catch {
+    return {}
+  }
 }
-const write = (database: Database.Database, key: string, value: unknown) => database.prepare(`INSERT INTO kv_store (key, value, expires_at) VALUES (?, ?, NULL)
-  ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = NULL`).run(key, JSON.stringify(value))
+const write = (database: Database.Database, key: string, value: unknown) =>
+  database
+    .prepare(
+      `INSERT INTO kv_store (key, value, expires_at) VALUES (?, ?, NULL)
+  ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = NULL`,
+    )
+    .run(key, JSON.stringify(value))
 
-function stored(database: Database.Database): Stored { return read(database, KEY) as Stored }
-function token(database: Database.Database) { const value = stored(database).token; return value ? decryptSecret(value) || '' : '' }
-export function anilistClientId(database: Database.Database) { return stored(database).clientId || DEFAULT_CLIENT_ID }
-export function authorizeUrl(clientId: string) { return clientId ? `https://anilist.co/api/v2/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token` : null }
+function stored(database: Database.Database): Stored {
+  return read(database, KEY) as Stored
+}
+function token(database: Database.Database) {
+  const value = stored(database).token
+  return value ? decryptSecret(value) || '' : ''
+}
+export function anilistClientId(database: Database.Database) {
+  return stored(database).clientId || DEFAULT_CLIENT_ID
+}
+export function authorizeUrl(clientId: string) {
+  return clientId ? `https://anilist.co/api/v2/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=token` : null
+}
 export function anilistStatus(database: Database.Database) {
   const value = stored(database)
   const clientId = anilistClientId(database)
@@ -39,14 +61,28 @@ export function disconnectAniList(database: Database.Database) {
   write(database, KEY, clientId ? { clientId } : {})
 }
 
-async function graphql<T>(query: string, variables: Record<string, unknown>, accessToken?: string, fetcher: typeof fetch = fetch): Promise<T> {
+async function graphql<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  accessToken?: string,
+  fetcher: typeof fetch = fetch,
+): Promise<T> {
   const response = await fetcher(API, {
-    method: 'POST', cache: 'no-store', signal: AbortSignal.timeout(20000),
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) },
+    method: 'POST',
+    cache: 'no-store',
+    signal: AbortSignal.timeout(20000),
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    },
     body: JSON.stringify({ query, variables }),
   })
-  const body = await response.json().catch(() => ({})) as { data?: T; errors?: Array<{ message?: string; status?: number }> }
-  if (!response.ok || body.errors?.length || !body.data) throw new Error(response.status === 401 || body.errors?.some((error) => error.status === 401) ? 'unauthorized' : `AniList ${response.status}`)
+  const body = (await response.json().catch(() => ({}))) as { data?: T; errors?: Array<{ message?: string; status?: number }> }
+  if (!response.ok || body.errors?.length || !body.data)
+    throw new Error(
+      response.status === 401 || body.errors?.some((error) => error.status === 401) ? 'unauthorized' : `AniList ${response.status}`,
+    )
   return body.data
 }
 
@@ -73,9 +109,18 @@ async function mediaId(database: Database.Database, workId: number, fetcher: typ
     const known = new Set(titles.map((title) => normalizeTitle(title)))
     for (const title of titles.slice(0, 3)) {
       const data = await graphql<{ Page: { media: Array<{ id: number; title: Record<string, string | null>; synonyms: string[] }> } }>(
-        'query ($search: String) { Page(perPage: 10) { media(search: $search, type: MANGA) { id title { romaji english native } synonyms } } }', { search: title }, undefined, fetcher)
-      const match = data.Page.media.find((media) => [...Object.values(media.title), ...(media.synonyms || [])].some((name) => name && known.has(normalizeTitle(name))))
-      if (match) { found = match.id; break }
+        'query ($search: String) { Page(perPage: 10) { media(search: $search, type: MANGA) { id title { romaji english native } synonyms } } }',
+        { search: title },
+        undefined,
+        fetcher,
+      )
+      const match = data.Page.media.find((media) =>
+        [...Object.values(media.title), ...(media.synonyms || [])].some((name) => name && known.has(normalizeTitle(name))),
+      )
+      if (match) {
+        found = match.id
+        break
+      }
     }
   }
   write(database, MAP_KEY, { ...map, [workId]: found })
@@ -86,19 +131,34 @@ async function mediaId(database: Database.Database, workId: number, fetcher: typ
 export async function syncAniListWork(database: Database.Database, workId: number, fetcher: typeof fetch = fetch) {
   const accessToken = token(database)
   if (!accessToken) return 'disconnected'
-  const done = database.prepare("SELECT number FROM work_chapters WHERE work_id=? AND read_done=1 AND number IS NOT NULL").all(workId) as Array<{ number: string }>
+  const done = database
+    .prepare('SELECT number FROM work_chapters WHERE work_id=? AND read_done=1 AND number IS NOT NULL')
+    .all(workId) as Array<{ number: string }>
   const progress = Math.max(0, ...done.map((row) => Math.floor(Number(row.number))).filter(Number.isFinite))
   if (!progress) return 'nothing'
   const id = await mediaId(database, workId, fetcher)
   if (!id) return 'not_found'
   try {
-    const current = await graphql<{ Media: { mediaListEntry: { progress: number; status: string } | null } }>('query ($id: Int) { Media(id: $id, type: MANGA) { mediaListEntry { progress status } } }', { id }, accessToken, fetcher)
+    const current = await graphql<{ Media: { mediaListEntry: { progress: number; status: string } | null } }>(
+      'query ($id: Int) { Media(id: $id, type: MANGA) { mediaListEntry { progress status } } }',
+      { id },
+      accessToken,
+      fetcher,
+    )
     const entry = current.Media.mediaListEntry
     if (entry && (entry.progress >= progress || entry.status === 'COMPLETED')) return 'up_to_date'
-    await graphql('mutation ($id: Int, $progress: Int) { SaveMediaListEntry(mediaId: $id, progress: $progress, status: CURRENT) { id } }', { id, progress }, accessToken, fetcher)
+    await graphql(
+      'mutation ($id: Int, $progress: Int) { SaveMediaListEntry(mediaId: $id, progress: $progress, status: CURRENT) { id } }',
+      { id, progress },
+      accessToken,
+      fetcher,
+    )
     return 'updated'
   } catch (error) {
-    if (error instanceof Error && error.message === 'unauthorized') { disconnectAniList(database); return 'disconnected' }
+    if (error instanceof Error && error.message === 'unauthorized') {
+      disconnectAniList(database)
+      return 'disconnected'
+    }
     throw error
   }
 }

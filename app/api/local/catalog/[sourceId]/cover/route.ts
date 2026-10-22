@@ -9,6 +9,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ sou
   try {
     await ensureSources(db)
     const bytes = await getCover((await params).sourceId)
-    return bytes ? new Response(bytes, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' } }) : new Response(null, { status: 404 })
-  } catch (error) { return sourceFailure(error) }
+    return bytes
+      ? new Response(bytes, { headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'private, max-age=86400' } })
+      : new Response(null, { status: 404 })
+  } catch (error) {
+    return sourceFailure(error)
+  }
 }

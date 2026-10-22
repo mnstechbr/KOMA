@@ -117,19 +117,13 @@ export function SectionCreateForm() {
     return 'Baixa (P2)'
   }, [priorityValue])
   const canUsePdfBatch = true
-  const isRole4OrAbove = useMemo(
-    () => userRole !== null && userRole >= 4,
-    [userRole]
-  )
+  const isRole4OrAbove = useMemo(() => userRole !== null && userRole >= 4, [userRole])
   const remainingSectionQuota = useMemo(() => {
     if (monthlyUsage.limit === null || monthlyUsage.generated === null) return null
     if (monthlyUsage.limit <= 0) return null
     return Math.max(0, Math.floor(monthlyUsage.limit - monthlyUsage.generated))
   }, [monthlyUsage.generated, monthlyUsage.limit])
-  const batchPlanCap = useMemo(
-    () => (isRole4OrAbove ? MAX_BATCH_PDFS_ROLE4 : MAX_BATCH_PDFS),
-    [isRole4OrAbove]
-  )
+  const batchPlanCap = useMemo(() => (isRole4OrAbove ? MAX_BATCH_PDFS_ROLE4 : MAX_BATCH_PDFS), [isRole4OrAbove])
   const maxBatchPdfsAllowedNow = useMemo(() => {
     if (remainingSectionQuota === null) return batchPlanCap
     if (batchPlanCap === null) return remainingSectionQuota
@@ -137,28 +131,21 @@ export function SectionCreateForm() {
   }, [batchPlanCap, remainingSectionQuota])
   const hasBatchErrors = useMemo(
     () => uploadMode === 'pdf-batch' && uploadItems.some((item) => batchPdfStatusByItemId[item.id]?.phase === 'error'),
-    [uploadMode, uploadItems, batchPdfStatusByItemId]
+    [uploadMode, uploadItems, batchPdfStatusByItemId],
   )
-  const files = useMemo(
-    () => uploadItems.flatMap((item) => item.files),
-    [uploadItems]
-  )
+  const files = useMemo(() => uploadItems.flatMap((item) => item.files), [uploadItems])
   useEffect(() => {
     uploadItemsRef.current = uploadItems
   }, [uploadItems])
   const hasLoadedPdf = uploadItems.length > 0
-  const preparingOverallProgress = useMemo(
-    () => getPreparingOverallProgress(preparingState),
-    [preparingState]
-  )
+  const preparingOverallProgress = useMemo(() => getPreparingOverallProgress(preparingState), [preparingState])
 
   useEffect(() => {
     let cancelled = false
 
     const warmupPdfRuntime = () => {
       if (cancelled) return
-      void getPdfjsLib().catch(() => {
-      })
+      void getPdfjsLib().catch(() => {})
     }
 
     if (typeof window === 'undefined') return
@@ -220,7 +207,6 @@ export function SectionCreateForm() {
           const parsed = Number(rawLimit)
           if (Number.isFinite(parsed)) setPageUploadLimit(parsed)
         }
-
       } catch (err) {
         setRoleError(err instanceof Error ? err.message : 'Falha ao obter role do usuário.')
         setMonthlyUsage({ limit: null, generated: null })
@@ -231,7 +217,6 @@ export function SectionCreateForm() {
 
     void fetchUserRole()
   }, [router])
-
 
   useEffect(() => {
     if (uploadMode === 'pdf-batch' && !canUsePdfBatch) {
@@ -374,7 +359,7 @@ export function SectionCreateForm() {
     if (!normalizedCategory) return false
 
     const alreadyExists = sectionCategoryOptions.some(
-      (category) => toSectionCategoryKey(category) === toSectionCategoryKey(normalizedCategory)
+      (category) => toSectionCategoryKey(category) === toSectionCategoryKey(normalizedCategory),
     )
     if (alreadyExists) return true
 
@@ -486,10 +471,8 @@ export function SectionCreateForm() {
       const deletedCountRaw = toFiniteNumber(data.deleted_sections_count)
       const deletedCount = deletedCountRaw === null ? 0 : Math.max(0, Math.floor(deletedCountRaw))
       toast.success(
-        data.message
-        || (deletedCount > 0
-          ? `Categoria removida. ${deletedCount} seção(ões) ficaram sem categoria.`
-          : 'Categoria removida com sucesso.')
+        data.message ||
+          (deletedCount > 0 ? `Categoria removida. ${deletedCount} seção(ões) ficaram sem categoria.` : 'Categoria removida com sucesso.'),
       )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao excluir categoria.')
@@ -547,7 +530,7 @@ export function SectionCreateForm() {
         toast.error(
           remaining > 0
             ? `Limite de ${pageUploadLimit} imagens. Você ainda pode adicionar ${remaining} imagem(ns).`
-            : `Limite de ${pageUploadLimit} imagens atingido.`
+            : `Limite de ${pageUploadLimit} imagens atingido.`,
         )
         return
       }
@@ -604,13 +587,15 @@ export function SectionCreateForm() {
       })
 
       const previewUrl = await extractPdfFirstPageThumbnail(selectedPdf).catch(() => null)
-      setUploadItems([{
-        id: createUploadItemId(),
-        sourceName: selectedPdf.name,
-        files: [],
-        rawPdf: selectedPdf,
-        previewUrl: previewUrl ?? undefined,
-      }])
+      setUploadItems([
+        {
+          id: createUploadItemId(),
+          sourceName: selectedPdf.name,
+          files: [],
+          rawPdf: selectedPdf,
+          previewUrl: previewUrl ?? undefined,
+        },
+      ])
       return
     }
 
@@ -626,9 +611,7 @@ export function SectionCreateForm() {
 
     const pdfsToProcess = selectedPdfs.slice(0, remaining)
     if (selectedPdfs.length > remaining) {
-      toast.warning(
-        `Máximo disponível agora: ${maxBatchPdfsAllowedNow} PDF(s). Apenas ${remaining} PDF(s) foram adicionados agora.`
-      )
+      toast.warning(`Máximo disponível agora: ${maxBatchPdfsAllowedNow} PDF(s). Apenas ${remaining} PDF(s) foram adicionados agora.`)
     }
 
     const preparedItems: PreparedUploadItem[] = await Promise.all(
@@ -643,7 +626,7 @@ export function SectionCreateForm() {
             rawPdf: pdfFile,
             previewUrl: previewUrl ?? undefined,
           }
-        })
+        }),
     )
 
     if (preparedItems.length === 0) {
@@ -727,7 +710,7 @@ export function SectionCreateForm() {
       if (sectionExceedingLimit) {
         const pagesCount = sectionExceedingLimit.files.length
         toast.error(
-          `O arquivo "${sectionExceedingLimit.sourceName}" gerou ${pagesCount} páginas, acima do limite de ${pageUploadLimit} por seção.`
+          `O arquivo "${sectionExceedingLimit.sourceName}" gerou ${pagesCount} páginas, acima do limite de ${pageUploadLimit} por seção.`,
         )
         return
       }
@@ -757,7 +740,7 @@ export function SectionCreateForm() {
                 totalPages,
               })
             },
-            { maxPages: pageUploadLimit }
+            { maxPages: pageUploadLimit },
           )
           if (filesToUpload.length === 0) {
             toast.error('Nenhuma página foi extraída do PDF.')
@@ -786,9 +769,7 @@ export function SectionCreateForm() {
     try {
       if (isBatchPdfMode) {
         const itemsToProcessIds = new Set(
-          uploadItems
-            .filter((item) => batchPdfStatusByItemId[item.id]?.phase !== 'success')
-            .map((item) => item.id)
+          uploadItems.filter((item) => batchPdfStatusByItemId[item.id]?.phase !== 'success').map((item) => item.id),
         )
 
         if (itemsToProcessIds.size === 0) {
@@ -823,7 +804,7 @@ export function SectionCreateForm() {
                     totalPages,
                   })
                 },
-                { maxPages: pageUploadLimit }
+                { maxPages: pageUploadLimit },
               )
             } else {
               setBatchItemStatus(item.id, {
@@ -915,7 +896,7 @@ export function SectionCreateForm() {
           toast.success(
             batchCreatedCount === 1
               ? '1 seção criada com sucesso. Use o botão Processar para iniciar a fila.'
-              : `${batchCreatedCount} seção(ões) criada(s) com sucesso. Use o botão Processar em cada seção para iniciar a fila.`
+              : `${batchCreatedCount} seção(ões) criada(s) com sucesso. Use o botão Processar em cada seção para iniciar a fila.`,
           )
           router.push('/inicio/secoes')
           return
@@ -969,9 +950,7 @@ export function SectionCreateForm() {
       toast.success('Seção criada com sucesso.')
       router.push('/inicio/secoes')
     } catch (err) {
-      const fallbackMessage = isBatchPdfMode
-        ? 'Erro ao criar seções em massa.'
-        : 'Erro ao criar seção.'
+      const fallbackMessage = isBatchPdfMode ? 'Erro ao criar seções em massa.' : 'Erro ao criar seção.'
       const baseMessage = err instanceof Error ? err.message : fallbackMessage
       if (isBatchPdfMode && batchCreatedCount > 0) {
         toast.error(`${baseMessage} ${batchCreatedCount} de ${uploadItems.length} seção(ões) foram criadas.`)
@@ -1002,13 +981,10 @@ export function SectionCreateForm() {
                 <span className="hidden sm:inline">Como usar</span>
               </Button>
             </div>
-            <p className="text-sm text-muted-foreground">
-              Crie traduções por capítulo com imagens ou PDF único.
-            </p>
+            <p className="text-sm text-muted-foreground">Crie traduções por capítulo com imagens ou PDF único.</p>
           </div>
         </div>
       </Card>
-
 
       <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_1fr] gap-4 items-start">
         <Card data-tour="upload-area" className="p-4 space-y-4">
@@ -1019,8 +995,8 @@ export function SectionCreateForm() {
                 {uploadMode === 'pdf'
                   ? 'Um único PDF — páginas extraídas localmente e enviadas como imagens.'
                   : uploadMode === 'pdf-batch'
-                  ? 'Vários PDFs — cada um vira uma seção, extraído localmente de 1 em 1.'
-                  : 'Várias imagens de uma vez (JPG, PNG, WEBP…).'}
+                    ? 'Vários PDFs — cada um vira uma seção, extraído localmente de 1 em 1.'
+                    : 'Várias imagens de uma vez (JPG, PNG, WEBP…).'}
               </p>
             </div>
           </div>
@@ -1030,9 +1006,7 @@ export function SectionCreateForm() {
               type="button"
               className={cn(
                 'flex items-center gap-2 px-4 py-1.5 text-sm transition-colors',
-                uploadMode === 'pdf'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background text-muted-foreground hover:bg-muted/50'
+                uploadMode === 'pdf' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted/50',
               )}
               disabled={isPreparingUploads || isCreatingSection}
               onClick={() => {
@@ -1054,7 +1028,7 @@ export function SectionCreateForm() {
                   'flex items-center gap-2 px-4 py-1.5 text-sm transition-colors border-l border-border',
                   uploadMode === 'pdf-batch'
                     ? 'bg-primary text-primary-foreground'
-                    : 'bg-background text-muted-foreground hover:bg-muted/50'
+                    : 'bg-background text-muted-foreground hover:bg-muted/50',
                 )}
                 disabled={isPreparingUploads || isCreatingSection}
                 onClick={() => {
@@ -1074,9 +1048,7 @@ export function SectionCreateForm() {
               type="button"
               className={cn(
                 'flex items-center gap-2 px-4 py-1.5 text-sm transition-colors border-l border-border',
-                uploadMode === 'images'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-background text-muted-foreground hover:bg-muted/50'
+                uploadMode === 'images' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted/50',
               )}
               disabled={isPreparingUploads || isCreatingSection}
               onClick={() => {
@@ -1096,12 +1068,9 @@ export function SectionCreateForm() {
           {uploadMode === 'pdf-batch' && (
             <div className="rounded-lg border border-primary/25 bg-primary/8 p-3">
               <p className="text-sm font-medium text-foreground">Tradução PDF em Massa</p>
+              <p className="mt-1 text-xs text-muted-foreground">Cada PDF vira uma seção separada com o nome do arquivo.</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Cada PDF vira uma seção separada com o nome do arquivo.
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Disponível agora:{' '}
-                <span className="font-medium text-foreground">{maxBatchPdfsAllowedNow}</span> / {batchPlanCap} PDF(s)
+                Disponível agora: <span className="font-medium text-foreground">{maxBatchPdfsAllowedNow}</span> / {batchPlanCap} PDF(s)
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Atual: <span className="font-medium text-foreground">{uploadItems.length}</span> PDF(s) carregado(s)
@@ -1122,10 +1091,10 @@ export function SectionCreateForm() {
             className="hidden"
             onChange={(event) => void handleFileInputChange(event)}
             disabled={
-              isCreatingSection
-              || isPreparingUploads
-              || (uploadMode === 'pdf' && uploadItems.length > 0)
-              || (uploadMode === 'pdf-batch' && maxBatchPdfsAllowedNow !== null && uploadItems.length >= maxBatchPdfsAllowedNow)
+              isCreatingSection ||
+              isPreparingUploads ||
+              (uploadMode === 'pdf' && uploadItems.length > 0) ||
+              (uploadMode === 'pdf-batch' && maxBatchPdfsAllowedNow !== null && uploadItems.length >= maxBatchPdfsAllowedNow)
             }
           />
           <Input
@@ -1141,23 +1110,16 @@ export function SectionCreateForm() {
           {(() => {
             const pdfSingleBlocked = uploadMode === 'pdf' && uploadItems.length > 0
             const pdfBatchBlocked =
-              uploadMode === 'pdf-batch'
-              && maxBatchPdfsAllowedNow !== null
-              && uploadItems.length >= maxBatchPdfsAllowedNow
+              uploadMode === 'pdf-batch' && maxBatchPdfsAllowedNow !== null && uploadItems.length >= maxBatchPdfsAllowedNow
             const imagesAtLimit = uploadMode === 'images' && pageUploadLimit !== null && files.length >= pageUploadLimit
             const blocked = pdfSingleBlocked || pdfBatchBlocked || imagesAtLimit
             return (
               <div
                 className={cn(
                   'rounded-lg border-2 border-dashed p-5 sm:p-6 transition-colors',
-                  blocked
-                    ? 'border-border bg-muted/10 cursor-not-allowed opacity-70'
-                    : 'cursor-pointer',
-                  !blocked && (
-                    isDragOver
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border bg-muted/20 hover:border-primary/50 hover:bg-muted/35'
-                  )
+                  blocked ? 'border-border bg-muted/10 cursor-not-allowed opacity-70' : 'cursor-pointer',
+                  !blocked &&
+                    (isDragOver ? 'border-primary bg-primary/10' : 'border-border bg-muted/20 hover:border-primary/50 hover:bg-muted/35'),
                 )}
                 onClick={() => {
                   if (blocked || isCreatingSection || isPreparingUploads) return
@@ -1250,10 +1212,7 @@ export function SectionCreateForm() {
                   <p className="text-xs text-muted-foreground">
                     Processando: {preparingState.processedPages} / {preparingState.totalPages}
                   </p>
-                  <Progress
-                    value={(preparingState.processedPages / preparingState.totalPages) * 100}
-                    className="h-2"
-                  />
+                  <Progress value={(preparingState.processedPages / preparingState.totalPages) * 100} className="h-2" />
                 </>
               )}
             </div>
@@ -1262,7 +1221,8 @@ export function SectionCreateForm() {
           <div className="flex flex-wrap gap-2">
             {uploadMode === 'images' ? (
               <Badge variant="outline">
-                {uploadItems.length}{pageUploadLimit !== null ? ` / ${pageUploadLimit}` : ''} imagem(ns)
+                {uploadItems.length}
+                {pageUploadLimit !== null ? ` / ${pageUploadLimit}` : ''} imagem(ns)
               </Badge>
             ) : (
               <Badge variant="outline">
@@ -1280,11 +1240,11 @@ export function SectionCreateForm() {
           {uploadItems.length > 0 ? (
             <div className="rounded-md border border-border bg-muted/20 p-2 max-h-56 overflow-auto space-y-2">
               {uploadItems.map((item) => {
-                const batchStatus = uploadMode === 'pdf-batch'
-                  ? batchPdfStatusByItemId[item.id] ?? getInitialBatchPdfUploadStatus()
-                  : null
+                const batchStatus =
+                  uploadMode === 'pdf-batch' ? (batchPdfStatusByItemId[item.id] ?? getInitialBatchPdfUploadStatus()) : null
                 const batchPhaseMeta = batchStatus ? getBatchPdfPhaseMeta(batchStatus.phase) : null
-                const isBatchRunning = batchStatus?.phase === 'preparing' || batchStatus?.phase === 'uploading' || batchStatus?.phase === 'assigning-category'
+                const isBatchRunning =
+                  batchStatus?.phase === 'preparing' || batchStatus?.phase === 'uploading' || batchStatus?.phase === 'assigning-category'
 
                 return (
                   <div
@@ -1299,18 +1259,18 @@ export function SectionCreateForm() {
                           className="h-[100px] w-[70px] rounded-sm border border-border/60 object-cover shrink-0"
                           loading="lazy"
                         />
-                      ) : uploadMode === 'images'
-                        ? <FileImage className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                        : <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+                      ) : uploadMode === 'images' ? (
+                        <FileImage className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      ) : (
+                        <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      )}
                       <div className="min-w-0">
                         <p className="text-sm text-foreground truncate" title={item.sourceName}>
                           {item.sourceName}
                         </p>
                         {uploadMode === 'pdf' && (
                           <p className="text-xs text-muted-foreground">
-                            {item.rawPdf
-                              ? 'Pronto para converter ao criar'
-                              : `${item.files.length} página(s) extraída(s)`}
+                            {item.rawPdf ? 'Pronto para converter ao criar' : `${item.files.length} página(s) extraída(s)`}
                           </p>
                         )}
                         {uploadMode === 'pdf-batch' && batchStatus && batchPhaseMeta && (
@@ -1319,25 +1279,24 @@ export function SectionCreateForm() {
                               {isBatchRunning ? (
                                 <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
                               ) : (
-                                <span className={cn('h-1.5 w-1.5 rounded-full', batchStatus.phase === 'success'
-                                  ? 'bg-emerald-500'
-                                  : batchStatus.phase === 'error'
-                                  ? 'bg-red-500'
-                                  : 'bg-muted-foreground/50')}
+                                <span
+                                  className={cn(
+                                    'h-1.5 w-1.5 rounded-full',
+                                    batchStatus.phase === 'success'
+                                      ? 'bg-emerald-500'
+                                      : batchStatus.phase === 'error'
+                                        ? 'bg-red-500'
+                                        : 'bg-muted-foreground/50',
+                                  )}
                                 />
                               )}
-                              <span className={cn('font-medium', batchPhaseMeta.className)}>
-                                {batchPhaseMeta.label}
-                              </span>
+                              <span className={cn('font-medium', batchPhaseMeta.className)}>{batchPhaseMeta.label}</span>
                             </p>
                             <p className="text-[11px] text-muted-foreground truncate" title={batchStatus.message}>
                               {batchStatus.message}
                             </p>
                             {batchStatus.phase === 'preparing' && batchStatus.totalPages !== undefined && batchStatus.totalPages > 0 && (
-                              <Progress
-                                value={(( batchStatus.processedPages ?? 0) / batchStatus.totalPages) * 100}
-                                className="h-1.5 mt-1"
-                              />
+                              <Progress value={((batchStatus.processedPages ?? 0) / batchStatus.totalPages) * 100} className="h-1.5 mt-1" />
                             )}
                             <p className="text-[11px] text-muted-foreground truncate">
                               seção: {buildSectionNameSuggestionFromPdf(item.sourceName) || item.sourceName}
@@ -1363,9 +1322,7 @@ export function SectionCreateForm() {
             </div>
           ) : (
             <p className="text-xs text-muted-foreground">
-              {uploadMode === 'images'
-                ? 'Nenhuma imagem carregada ainda.'
-                : 'Nenhum PDF carregado ainda.'}
+              {uploadMode === 'images' ? 'Nenhuma imagem carregada ainda.' : 'Nenhum PDF carregado ainda.'}
             </p>
           )}
         </Card>
@@ -1378,9 +1335,11 @@ export function SectionCreateForm() {
               onClick={() => setConfigExpanded((v) => !v)}
             >
               <h2 className="text-base font-semibold text-foreground">Configuração</h2>
-              {configExpanded
-                ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
-                : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />}
+              {configExpanded ? (
+                <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              )}
             </button>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -1388,11 +1347,7 @@ export function SectionCreateForm() {
                 <label className="text-sm font-medium text-foreground" htmlFor="section-source-lang">
                   Origem
                 </label>
-                <Select
-                  value={sourceLang}
-                  onValueChange={setSourceLang}
-                  disabled={isCreatingSection}
-                >
+                <Select value={sourceLang} onValueChange={setSourceLang} disabled={isCreatingSection}>
                   <SelectTrigger id="section-source-lang" className="w-full h-12 text-sm">
                     <SelectValue placeholder="Origem">
                       {sourceLanguageOptions.find((o) => o.code === sourceLang)?.name ?? sourceLang}
@@ -1412,11 +1367,7 @@ export function SectionCreateForm() {
                 <label className="text-sm font-medium text-foreground" htmlFor="section-target-lang">
                   Destino
                 </label>
-                <Select
-                  value={targetLang}
-                  onValueChange={setTargetLang}
-                  disabled={isCreatingSection}
-                >
+                <Select value={targetLang} onValueChange={setTargetLang} disabled={isCreatingSection}>
                   <SelectTrigger id="section-target-lang" className="w-full h-12 text-sm">
                     <SelectValue placeholder="Destino">
                       {targetLanguageOptions.find((o) => o.code === targetLang)?.name ?? targetLang}
@@ -1431,17 +1382,13 @@ export function SectionCreateForm() {
                   </SelectContent>
                 </Select>
               </div>
-
             </div>
 
             <div className="space-y-1.5">
               <label htmlFor="section-category-select" className="text-sm font-medium text-foreground">
                 Categoria (opcional)
               </label>
-              <Popover
-                open={isSectionCategoryPopoverOpen}
-                onOpenChange={handleSectionCategoryPopoverChange}
-              >
+              <Popover open={isSectionCategoryPopoverOpen} onOpenChange={handleSectionCategoryPopoverChange}>
                 <PopoverTrigger asChild>
                   <Button
                     ref={sectionCategoryTriggerRef}
@@ -1468,11 +1415,7 @@ export function SectionCreateForm() {
                   side="bottom"
                   sideOffset={6}
                   className="max-w-[calc(100vw-1rem)] p-0"
-                  style={
-                    sectionCategoryPopoverWidth
-                      ? { width: `${sectionCategoryPopoverWidth}px` }
-                      : undefined
-                  }
+                  style={sectionCategoryPopoverWidth ? { width: `${sectionCategoryPopoverWidth}px` } : undefined}
                 >
                   <Command shouldFilter={false}>
                     <CommandInput
@@ -1533,9 +1476,7 @@ export function SectionCreateForm() {
                           }}
                           className="text-sm"
                         >
-                          <span className="truncate">
-                            Criar categoria "{normalizeSectionCategoryValue(sectionCategoryQuery)}"
-                          </span>
+                          <span className="truncate">Criar categoria "{normalizeSectionCategoryValue(sectionCategoryQuery)}"</span>
                         </CommandItem>
                       )}
                       {sectionCategoryDraft && (
@@ -1551,9 +1492,7 @@ export function SectionCreateForm() {
                   </Command>
                 </PopoverContent>
               </Popover>
-              <p className="text-xs text-muted-foreground">
-                Opcional. Escolha uma categoria existente ou crie uma nova.
-              </p>
+              <p className="text-xs text-muted-foreground">Opcional. Escolha uma categoria existente ou crie uma nova.</p>
             </div>
           </div>
 
@@ -1571,33 +1510,23 @@ export function SectionCreateForm() {
                   disabled={isCreatingSection || isPreparingUploads}
                 />
                 {hasLoadedPdf && nameSuggestion && (
-                  <p className="text-xs text-muted-foreground">
-                    Sugestão baseada no PDF: {nameSuggestion}
-                  </p>
+                  <p className="text-xs text-muted-foreground">Sugestão baseada no PDF: {nameSuggestion}</p>
                 )}
               </div>
 
               <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
                 <p className="text-xs font-medium text-foreground">Prioridade automática</p>
-                <p className="text-sm text-foreground">
-                  {isLoadingRole ? 'Calculando prioridade...' : priorityLabel}
-                </p>
+                <p className="text-sm text-foreground">{isLoadingRole ? 'Calculando prioridade...' : priorityLabel}</p>
               </div>
 
-<p className="text-xs text-muted-foreground">
-                {`${sourceLanguageOptions.length} idioma(s) disponível(is).`}
-              </p>
+              <p className="text-xs text-muted-foreground">{`${sourceLanguageOptions.length} idioma(s) disponível(is).`}</p>
 
               {roleError && (
-                <p className="text-xs text-amber-600 dark:text-amber-400">
-                  {roleError} Aplicando prioridade baixa por segurança.
-                </p>
+                <p className="text-xs text-amber-600 dark:text-amber-400">{roleError} Aplicando prioridade baixa por segurança.</p>
               )}
-
             </div>
           )}
         </Card>
-
       </div>
 
       <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
@@ -1626,13 +1555,18 @@ export function SectionCreateForm() {
           ) : (
             <>
               <Save className="h-4 w-4" />
-              {uploadMode === 'pdf-batch'
-                ? hasBatchErrors ? 'Tentar novamente' : 'Criar Seções em Massa'
-                : 'Criar Seção'}
+              {uploadMode === 'pdf-batch' ? (hasBatchErrors ? 'Tentar novamente' : 'Criar Seções em Massa') : 'Criar Seção'}
             </>
           )}
         </Button>
-        <Button asChild size="lg" className="w-full sm:w-auto" type="button" variant="outline" disabled={isCreatingSection || isPreparingUploads}>
+        <Button
+          asChild
+          size="lg"
+          className="w-full sm:w-auto"
+          type="button"
+          variant="outline"
+          disabled={isCreatingSection || isPreparingUploads}
+        >
           <Link href="/inicio/secoes">Cancelar</Link>
         </Button>
       </div>
@@ -1664,21 +1598,13 @@ export function SectionCreateForm() {
             </div>
 
             <div className="text-center space-y-1.5">
-              <DialogTitle className="text-lg font-semibold text-foreground">
-                Criando sua seção...
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground">
-                Aguarde enquanto processamos seu pedido.
-              </DialogDescription>
+              <DialogTitle className="text-lg font-semibold text-foreground">Criando sua seção...</DialogTitle>
+              <DialogDescription className="text-sm text-muted-foreground">Aguarde enquanto processamos seu pedido.</DialogDescription>
             </div>
 
             <div className="flex gap-2">
               {[0, 150, 300].map((delay) => (
-                <span
-                  key={delay}
-                  className="h-2 w-2 rounded-full bg-primary animate-bounce"
-                  style={{ animationDelay: `${delay}ms` }}
-                />
+                <span key={delay} className="h-2 w-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: `${delay}ms` }} />
               ))}
             </div>
           </div>
@@ -1699,9 +1625,8 @@ export function SectionCreateForm() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir categoria</AlertDialogTitle>
             <AlertDialogDescription>
-              A categoria "{categoryToDelete}" será excluída.
-              Todas as seções vinculadas a essa categoria ficarão sem categoria.
-              Esta ação não pode ser desfeita.
+              A categoria "{categoryToDelete}" será excluída. Todas as seções vinculadas a essa categoria ficarão sem categoria. Esta ação
+              não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1727,12 +1652,7 @@ export function SectionCreateForm() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <SpotlightTour
-        storageKey="tour-create-v2"
-        open={isTourOpen}
-        onClose={() => setIsTourOpen(false)}
-        steps={CREATE_TOUR_STEPS}
-      />
+      <SpotlightTour storageKey="tour-create-v2" open={isTourOpen} onClose={() => setIsTourOpen(false)} steps={CREATE_TOUR_STEPS} />
     </form>
   )
 }
@@ -1740,23 +1660,27 @@ export function SectionCreateForm() {
 const CREATE_TOUR_STEPS: TourStep[] = [
   {
     title: 'Criar uma nova tradução',
-    description: 'Nesta tela você prepara um capítulo ou lote de páginas para tradução automática com IA. São apenas 3 passos: enviar arquivos, configurar idiomas e criar.',
+    description:
+      'Nesta tela você prepara um capítulo ou lote de páginas para tradução automática com IA. São apenas 3 passos: enviar arquivos, configurar idiomas e criar.',
   },
   {
     title: 'Envie seus arquivos',
-    description: 'Arraste imagens (JPG, PNG, WEBP…) ou um único PDF. O PDF é processado localmente: cada página vira uma imagem enviada para tradução.',
+    description:
+      'Arraste imagens (JPG, PNG, WEBP…) ou um único PDF. O PDF é processado localmente: cada página vira uma imagem enviada para tradução.',
     selector: 'upload-area',
     tooltipSide: 'bottom',
   },
   {
     title: 'Configure os idiomas',
-    description: 'Escolha o idioma de origem do mangá (ex: Inglês ou Japonês) e o idioma de destino (ex: Português). Você também pode trocar o provedor de tradução nessa seção.',
+    description:
+      'Escolha o idioma de origem do mangá (ex: Inglês ou Japonês) e o idioma de destino (ex: Português). Você também pode trocar o provedor de tradução nessa seção.',
     selector: 'lang-config',
     tooltipSide: 'bottom',
   },
   {
     title: 'Criar e traduzir',
-    description: 'Com arquivos e idiomas prontos, toque aqui para criar a seção. Depois, use o botão Processar para enviar para a fila de tradução.',
+    description:
+      'Com arquivos e idiomas prontos, toque aqui para criar a seção. Depois, use o botão Processar para enviar para a fila de tradução.',
     selector: 'submit-btn',
     tooltipSide: 'top',
   },

@@ -21,10 +21,11 @@ export async function GET() {
 export async function PUT(request: Request) {
   const denied = await owner(request)
   if (denied) return denied
-  const body = await request.json().catch(() => ({})) as { apiKey?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { apiKey?: unknown }
   const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : ''
   if (!apiKey) return NextResponse.json({ message: 'Informe a chave do OpenRouter.' }, { status: 400 })
-  if (!await openRouterService.saveApiKey(apiKey)) return NextResponse.json({ message: 'O OpenRouter não aceitou essa chave.' }, { status: 401 })
+  if (!(await openRouterService.saveApiKey(apiKey)))
+    return NextResponse.json({ message: 'O OpenRouter não aceitou essa chave.' }, { status: 401 })
   return NextResponse.json({ message: 'Chave do OpenRouter salva.', hasApiKey: true, isValid: true })
 }
 

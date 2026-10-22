@@ -23,10 +23,14 @@ export async function GET() {
 export async function PUT(request: Request) {
   const denied = await owner(request)
   if (denied) return denied
-  const body = await request.json().catch(() => ({})) as { apiKey?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { apiKey?: unknown }
   const apiKey = typeof body.apiKey === 'string' ? body.apiKey.trim() : ''
   if (!apiKey || apiKey.length > 200) return NextResponse.json({ message: 'Informe a chave do DeepL API Free.' }, { status: 400 })
-  if (!apiKey.endsWith(':fx')) return NextResponse.json({ message: 'Essa não é uma chave do plano gratuito. A chave do DeepL API Free termina em :fx.' }, { status: 400 })
+  if (!apiKey.endsWith(':fx'))
+    return NextResponse.json(
+      { message: 'Essa não é uma chave do plano gratuito. A chave do DeepL API Free termina em :fx.' },
+      { status: 400 },
+    )
   const usage = await deeplUsage(apiKey)
   if (!usage) return NextResponse.json({ message: 'O DeepL não aceitou essa chave.' }, { status: 401 })
   saveDeeplKey(apiKey)

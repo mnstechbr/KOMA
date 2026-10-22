@@ -25,8 +25,10 @@ describe('biblioteca desktop automática', () => {
   })
   it('reutiliza o proprietário existente sem alterar sua biblioteca ou credenciais', () => {
     const db = database()
-    db.prepare(`INSERT INTO users (id, name, email, password_hash, role, created_at, updated_at)
-      VALUES (42, 'Nome existente', 'pessoal@example.invalid', 'hash-anterior', 4, '2026-01-01', '2026-01-01')`).run()
+    db.prepare(
+      `INSERT INTO users (id, name, email, password_hash, role, created_at, updated_at)
+      VALUES (42, 'Nome existente', 'pessoal@example.invalid', 'hash-anterior', 4, '2026-01-01', '2026-01-01')`,
+    ).run()
     expect(createDesktopSession(db).userId).toBe(42)
     expect(db.prepare('SELECT password_hash FROM users WHERE id = 42').get()).toEqual({ password_hash: 'hash-anterior' })
     expect(db.prepare('SELECT COUNT(*) AS total FROM users').get()).toEqual({ total: 1 })
@@ -39,6 +41,8 @@ describe('biblioteca desktop automática', () => {
     vi.stubEnv('KOMA_DESKTOP', '1')
     expect(isDesktopBootstrapAuthorized(request)).toBe(true)
     expect(isDesktopBootstrapAuthorized(new Request(request.url))).toBe(false)
-    expect(isDesktopBootstrapAuthorized(new Request(request.url, { headers: { 'x-koma-bootstrap-token': 'segredo-incorreto' } }))).toBe(false)
+    expect(isDesktopBootstrapAuthorized(new Request(request.url, { headers: { 'x-koma-bootstrap-token': 'segredo-incorreto' } }))).toBe(
+      false,
+    )
   })
 })

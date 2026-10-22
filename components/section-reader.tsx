@@ -18,14 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -173,9 +166,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
   const searchParams = useSearchParams()
   const libraryPageParam = searchParams.get('page')
   const libraryPage = libraryPageParam ? Number.parseInt(libraryPageParam, 10) : NaN
-  const backToLibraryHref = Number.isFinite(libraryPage) && libraryPage > 1
-    ? `/inicio/secoes?page=${libraryPage}`
-    : '/inicio/secoes'
+  const backToLibraryHref = Number.isFinite(libraryPage) && libraryPage > 1 ? `/inicio/secoes?page=${libraryPage}` : '/inicio/secoes'
 
   const [section, setSection] = useState<SectionDetail | null>(null)
   const [isLoadingSection, setIsLoadingSection] = useState(true)
@@ -249,10 +240,11 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
   const [ocrOverlayDensity, setOcrOverlayDensity] = useState(OCR_OVERLAY_DENSITY_DEFAULT)
   const [ocrOverlayOpacity, setOcrOverlayOpacity] = useState(OCR_OVERLAY_OPACITY_DEFAULT)
   const [ocrOverlayGlobalShape, setOcrOverlayGlobalShape] = useState<OcrOverlayShape>(OCR_OVERLAY_DEFAULT_SHAPE)
-  const [sectionCategoryOverlayPreferences, setSectionCategoryOverlayPreferences] =
-    useState<SectionCategoryOverlayPreferences | null>(null)
+  const [sectionCategoryOverlayPreferences, setSectionCategoryOverlayPreferences] = useState<SectionCategoryOverlayPreferences | null>(null)
   const ocrOverlayEditMode = true
-  const [ocrOverlayOverridesByImageId, setOcrOverlayOverridesByImageId] = useState<Record<number, Record<number, OcrOverlayItemOverride>>>({})
+  const [ocrOverlayOverridesByImageId, setOcrOverlayOverridesByImageId] = useState<Record<number, Record<number, OcrOverlayItemOverride>>>(
+    {},
+  )
   const [selectedOverlayTarget, setSelectedOverlayTarget] = useState<{ imageId: number; itemId: number } | null>(null)
   const [overlayQuickEditorState, setOverlayQuickEditorState] = useState<{
     imageId: number
@@ -310,9 +302,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     const params = new URLSearchParams()
     params.set('expired', '1')
     const currentPath =
-      typeof window !== 'undefined'
-        ? `${window.location.pathname}${window.location.search}`
-        : `/inicio/secoes/${sectionId}`
+      typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : `/inicio/secoes/${sectionId}`
     if (currentPath.startsWith('/')) {
       params.set('redirect', currentPath)
     }
@@ -358,45 +348,48 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     })
   }, [])
 
-  const fetchSection = useCallback(async (options?: { silent?: boolean }) => {
-    const silent = options?.silent ?? false
+  const fetchSection = useCallback(
+    async (options?: { silent?: boolean }) => {
+      const silent = options?.silent ?? false
 
-    if (silent) {
-      setIsPollingStatus(true)
-    } else {
-      setIsLoadingSection(true)
-    }
-
-    try {
-      const response = await fetch(`/api/sections/${sectionId}`, { cache: 'no-store' })
-      const data = await response.json()
-
-      if (response.status === 401) {
-        handleUnauthorized()
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error(toErrorMessage(data, 'Não foi possível carregar a seção.'))
-      }
-
-      setSection(data as SectionDetail)
-      setLastStatusSyncAt(Date.now())
-      if (!silent) {
-        setError('')
-      }
-    } catch (err) {
-      if (!silent) {
-        setError(err instanceof Error ? err.message : 'Erro ao carregar seção.')
-      }
-    } finally {
       if (silent) {
-        setIsPollingStatus(false)
+        setIsPollingStatus(true)
       } else {
-        setIsLoadingSection(false)
+        setIsLoadingSection(true)
       }
-    }
-  }, [handleUnauthorized, sectionId])
+
+      try {
+        const response = await fetch(`/api/sections/${sectionId}`, { cache: 'no-store' })
+        const data = await response.json()
+
+        if (response.status === 401) {
+          handleUnauthorized()
+          return
+        }
+
+        if (!response.ok) {
+          throw new Error(toErrorMessage(data, 'Não foi possível carregar a seção.'))
+        }
+
+        setSection(data as SectionDetail)
+        setLastStatusSyncAt(Date.now())
+        if (!silent) {
+          setError('')
+        }
+      } catch (err) {
+        if (!silent) {
+          setError(err instanceof Error ? err.message : 'Erro ao carregar seção.')
+        }
+      } finally {
+        if (silent) {
+          setIsPollingStatus(false)
+        } else {
+          setIsLoadingSection(false)
+        }
+      }
+    },
+    [handleUnauthorized, sectionId],
+  )
 
   const fetchSectionStats = useCallback(async () => {
     setIsStatsLoading(true)
@@ -453,19 +446,15 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
   }, [])
 
   const derivedProcessingCount = useMemo(
-    () => (
-      section?.images ?? []
-    ).filter((img) => img.selected_for_processing && isImageProcessing(img)).length,
-    [section]
+    () => (section?.images ?? []).filter((img) => img.selected_for_processing && isImageProcessing(img)).length,
+    [section],
   )
   const derivedQueuedCount = useMemo(
-    () => (
-      section?.images ?? []
-    ).filter((img) => (
-      img.selected_for_processing
-      && (img.translation_status === 'queued' || img.translation_status === 'pending')
-    )).length,
-    [section]
+    () =>
+      (section?.images ?? []).filter(
+        (img) => img.selected_for_processing && (img.translation_status === 'queued' || img.translation_status === 'pending'),
+      ).length,
+    [section],
   )
 
   useEffect(() => {
@@ -669,9 +658,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
 
         const nextCategory = normalizeSectionCategoryValue(data.category)
         const nextOptions = normalizeSectionCategoryOptions(data.categories)
-        const nextCategoryPreferences = normalizeSectionCategoryOverlayPreferences(
-          data.category_preferences
-        )
+        const nextCategoryPreferences = normalizeSectionCategoryOverlayPreferences(data.category_preferences)
 
         setSectionCategoryDraft(nextCategory)
         setSectionCategoryOptions(nextOptions)
@@ -796,7 +783,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
           })
         }
       },
-      { rootMargin: '300px 0px' }
+      { rootMargin: '300px 0px' },
     )
     return () => {
       scrollImageObserverRef.current?.disconnect()
@@ -805,7 +792,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
 
   const pageEndSuggestions = useMemo(
     () => suggestedSections.filter((item) => item.id !== sectionId).slice(0, 10),
-    [sectionId, suggestedSections]
+    [sectionId, suggestedSections],
   )
 
   useEffect(() => {
@@ -872,11 +859,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     }
 
     setOverlayQuickEditorPlacement((prev) => {
-      if (
-        prev
-        && prev.imageId === overlayQuickEditorState.imageId
-        && prev.itemId === overlayQuickEditorState.itemId
-      ) {
+      if (prev && prev.imageId === overlayQuickEditorState.imageId && prev.itemId === overlayQuickEditorState.itemId) {
         return prev
       }
 
@@ -939,8 +922,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
           }
 
           overlayStateLastSavedRef.current = serializedToPersist
-        } catch {
-        }
+        } catch {}
       })()
     }, 700)
 
@@ -979,8 +961,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
         const ids = JSON.parse(stored) as number[]
         setReadPages(new Set(ids))
       }
-    } catch {
-    }
+    } catch {}
   }, [sectionId])
 
   useEffect(() => {
@@ -993,8 +974,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
       next.add(image.id)
       try {
         localStorage.setItem(`${READ_PAGES_LS_PREFIX}${sectionId}`, JSON.stringify([...next]))
-      } catch {
-      }
+      } catch {}
       return next
     })
   }, [currentReadingPage, readingMode, readingViewMode, sectionImages, sectionId])
@@ -1037,8 +1017,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
 
           try {
             localStorage.setItem(`${READ_PAGES_LS_PREFIX}${sectionId}`, JSON.stringify([...next]))
-          } catch {
-          }
+          } catch {}
 
           return next
         })
@@ -1046,7 +1025,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
       {
         root: zone,
         threshold: [0.12, 0.2, 0.35],
-      }
+      },
     )
 
     pageNodes.forEach((node) => observer.observe(node))
@@ -1065,18 +1044,16 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
       } else {
         localStorage.removeItem(`${SECTION_READ_LS_PREFIX}${sectionId}`)
       }
-    } catch {
-    }
+    } catch {}
 
     if (typeof window !== 'undefined') {
       try {
         window.dispatchEvent(
           new CustomEvent('section-read-progress-updated', {
             detail: { sectionId, done: isDone },
-          })
+          }),
         )
-      } catch {
-      }
+      } catch {}
     }
 
     if (readProgressLastSyncedDoneRef.current === isDone) {
@@ -1096,46 +1073,31 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
   const currentPage = sectionImages[currentReadingPage] ?? null
   const readingTranslatedAvailable = currentPage ? isImageTranslated(currentPage) : false
   const readingDisplayUrl = currentPage
-    ? (
-      readingTranslatedAvailable
-        ? buildImageViewUrl(section!.id, currentPage.id, 'translated')
-        : buildImageViewUrl(section!.id, currentPage.id, 'original')
-    )
+    ? readingTranslatedAvailable
+      ? buildImageViewUrl(section!.id, currentPage.id, 'translated')
+      : buildImageViewUrl(section!.id, currentPage.id, 'original')
     : ''
-  const shouldUseCurrentPageOcrOverlay = Boolean(
-    currentPage
-      && !readingTranslatedAvailable
-  )
-  const ocrOverlayQueuedImageIds = useMemo(
-    () => new Set(ocrOverlayTranslateQueue),
-    [ocrOverlayTranslateQueue]
-  )
+  const shouldUseCurrentPageOcrOverlay = Boolean(currentPage && !readingTranslatedAvailable)
+  const ocrOverlayQueuedImageIds = useMemo(() => new Set(ocrOverlayTranslateQueue), [ocrOverlayTranslateQueue])
   const currentPageOverlayItems = useMemo(
-    () => currentPage
-      ? filterOverlayItemsByHiddenIds(
-        mergeOverlayItems(
-          mergeOverlayItems(
-            toOverlaySeedItems(currentPage),
-            ocrOverlayByImageId[currentPage.id] ?? []
-          ),
-          ocrOverlayManualItemsByImageId[currentPage.id] ?? []
-        ),
-        ocrOverlayHiddenItemIdsByImageId[currentPage.id] ?? []
-      )
-      : [],
-    [
-      currentPage,
-      ocrOverlayByImageId,
-      ocrOverlayHiddenItemIdsByImageId,
-      ocrOverlayManualItemsByImageId,
-    ]
+    () =>
+      currentPage
+        ? filterOverlayItemsByHiddenIds(
+            mergeOverlayItems(
+              mergeOverlayItems(toOverlaySeedItems(currentPage), ocrOverlayByImageId[currentPage.id] ?? []),
+              ocrOverlayManualItemsByImageId[currentPage.id] ?? [],
+            ),
+            ocrOverlayHiddenItemIdsByImageId[currentPage.id] ?? [],
+          )
+        : [],
+    [currentPage, ocrOverlayByImageId, ocrOverlayHiddenItemIdsByImageId, ocrOverlayManualItemsByImageId],
   )
   const currentPageOverlayLoading = currentPage
     ? Boolean(
-      ocrOverlayLoadingByImageId[currentPage.id]
-      || ocrOverlayCreatingSelectionByImageId[currentPage.id]
-      || ocrOverlayQueuedImageIds.has(currentPage.id)
-    )
+        ocrOverlayLoadingByImageId[currentPage.id] ||
+        ocrOverlayCreatingSelectionByImageId[currentPage.id] ||
+        ocrOverlayQueuedImageIds.has(currentPage.id),
+      )
     : false
   const overlayFontFamilyCss = OCR_OVERLAY_FONT_FAMILIES[ocrOverlayFontFamily].css
   const overlayDensityLabel = `${Math.round(ocrOverlayDensity * 100)}%`
@@ -1144,89 +1106,76 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
   const overlaySelectionEnabled = isOverlaySelectionMode && !overlaySelectionDraft
   const currentPageOverlayOverrides = currentPage ? (ocrOverlayOverridesByImageId[currentPage.id] ?? {}) : {}
   const currentPageOverlayColors = currentPage ? (ocrOverlayColorsByImageId[currentPage.id] ?? {}) : {}
-  const overlaySelectionDraftForCurrentPage = (
-    overlaySelectionDraft
-    && currentPage
-    && overlaySelectionDraft.imageId === currentPage.id
-  )
-    ? overlaySelectionDraft
-    : null
-  const selectedOverlayOnCurrentPage = (
-    selectedOverlayTarget && currentPage && selectedOverlayTarget.imageId === currentPage.id
-  )
-    ? selectedOverlayTarget
-    : null
-  const selectedOverlayOverrides = selectedOverlayTarget
-    ? (ocrOverlayOverridesByImageId[selectedOverlayTarget.imageId] ?? {})
-    : {}
+  const overlaySelectionDraftForCurrentPage =
+    overlaySelectionDraft && currentPage && overlaySelectionDraft.imageId === currentPage.id ? overlaySelectionDraft : null
+  const selectedOverlayOnCurrentPage =
+    selectedOverlayTarget && currentPage && selectedOverlayTarget.imageId === currentPage.id ? selectedOverlayTarget : null
+  const selectedOverlayOverrides = selectedOverlayTarget ? (ocrOverlayOverridesByImageId[selectedOverlayTarget.imageId] ?? {}) : {}
   const selectedOverlayShape: OcrOverlayShape = selectedOverlayTarget
     ? (selectedOverlayOverrides[selectedOverlayTarget.itemId]?.shape ?? ocrOverlayGlobalShape)
     : ocrOverlayGlobalShape
   const selectedOverlayItemFontScale = selectedOverlayTarget
     ? clampRange(
-      selectedOverlayOverrides[selectedOverlayTarget.itemId]?.fontScale ?? OCR_OVERLAY_ITEM_FONT_SCALE_DEFAULT,
-      OCR_OVERLAY_ITEM_FONT_SCALE_MIN,
-      OCR_OVERLAY_ITEM_FONT_SCALE_MAX
-    )
+        selectedOverlayOverrides[selectedOverlayTarget.itemId]?.fontScale ?? OCR_OVERLAY_ITEM_FONT_SCALE_DEFAULT,
+        OCR_OVERLAY_ITEM_FONT_SCALE_MIN,
+        OCR_OVERLAY_ITEM_FONT_SCALE_MAX,
+      )
     : OCR_OVERLAY_ITEM_FONT_SCALE_DEFAULT
   const selectedOverlayItemFontLabel = `${Math.round(selectedOverlayItemFontScale * 100)}%`
   const selectedOverlayItemSizeScale = selectedOverlayTarget
     ? clampRange(
-      selectedOverlayOverrides[selectedOverlayTarget.itemId]?.sizeScale ?? OCR_OVERLAY_ITEM_SIZE_DEFAULT,
-      OCR_OVERLAY_ITEM_SIZE_MIN,
-      OCR_OVERLAY_ITEM_SIZE_MAX
-    )
+        selectedOverlayOverrides[selectedOverlayTarget.itemId]?.sizeScale ?? OCR_OVERLAY_ITEM_SIZE_DEFAULT,
+        OCR_OVERLAY_ITEM_SIZE_MIN,
+        OCR_OVERLAY_ITEM_SIZE_MAX,
+      )
     : OCR_OVERLAY_ITEM_SIZE_DEFAULT
   const selectedOverlayItemSizeLabel = `${Math.round(selectedOverlayItemSizeScale * 100)}%`
   const selectedOverlayItemDensity = selectedOverlayTarget
     ? clampRange(
-      selectedOverlayOverrides[selectedOverlayTarget.itemId]?.density ?? OCR_OVERLAY_ITEM_DENSITY_DEFAULT,
-      OCR_OVERLAY_ITEM_DENSITY_MIN,
-      OCR_OVERLAY_ITEM_DENSITY_MAX
-    )
+        selectedOverlayOverrides[selectedOverlayTarget.itemId]?.density ?? OCR_OVERLAY_ITEM_DENSITY_DEFAULT,
+        OCR_OVERLAY_ITEM_DENSITY_MIN,
+        OCR_OVERLAY_ITEM_DENSITY_MAX,
+      )
     : OCR_OVERLAY_ITEM_DENSITY_DEFAULT
   const selectedOverlayItemDensityLabel = `${Math.round(selectedOverlayItemDensity * 100)}%`
   const selectedOverlayDragEnabled = Boolean(
-    selectedOverlayTarget
-    && overlayDragEnabledTarget
-    && selectedOverlayTarget.imageId === overlayDragEnabledTarget.imageId
-    && selectedOverlayTarget.itemId === overlayDragEnabledTarget.itemId
+    selectedOverlayTarget &&
+    overlayDragEnabledTarget &&
+    selectedOverlayTarget.imageId === overlayDragEnabledTarget.imageId &&
+    selectedOverlayTarget.itemId === overlayDragEnabledTarget.itemId,
   )
-  const overlayQuickEditorForCurrentPage = (
-    overlayQuickEditorState
-    && currentPage
-    && overlayQuickEditorState.imageId === currentPage.id
+  const overlayQuickEditorForCurrentPage =
+    overlayQuickEditorState && currentPage && overlayQuickEditorState.imageId === currentPage.id ? overlayQuickEditorState : null
+  const quickEditorPlacementForCurrentPage =
+    overlayQuickEditorForCurrentPage &&
+    overlayQuickEditorPlacement &&
+    overlayQuickEditorPlacement.imageId === overlayQuickEditorForCurrentPage.imageId &&
+    overlayQuickEditorPlacement.itemId === overlayQuickEditorForCurrentPage.itemId
+      ? {
+          side: overlayQuickEditorPlacement.side,
+          align: overlayQuickEditorPlacement.align,
+        }
+      : resolveQuickEditorPlacement(overlayQuickEditorForCurrentPage)
+
+  const resolveImageOverlayReferenceSize = useCallback(
+    (image: SectionImage | null): ImageNaturalSize | null => {
+      if (!image) return null
+
+      const measured = imageNaturalSizeById[image.id]
+      if (measured && measured.width > 0 && measured.height > 0) {
+        return measured
+      }
+
+      const rawWidth = toFiniteNumber(image.translated_width)
+      const rawHeight = toFiniteNumber(image.translated_height)
+      if (rawWidth !== null && rawHeight !== null && rawWidth > 0 && rawHeight > 0) {
+        return { width: rawWidth, height: rawHeight }
+      }
+
+      return null
+    },
+    [imageNaturalSizeById],
   )
-    ? overlayQuickEditorState
-    : null
-  const quickEditorPlacementForCurrentPage = (
-    overlayQuickEditorForCurrentPage
-    && overlayQuickEditorPlacement
-    && overlayQuickEditorPlacement.imageId === overlayQuickEditorForCurrentPage.imageId
-    && overlayQuickEditorPlacement.itemId === overlayQuickEditorForCurrentPage.itemId
-  )
-    ? {
-      side: overlayQuickEditorPlacement.side,
-      align: overlayQuickEditorPlacement.align,
-    }
-    : resolveQuickEditorPlacement(overlayQuickEditorForCurrentPage)
-
-  const resolveImageOverlayReferenceSize = useCallback((image: SectionImage | null): ImageNaturalSize | null => {
-    if (!image) return null
-
-    const measured = imageNaturalSizeById[image.id]
-    if (measured && measured.width > 0 && measured.height > 0) {
-      return measured
-    }
-
-    const rawWidth = toFiniteNumber(image.translated_width)
-    const rawHeight = toFiniteNumber(image.translated_height)
-    if (rawWidth !== null && rawHeight !== null && rawWidth > 0 && rawHeight > 0) {
-      return { width: rawWidth, height: rawHeight }
-    }
-
-    return null
-  }, [imageNaturalSizeById])
 
   const currentPageOverlayReferenceSize = resolveImageOverlayReferenceSize(currentPage)
 
@@ -1238,10 +1187,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     return sectionImages.some((image) => {
       const translationStatus = normalizeStatus(image.translation_status)
 
-      return (
-        FAILED_TRANSLATION_STATUSES.has(translationStatus)
-        || Boolean(image.translation_error)
-      )
+      return FAILED_TRANSLATION_STATUSES.has(translationStatus) || Boolean(image.translation_error)
     })
   }, [sectionImages])
   const isRecentlyCreatedSection = useMemo(() => {
@@ -1251,25 +1197,11 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     return Date.now() - createdAtMs <= 5 * 60 * 1000
   }, [section])
   const isSectionLoadingImagesInBackground = Boolean(
-    section
-    && sectionImages.length === 0
-    && (queueState?.inQueueOrProcessing || isRecentlyCreatedSection)
+    section && sectionImages.length === 0 && (queueState?.inQueueOrProcessing || isRecentlyCreatedSection),
   )
-  const shouldPollSectionStatus = Boolean(
-    queueState?.inQueueOrProcessing
-    || isSectionLoadingImagesInBackground
-  )
-  const canShowReprocessButton = Boolean(
-    !isAutoProcessingEnabled
-    && section
-    && !queueState?.inQueueOrProcessing
-    && hasAnyFailedTranslation
-  )
-  const canShowProcessButton = Boolean(
-    !isAutoProcessingEnabled
-    && section
-    && queueState?.canQueue
-  )
+  const shouldPollSectionStatus = Boolean(queueState?.inQueueOrProcessing || isSectionLoadingImagesInBackground)
+  const canShowReprocessButton = Boolean(!isAutoProcessingEnabled && section && !queueState?.inQueueOrProcessing && hasAnyFailedTranslation)
+  const canShowProcessButton = Boolean(!isAutoProcessingEnabled && section && queueState?.canQueue)
   const latestJobSnapshot = useMemo(() => {
     if (!section?.jobs || section.jobs.length === 0) return null
 
@@ -1286,9 +1218,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
   const queueSnapshot = section?.queue ?? null
   const latestJobQueueSnapshot = latestJobSnapshot?.queue ?? null
   const hasLiveQueueSnapshot = queueSnapshot !== null
-  const queueActiveJobId = hasLiveQueueSnapshot
-    ? toFiniteNumber(queueSnapshot?.active_job_id)
-    : toFiniteNumber(latestJobSnapshot?.id)
+  const queueActiveJobId = hasLiveQueueSnapshot ? toFiniteNumber(queueSnapshot?.active_job_id) : toFiniteNumber(latestJobSnapshot?.id)
   const queueActiveJobStatus = hasLiveQueueSnapshot
     ? toStringValue(queueSnapshot?.active_job_status)
     : toStringValue(latestJobSnapshot?.status)
@@ -1303,31 +1233,16 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     : firstDefined(toFiniteNumber(latestJobQueueSnapshot?.estimated_wait_minutes), 0)
   const queueEstimatedStartRaw = hasLiveQueueSnapshot
     ? toStringValue(queueSnapshot?.estimated_start_at)
-    : firstDefined(
-      toStringValue(latestJobQueueSnapshot?.estimated_start_at),
-      toStringValue(latestJobSnapshot?.estimated_start_at)
-    )
-  const queueEstimatedStartLabel = queueEstimatedStartRaw
-    ? formatSectionDate(queueEstimatedStartRaw)
-    : '—'
-  const queueStatusLabel = queueActiveJobStatus
-    ? formatStatus(queueActiveJobStatus)
-    : 'Sem job ativo'
+    : firstDefined(toStringValue(latestJobQueueSnapshot?.estimated_start_at), toStringValue(latestJobSnapshot?.estimated_start_at))
+  const queueEstimatedStartLabel = queueEstimatedStartRaw ? formatSectionDate(queueEstimatedStartRaw) : '—'
+  const queueStatusLabel = queueActiveJobStatus ? formatStatus(queueActiveJobStatus) : 'Sem job ativo'
   const hasQueueImageCounters = derivedProcessingCount > 0 || derivedQueuedCount > 0
   const hasQueueRuntimeSignals = Boolean(
-    hasQueueImageCounters
-    || queueActiveJobId !== null
-    || queuePosition !== null
-    || (queueJobsAhead ?? 0) > 0
+    hasQueueImageCounters || queueActiveJobId !== null || queuePosition !== null || (queueJobsAhead ?? 0) > 0,
   )
-  const shouldShowQueueInProgressBadge = Boolean(
-    queueState?.inQueueOrProcessing
-    && hasQueueRuntimeSignals
-  )
+  const shouldShowQueueInProgressBadge = Boolean(queueState?.inQueueOrProcessing && hasQueueRuntimeSignals)
   const trimmedSectionNameDraft = sectionNameDraft.trim()
-  const hasPendingSectionNameChange = Boolean(
-    section && trimmedSectionNameDraft.length > 0 && trimmedSectionNameDraft !== section.name
-  )
+  const hasPendingSectionNameChange = Boolean(section && trimmedSectionNameDraft.length > 0 && trimmedSectionNameDraft !== section.name)
 
   const handleSelectOverlayItem = useCallback((imageId: number, itemId: number) => {
     setSelectedOverlayTarget({ imageId, itemId })
@@ -1421,9 +1336,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
   useEffect(() => {
     if (!selectedOverlayTarget && !overlayQuickEditorState) return
 
-    const selectedOverlayItemKey = selectedOverlayTarget
-      ? `${selectedOverlayTarget.imageId}:${selectedOverlayTarget.itemId}`
-      : null
+    const selectedOverlayItemKey = selectedOverlayTarget ? `${selectedOverlayTarget.imageId}:${selectedOverlayTarget.itemId}` : null
 
     const handleDocumentPointerDown = (event: PointerEvent) => {
       const target = event.target instanceof HTMLElement ? event.target : null
@@ -1456,77 +1369,78 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     })
   }, [])
 
-  const handleResizeOverlayItem = useCallback((
-    imageId: number,
-    itemId: number,
-    payload: { dx: number; dy: number; widthScale: number; heightScale: number }
-  ) => {
-    setOcrOverlayOverridesByImageId((prev) => {
-      const imageOverrides = prev[imageId] ?? {}
-      return {
-        ...prev,
-        [imageId]: {
-          ...imageOverrides,
-          [itemId]: {
-            ...imageOverrides[itemId],
-            dx: clampRange(payload.dx, -5000, 5000),
-            dy: clampRange(payload.dy, -5000, 5000),
-            widthScale: clampRange(payload.widthScale, OCR_OVERLAY_ITEM_AXIS_SCALE_MIN, OCR_OVERLAY_ITEM_AXIS_SCALE_MAX),
-            heightScale: clampRange(payload.heightScale, OCR_OVERLAY_ITEM_AXIS_SCALE_MIN, OCR_OVERLAY_ITEM_AXIS_SCALE_MAX),
+  const handleResizeOverlayItem = useCallback(
+    (imageId: number, itemId: number, payload: { dx: number; dy: number; widthScale: number; heightScale: number }) => {
+      setOcrOverlayOverridesByImageId((prev) => {
+        const imageOverrides = prev[imageId] ?? {}
+        return {
+          ...prev,
+          [imageId]: {
+            ...imageOverrides,
+            [itemId]: {
+              ...imageOverrides[itemId],
+              dx: clampRange(payload.dx, -5000, 5000),
+              dy: clampRange(payload.dy, -5000, 5000),
+              widthScale: clampRange(payload.widthScale, OCR_OVERLAY_ITEM_AXIS_SCALE_MIN, OCR_OVERLAY_ITEM_AXIS_SCALE_MAX),
+              heightScale: clampRange(payload.heightScale, OCR_OVERLAY_ITEM_AXIS_SCALE_MIN, OCR_OVERLAY_ITEM_AXIS_SCALE_MAX),
+            },
           },
-        },
-      }
-    })
-  }, [])
+        }
+      })
+    },
+    [],
+  )
 
-  const handleSetSelectedOverlayShape = useCallback((shape: OcrOverlayShape) => {
-    if (!selectedOverlayTarget) return
-    const { imageId, itemId } = selectedOverlayTarget
+  const handleSetSelectedOverlayShape = useCallback(
+    (shape: OcrOverlayShape) => {
+      if (!selectedOverlayTarget) return
+      const { imageId, itemId } = selectedOverlayTarget
 
-    setOcrOverlayOverridesByImageId((prev) => {
-      const imageOverrides = prev[imageId] ?? {}
-      return {
-        ...prev,
-        [imageId]: {
-          ...imageOverrides,
-          [itemId]: {
-            ...imageOverrides[itemId],
-            shape,
+      setOcrOverlayOverridesByImageId((prev) => {
+        const imageOverrides = prev[imageId] ?? {}
+        return {
+          ...prev,
+          [imageId]: {
+            ...imageOverrides,
+            [itemId]: {
+              ...imageOverrides[itemId],
+              shape,
+            },
           },
-        },
-      }
-    })
-  }, [selectedOverlayTarget])
+        }
+      })
+    },
+    [selectedOverlayTarget],
+  )
 
-  const handleAdjustSelectedOverlayItemFont = useCallback((delta: number) => {
-    if (!selectedOverlayTarget) return
-    const { imageId, itemId } = selectedOverlayTarget
+  const handleAdjustSelectedOverlayItemFont = useCallback(
+    (delta: number) => {
+      if (!selectedOverlayTarget) return
+      const { imageId, itemId } = selectedOverlayTarget
 
-    setOcrOverlayOverridesByImageId((prev) => {
-      const imageOverrides = prev[imageId] ?? {}
-      const currentScale = clampRange(
-        imageOverrides[itemId]?.fontScale ?? OCR_OVERLAY_ITEM_FONT_SCALE_DEFAULT,
-        OCR_OVERLAY_ITEM_FONT_SCALE_MIN,
-        OCR_OVERLAY_ITEM_FONT_SCALE_MAX
-      )
-      const nextScale = clampRange(
-        currentScale + delta,
-        OCR_OVERLAY_ITEM_FONT_SCALE_MIN,
-        OCR_OVERLAY_ITEM_FONT_SCALE_MAX
-      )
+      setOcrOverlayOverridesByImageId((prev) => {
+        const imageOverrides = prev[imageId] ?? {}
+        const currentScale = clampRange(
+          imageOverrides[itemId]?.fontScale ?? OCR_OVERLAY_ITEM_FONT_SCALE_DEFAULT,
+          OCR_OVERLAY_ITEM_FONT_SCALE_MIN,
+          OCR_OVERLAY_ITEM_FONT_SCALE_MAX,
+        )
+        const nextScale = clampRange(currentScale + delta, OCR_OVERLAY_ITEM_FONT_SCALE_MIN, OCR_OVERLAY_ITEM_FONT_SCALE_MAX)
 
-      return {
-        ...prev,
-        [imageId]: {
-          ...imageOverrides,
-          [itemId]: {
-            ...imageOverrides[itemId],
-            fontScale: nextScale,
+        return {
+          ...prev,
+          [imageId]: {
+            ...imageOverrides,
+            [itemId]: {
+              ...imageOverrides[itemId],
+              fontScale: nextScale,
+            },
           },
-        },
-      }
-    })
-  }, [selectedOverlayTarget])
+        }
+      })
+    },
+    [selectedOverlayTarget],
+  )
 
   const handleResetSelectedOverlayItemAdjustments = useCallback(() => {
     if (!selectedOverlayTarget) return
@@ -1551,75 +1465,69 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     })
   }, [selectedOverlayTarget])
 
-  const handleAdjustSelectedOverlayItemSize = useCallback((delta: number) => {
-    if (!selectedOverlayTarget) return
-    const { imageId, itemId } = selectedOverlayTarget
+  const handleAdjustSelectedOverlayItemSize = useCallback(
+    (delta: number) => {
+      if (!selectedOverlayTarget) return
+      const { imageId, itemId } = selectedOverlayTarget
 
-    setOcrOverlayOverridesByImageId((prev) => {
-      const imageOverrides = prev[imageId] ?? {}
-      const currentScale = clampRange(
-        imageOverrides[itemId]?.sizeScale ?? OCR_OVERLAY_ITEM_SIZE_DEFAULT,
-        OCR_OVERLAY_ITEM_SIZE_MIN,
-        OCR_OVERLAY_ITEM_SIZE_MAX
-      )
-      const nextScale = clampRange(
-        currentScale + delta,
-        OCR_OVERLAY_ITEM_SIZE_MIN,
-        OCR_OVERLAY_ITEM_SIZE_MAX
-      )
+      setOcrOverlayOverridesByImageId((prev) => {
+        const imageOverrides = prev[imageId] ?? {}
+        const currentScale = clampRange(
+          imageOverrides[itemId]?.sizeScale ?? OCR_OVERLAY_ITEM_SIZE_DEFAULT,
+          OCR_OVERLAY_ITEM_SIZE_MIN,
+          OCR_OVERLAY_ITEM_SIZE_MAX,
+        )
+        const nextScale = clampRange(currentScale + delta, OCR_OVERLAY_ITEM_SIZE_MIN, OCR_OVERLAY_ITEM_SIZE_MAX)
 
-      return {
-        ...prev,
-        [imageId]: {
-          ...imageOverrides,
-          [itemId]: {
-            ...imageOverrides[itemId],
-            sizeScale: nextScale,
+        return {
+          ...prev,
+          [imageId]: {
+            ...imageOverrides,
+            [itemId]: {
+              ...imageOverrides[itemId],
+              sizeScale: nextScale,
+            },
           },
-        },
-      }
-    })
-  }, [selectedOverlayTarget])
+        }
+      })
+    },
+    [selectedOverlayTarget],
+  )
 
-  const handleAdjustSelectedOverlayItemDensity = useCallback((delta: number) => {
-    if (!selectedOverlayTarget) return
-    const { imageId, itemId } = selectedOverlayTarget
+  const handleAdjustSelectedOverlayItemDensity = useCallback(
+    (delta: number) => {
+      if (!selectedOverlayTarget) return
+      const { imageId, itemId } = selectedOverlayTarget
 
-    setOcrOverlayOverridesByImageId((prev) => {
-      const imageOverrides = prev[imageId] ?? {}
-      const currentDensity = clampRange(
-        imageOverrides[itemId]?.density ?? OCR_OVERLAY_ITEM_DENSITY_DEFAULT,
-        OCR_OVERLAY_ITEM_DENSITY_MIN,
-        OCR_OVERLAY_ITEM_DENSITY_MAX
-      )
-      const nextDensity = clampRange(
-        currentDensity + delta,
-        OCR_OVERLAY_ITEM_DENSITY_MIN,
-        OCR_OVERLAY_ITEM_DENSITY_MAX
-      )
+      setOcrOverlayOverridesByImageId((prev) => {
+        const imageOverrides = prev[imageId] ?? {}
+        const currentDensity = clampRange(
+          imageOverrides[itemId]?.density ?? OCR_OVERLAY_ITEM_DENSITY_DEFAULT,
+          OCR_OVERLAY_ITEM_DENSITY_MIN,
+          OCR_OVERLAY_ITEM_DENSITY_MAX,
+        )
+        const nextDensity = clampRange(currentDensity + delta, OCR_OVERLAY_ITEM_DENSITY_MIN, OCR_OVERLAY_ITEM_DENSITY_MAX)
 
-      return {
-        ...prev,
-        [imageId]: {
-          ...imageOverrides,
-          [itemId]: {
-            ...imageOverrides[itemId],
-            density: nextDensity,
+        return {
+          ...prev,
+          [imageId]: {
+            ...imageOverrides,
+            [itemId]: {
+              ...imageOverrides[itemId],
+              density: nextDensity,
+            },
           },
-        },
-      }
-    })
-  }, [selectedOverlayTarget])
+        }
+      })
+    },
+    [selectedOverlayTarget],
+  )
 
   const handleToggleSelectedOverlayDrag = useCallback(() => {
     if (!selectedOverlayTarget) return
 
     setOverlayDragEnabledTarget((prev) => {
-      if (
-        prev
-        && prev.imageId === selectedOverlayTarget.imageId
-        && prev.itemId === selectedOverlayTarget.itemId
-      ) {
+      if (prev && prev.imageId === selectedOverlayTarget.imageId && prev.itemId === selectedOverlayTarget.itemId) {
         return null
       }
 
@@ -1630,337 +1538,170 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     })
   }, [selectedOverlayTarget])
 
-  const handleOpenOverlayQuickEditor = useCallback((payload: {
-    imageId: number
-    itemId: number
-    leftPercent: number
-    topPercent: number
-  }) => {
-    const nextPlacement = resolveQuickEditorPlacement(payload)
-    setSelectedOverlayTarget({ imageId: payload.imageId, itemId: payload.itemId })
-    setOverlayQuickEditorPlacement({
-      imageId: payload.imageId,
-      itemId: payload.itemId,
-      side: nextPlacement.side,
-      align: nextPlacement.align,
-    })
-    setOverlayDragEnabledTarget(null)
-    setOverlayQuickEditorState(payload)
-  }, [])
+  const handleOpenOverlayQuickEditor = useCallback(
+    (payload: { imageId: number; itemId: number; leftPercent: number; topPercent: number }) => {
+      const nextPlacement = resolveQuickEditorPlacement(payload)
+      setSelectedOverlayTarget({ imageId: payload.imageId, itemId: payload.itemId })
+      setOverlayQuickEditorPlacement({
+        imageId: payload.imageId,
+        itemId: payload.itemId,
+        side: nextPlacement.side,
+        align: nextPlacement.align,
+      })
+      setOverlayDragEnabledTarget(null)
+      setOverlayQuickEditorState(payload)
+    },
+    [],
+  )
 
-  const handleStartOverlayQuickEditorDrag = useCallback((
-    imageId: number,
-    event: React.PointerEvent<HTMLDivElement>
-  ) => {
-    const startState = overlayQuickEditorState
-    if (!startState || startState.imageId !== imageId) return
+  const handleStartOverlayQuickEditorDrag = useCallback(
+    (imageId: number, event: React.PointerEvent<HTMLDivElement>) => {
+      const startState = overlayQuickEditorState
+      if (!startState || startState.imageId !== imageId) return
 
-    const host = document.querySelector(`[data-ocr-overlay-host="${imageId}"]`) as HTMLElement | null
-    if (!host) return
-    const hostRect = host.getBoundingClientRect()
-    if (hostRect.width <= 0 || hostRect.height <= 0) return
+      const host = document.querySelector(`[data-ocr-overlay-host="${imageId}"]`) as HTMLElement | null
+      if (!host) return
+      const hostRect = host.getBoundingClientRect()
+      if (hostRect.width <= 0 || hostRect.height <= 0) return
 
-    event.preventDefault()
-    event.stopPropagation()
+      event.preventDefault()
+      event.stopPropagation()
 
-    const pointerTarget = event.currentTarget
-    try {
-      pointerTarget.setPointerCapture(event.pointerId)
-    } catch {
-    }
+      const pointerTarget = event.currentTarget
+      try {
+        pointerTarget.setPointerCapture(event.pointerId)
+      } catch {}
 
-    const pointerId = event.pointerId
-    let lastClientX = event.clientX
-    let lastClientY = event.clientY
+      const pointerId = event.pointerId
+      let lastClientX = event.clientX
+      let lastClientY = event.clientY
 
-    const handlePointerMove = (moveEvent: PointerEvent) => {
-      if (moveEvent.pointerId !== pointerId) return
-      moveEvent.preventDefault()
+      const handlePointerMove = (moveEvent: PointerEvent) => {
+        if (moveEvent.pointerId !== pointerId) return
+        moveEvent.preventDefault()
 
-      const deltaXPercent = ((moveEvent.clientX - lastClientX) / hostRect.width) * 100
-      const deltaYPercent = ((moveEvent.clientY - lastClientY) / hostRect.height) * 100
+        const deltaXPercent = ((moveEvent.clientX - lastClientX) / hostRect.width) * 100
+        const deltaYPercent = ((moveEvent.clientY - lastClientY) / hostRect.height) * 100
 
-      setOverlayQuickEditorState((prev) => {
-        if (!prev || prev.imageId !== imageId) return prev
+        setOverlayQuickEditorState((prev) => {
+          if (!prev || prev.imageId !== imageId) return prev
+          return {
+            ...prev,
+            leftPercent: clampPercent(prev.leftPercent + deltaXPercent),
+            topPercent: clampPercent(prev.topPercent + deltaYPercent),
+          }
+        })
+
+        lastClientX = moveEvent.clientX
+        lastClientY = moveEvent.clientY
+      }
+
+      const clearListeners = () => {
+        window.removeEventListener('pointermove', handlePointerMove)
+        window.removeEventListener('pointerup', clearListeners)
+        window.removeEventListener('pointercancel', clearListeners)
+        try {
+          pointerTarget.releasePointerCapture(pointerId)
+        } catch {}
+      }
+
+      window.addEventListener('pointermove', handlePointerMove)
+      window.addEventListener('pointerup', clearListeners)
+      window.addEventListener('pointercancel', clearListeners)
+    },
+    [overlayQuickEditorState],
+  )
+
+  const handleOverlaySelectionDraftReady = useCallback(
+    (payload: { imageId: number; box: [number, number, number, number]; leftPercent: number; topPercent: number }) => {
+      const image = sectionImages.find((entry) => entry.id === payload.imageId)
+      const nextSourceLang = normalizeOverlaySelectionLanguage(
+        image?.source_lang?.trim() || section?.source_lang || OCR_OVERLAY_SELECTION_SOURCE_DEFAULT,
+        OCR_OVERLAY_SELECTION_SOURCE_DEFAULT,
+        OCR_OVERLAY_SELECTION_LANGUAGES,
+      )
+      const nextTargetLang = normalizeOverlaySelectionLanguage(
+        image?.target_lang?.trim() || section?.target_lang || OCR_OVERLAY_SELECTION_TARGET_DEFAULT,
+        OCR_OVERLAY_SELECTION_TARGET_DEFAULT,
+        OCR_OVERLAY_SELECTION_TARGET_LANGUAGES,
+      )
+
+      setOverlaySelectionSourceLang(nextSourceLang)
+      setOverlaySelectionTargetLang(nextTargetLang)
+      setSelectedOverlayTarget(null)
+      setOverlayQuickEditorState(null)
+      setOverlayDragEnabledTarget(null)
+      setOverlaySelectionDraft(payload)
+    },
+    [section, sectionImages],
+  )
+
+  const handleOverlaySelectionDraftChange = useCallback(
+    (payload: { imageId: number; box: [number, number, number, number]; leftPercent: number; topPercent: number }) => {
+      setOverlaySelectionDraft((prev) => {
+        if (!prev || prev.imageId !== payload.imageId) return prev
         return {
           ...prev,
-          leftPercent: clampPercent(prev.leftPercent + deltaXPercent),
-          topPercent: clampPercent(prev.topPercent + deltaYPercent),
+          box: payload.box,
+          leftPercent: payload.leftPercent,
+          topPercent: payload.topPercent,
         }
       })
+    },
+    [],
+  )
 
-      lastClientX = moveEvent.clientX
-      lastClientY = moveEvent.clientY
-    }
+  const handleCreateOverlaySelectionBox = useCallback(
+    async (payload: { imageId: number; box: [number, number, number, number]; sourceLang?: string; targetLang?: string }) => {
+      if (!section) return
 
-    const clearListeners = () => {
-      window.removeEventListener('pointermove', handlePointerMove)
-      window.removeEventListener('pointerup', clearListeners)
-      window.removeEventListener('pointercancel', clearListeners)
-      try {
-        pointerTarget.releasePointerCapture(pointerId)
-      } catch {
-      }
-    }
+      const image = sectionImages.find((entry) => entry.id === payload.imageId)
+      if (!image) return
+      if (isImageTranslated(image)) return
 
-    window.addEventListener('pointermove', handlePointerMove)
-    window.addEventListener('pointerup', clearListeners)
-    window.addEventListener('pointercancel', clearListeners)
-  }, [overlayQuickEditorState])
-
-  const handleOverlaySelectionDraftReady = useCallback((payload: {
-    imageId: number
-    box: [number, number, number, number]
-    leftPercent: number
-    topPercent: number
-  }) => {
-    const image = sectionImages.find((entry) => entry.id === payload.imageId)
-    const nextSourceLang = normalizeOverlaySelectionLanguage(
-      image?.source_lang?.trim() || section?.source_lang || OCR_OVERLAY_SELECTION_SOURCE_DEFAULT,
-      OCR_OVERLAY_SELECTION_SOURCE_DEFAULT,
-      OCR_OVERLAY_SELECTION_LANGUAGES
-    )
-    const nextTargetLang = normalizeOverlaySelectionLanguage(
-      image?.target_lang?.trim() || section?.target_lang || OCR_OVERLAY_SELECTION_TARGET_DEFAULT,
-      OCR_OVERLAY_SELECTION_TARGET_DEFAULT,
-      OCR_OVERLAY_SELECTION_TARGET_LANGUAGES
-    )
-
-    setOverlaySelectionSourceLang(nextSourceLang)
-    setOverlaySelectionTargetLang(nextTargetLang)
-    setSelectedOverlayTarget(null)
-    setOverlayQuickEditorState(null)
-    setOverlayDragEnabledTarget(null)
-    setOverlaySelectionDraft(payload)
-  }, [section, sectionImages])
-
-  const handleOverlaySelectionDraftChange = useCallback((payload: {
-    imageId: number
-    box: [number, number, number, number]
-    leftPercent: number
-    topPercent: number
-  }) => {
-    setOverlaySelectionDraft((prev) => {
-      if (!prev || prev.imageId !== payload.imageId) return prev
-      return {
-        ...prev,
-        box: payload.box,
-        leftPercent: payload.leftPercent,
-        topPercent: payload.topPercent,
-      }
-    })
-  }, [])
-
-  const handleCreateOverlaySelectionBox = useCallback(async (
-    payload: {
-      imageId: number
-      box: [number, number, number, number]
-      sourceLang?: string
-      targetLang?: string
-    }
-  ) => {
-    if (!section) return
-
-    const image = sectionImages.find((entry) => entry.id === payload.imageId)
-    if (!image) return
-    if (isImageTranslated(image)) return
-
-    const referenceSize = resolveImageOverlayReferenceSize(image)
-    if (!referenceSize) {
-      toast.error('Não foi possível preparar a área para OCR.')
-      return
-    }
-
-    const existingItemIds = [
-      ...toOverlaySeedItems(image).map((item) => item.id),
-      ...(ocrOverlayByImageId[image.id] ?? []).map((item) => item.id),
-      ...(ocrOverlayManualItemsByImageId[image.id] ?? []).map((item) => item.id),
-      ...(ocrOverlayHiddenItemIdsByImageId[image.id] ?? []),
-    ]
-    const nextManualItemId = existingItemIds.reduce(
-      (maxValue, currentValue) => Math.max(maxValue, currentValue),
-      0
-    ) + 1
-
-    const pendingItem: OcrOverlayItem = {
-      id: nextManualItemId,
-      box: payload.box,
-      ocrText: 'OCR...',
-      translatedText: 'OCR...',
-    }
-
-    setSelectedOverlayTarget({ imageId: image.id, itemId: nextManualItemId })
-    setOverlayQuickEditorState(null)
-    setOverlayDragEnabledTarget(null)
-    setOcrOverlayHiddenItemIdsByImageId((prev) => {
-      const imageHiddenIds = prev[image.id] ?? []
-      if (!imageHiddenIds.includes(nextManualItemId)) return prev
-
-      const nextImageHiddenIds = imageHiddenIds.filter((itemId) => itemId !== nextManualItemId)
-      const next = { ...prev }
-      if (nextImageHiddenIds.length === 0) {
-        delete next[image.id]
-      } else {
-        next[image.id] = nextImageHiddenIds
-      }
-      return next
-    })
-    setOcrOverlayCreatingSelectionByImageId((prev) => ({ ...prev, [image.id]: true }))
-    setOcrOverlayManualItemsByImageId((prev) => {
-      const imageItems = prev[image.id] ?? []
-      return {
-        ...prev,
-        [image.id]: upsertOverlayItem(imageItems, pendingItem),
-      }
-    })
-    setOcrOverlayByImageId((prev) => {
-      const hiddenIds = ocrOverlayHiddenItemIdsByImageId[image.id] ?? []
-      const imageItems = prev[image.id] ?? filterOverlayItemsByHiddenIds(toOverlaySeedItems(image), hiddenIds)
-      return {
-        ...prev,
-        [image.id]: upsertOverlayItem(imageItems, pendingItem),
-      }
-    })
-
-    try {
-      const sourceImageUrl = buildImageViewUrl(section.id, image.id, 'original')
-      const croppedBlob = await cropImageAreaToBlob(sourceImageUrl, referenceSize, payload.box)
-      const ocrFile = new File(
-        [croppedBlob],
-        `section-${section.id}-image-${image.id}-overlay-${nextManualItemId}.png`,
-        { type: 'image/png' }
-      )
-
-      const ocrFormData = new FormData()
-      ocrFormData.append('file', ocrFile)
-
-      const ocrQueueResponse = await fetch('/api/ocr-image/queue', {
-        method: 'POST',
-        body: ocrFormData,
-      })
-      const ocrQueueData = (await ocrQueueResponse.json()) as OcrImageQueueResponse
-
-      if (ocrQueueResponse.status === 401) {
-        handleUnauthorized()
-        throw new Error('Sessão expirada. Faça login novamente.')
-      }
-      if (!ocrQueueResponse.ok) {
-        throw new Error(toErrorMessage(ocrQueueData, 'Falha ao enfileirar OCR da área selecionada.'))
+      const referenceSize = resolveImageOverlayReferenceSize(image)
+      if (!referenceSize) {
+        toast.error('Não foi possível preparar a área para OCR.')
+        return
       }
 
-      const queueRedisPayload = asObjectRecord(ocrQueueData.redis) ?? {}
-      const jobKey = toStringValue(ocrQueueData.job_id)
-        ?? toStringValue(queueRedisPayload.job_key)
-        ?? toStringValue((ocrQueueData as Record<string, unknown>).job_key)
-      const queueKey = toStringValue(queueRedisPayload.queue_key)
-        ?? toStringValue((ocrQueueData as Record<string, unknown>).queue_key)
-      if (!jobKey) {
-        throw new Error('A fila OCR não retornou job_key para polling.')
-      }
+      const existingItemIds = [
+        ...toOverlaySeedItems(image).map((item) => item.id),
+        ...(ocrOverlayByImageId[image.id] ?? []).map((item) => item.id),
+        ...(ocrOverlayManualItemsByImageId[image.id] ?? []).map((item) => item.id),
+        ...(ocrOverlayHiddenItemIdsByImageId[image.id] ?? []),
+      ]
+      const nextManualItemId = existingItemIds.reduce((maxValue, currentValue) => Math.max(maxValue, currentValue), 0) + 1
 
-      const pollStartedAt = Date.now()
-      let finalJobPayload: Record<string, unknown> | null = null
-      while (Date.now() - pollStartedAt <= OCR_QUEUE_POLL_TIMEOUT_MS) {
-        const params = new URLSearchParams()
-        params.set('job_key', jobKey)
-        if (queueKey) {
-          params.set('queue_key', queueKey)
-        }
-
-        const pollResponse = await fetch(`/api/ocr-image/job?${params.toString()}`, {
-          cache: 'no-store',
-        })
-        const pollData = (await pollResponse.json()) as OcrImageJobPollResponse
-
-        if (pollResponse.status === 401) {
-          handleUnauthorized()
-          throw new Error('Sessão expirada. Faça login novamente.')
-        }
-
-        if (pollResponse.ok) {
-          const normalizedStatus = normalizeStatus(toStringValue(pollData.status))
-          const jobPayload = asObjectRecord(pollData.job)
-
-          if (normalizedStatus === 'done') {
-            finalJobPayload = jobPayload
-            break
-          }
-
-          if (normalizedStatus === 'failed' || normalizedStatus === 'timeout') {
-            const errorMessage = toStringValue(jobPayload?.error_message)
-              || toStringValue(pollData.message)
-              || 'Falha no processamento OCR da área selecionada.'
-            throw new Error(errorMessage)
-          }
-        }
-
-        await new Promise((resolve) => window.setTimeout(resolve, OCR_QUEUE_POLL_INTERVAL_MS))
-      }
-
-      if (!finalJobPayload) {
-        throw new Error('Timeout aguardando OCR da área selecionada na fila.')
-      }
-
-      const extractedText = toStringValue(finalJobPayload.extracted_text) ?? ''
-      const baseText = extractedText || '[sem texto detectado]'
-
-      let translatedText = baseText
-      const sourceLang = normalizeOverlaySelectionLanguage(
-        payload.sourceLang ?? image.source_lang?.trim() ?? section.source_lang ?? OCR_OVERLAY_SELECTION_SOURCE_DEFAULT,
-        OCR_OVERLAY_SELECTION_SOURCE_DEFAULT,
-        OCR_OVERLAY_SELECTION_LANGUAGES
-      )
-      const targetLang = normalizeOverlaySelectionLanguage(
-        payload.targetLang ?? image.target_lang?.trim() ?? section.target_lang ?? OCR_OVERLAY_SELECTION_TARGET_DEFAULT,
-        OCR_OVERLAY_SELECTION_TARGET_DEFAULT,
-        OCR_OVERLAY_SELECTION_TARGET_LANGUAGES
-      )
-      const providerLang = resolveOcrOverlayProvider(section.provider_lang)
-      const translateEndpoint = '/api/translate/text-batch'
-
-      const translateResponse = await fetch(translateEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          source_lang: sourceLang,
-          target_lang: targetLang,
-          provider_lang: providerLang,
-          texts: [baseText],
-        }),
-      })
-      const translateData = (await translateResponse.json()) as OcrBatchTranslateResponse
-
-      if (translateResponse.status === 401) {
-        handleUnauthorized()
-        throw new Error('Sessão expirada. Faça login novamente.')
-      }
-      if (!translateResponse.ok) {
-        throw new Error(toErrorMessage(translateData, 'Falha ao traduzir o texto OCR da área selecionada.'))
-      }
-
-      const translatedItems = Array.isArray(translateData.translations)
-        ? translateData.translations
-          .map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-          .filter(Boolean)
-        : []
-      if (translatedItems[0]) {
-        translatedText = translatedItems[0]
-      }
-
-      const finalizedItem: OcrOverlayItem = {
+      const pendingItem: OcrOverlayItem = {
         id: nextManualItemId,
         box: payload.box,
-        ocrText: baseText,
-        translatedText,
+        ocrText: 'OCR...',
+        translatedText: 'OCR...',
       }
 
+      setSelectedOverlayTarget({ imageId: image.id, itemId: nextManualItemId })
+      setOverlayQuickEditorState(null)
+      setOverlayDragEnabledTarget(null)
+      setOcrOverlayHiddenItemIdsByImageId((prev) => {
+        const imageHiddenIds = prev[image.id] ?? []
+        if (!imageHiddenIds.includes(nextManualItemId)) return prev
+
+        const nextImageHiddenIds = imageHiddenIds.filter((itemId) => itemId !== nextManualItemId)
+        const next = { ...prev }
+        if (nextImageHiddenIds.length === 0) {
+          delete next[image.id]
+        } else {
+          next[image.id] = nextImageHiddenIds
+        }
+        return next
+      })
+      setOcrOverlayCreatingSelectionByImageId((prev) => ({ ...prev, [image.id]: true }))
       setOcrOverlayManualItemsByImageId((prev) => {
         const imageItems = prev[image.id] ?? []
         return {
           ...prev,
-          [image.id]: upsertOverlayItem(imageItems, finalizedItem),
+          [image.id]: upsertOverlayItem(imageItems, pendingItem),
         }
       })
       setOcrOverlayByImageId((prev) => {
@@ -1968,48 +1709,197 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
         const imageItems = prev[image.id] ?? filterOverlayItemsByHiddenIds(toOverlaySeedItems(image), hiddenIds)
         return {
           ...prev,
-          [image.id]: upsertOverlayItem(imageItems, finalizedItem),
+          [image.id]: upsertOverlayItem(imageItems, pendingItem),
         }
       })
-    } catch (err) {
-      setOcrOverlayManualItemsByImageId((prev) => {
-        const imageItems = prev[image.id] ?? []
-        const nextImageItems = removeOverlayItem(imageItems, nextManualItemId)
-        if (nextImageItems.length === imageItems.length) return prev
 
-        const next = { ...prev }
-        if (nextImageItems.length === 0) {
-          delete next[image.id]
-        } else {
+      try {
+        const sourceImageUrl = buildImageViewUrl(section.id, image.id, 'original')
+        const croppedBlob = await cropImageAreaToBlob(sourceImageUrl, referenceSize, payload.box)
+        const ocrFile = new File([croppedBlob], `section-${section.id}-image-${image.id}-overlay-${nextManualItemId}.png`, {
+          type: 'image/png',
+        })
+
+        const ocrFormData = new FormData()
+        ocrFormData.append('file', ocrFile)
+
+        const ocrQueueResponse = await fetch('/api/ocr-image/queue', {
+          method: 'POST',
+          body: ocrFormData,
+        })
+        const ocrQueueData = (await ocrQueueResponse.json()) as OcrImageQueueResponse
+
+        if (ocrQueueResponse.status === 401) {
+          handleUnauthorized()
+          throw new Error('Sessão expirada. Faça login novamente.')
+        }
+        if (!ocrQueueResponse.ok) {
+          throw new Error(toErrorMessage(ocrQueueData, 'Falha ao enfileirar OCR da área selecionada.'))
+        }
+
+        const queueRedisPayload = asObjectRecord(ocrQueueData.redis) ?? {}
+        const jobKey =
+          toStringValue(ocrQueueData.job_id) ??
+          toStringValue(queueRedisPayload.job_key) ??
+          toStringValue((ocrQueueData as Record<string, unknown>).job_key)
+        const queueKey = toStringValue(queueRedisPayload.queue_key) ?? toStringValue((ocrQueueData as Record<string, unknown>).queue_key)
+        if (!jobKey) {
+          throw new Error('A fila OCR não retornou job_key para polling.')
+        }
+
+        const pollStartedAt = Date.now()
+        let finalJobPayload: Record<string, unknown> | null = null
+        while (Date.now() - pollStartedAt <= OCR_QUEUE_POLL_TIMEOUT_MS) {
+          const params = new URLSearchParams()
+          params.set('job_key', jobKey)
+          if (queueKey) {
+            params.set('queue_key', queueKey)
+          }
+
+          const pollResponse = await fetch(`/api/ocr-image/job?${params.toString()}`, {
+            cache: 'no-store',
+          })
+          const pollData = (await pollResponse.json()) as OcrImageJobPollResponse
+
+          if (pollResponse.status === 401) {
+            handleUnauthorized()
+            throw new Error('Sessão expirada. Faça login novamente.')
+          }
+
+          if (pollResponse.ok) {
+            const normalizedStatus = normalizeStatus(toStringValue(pollData.status))
+            const jobPayload = asObjectRecord(pollData.job)
+
+            if (normalizedStatus === 'done') {
+              finalJobPayload = jobPayload
+              break
+            }
+
+            if (normalizedStatus === 'failed' || normalizedStatus === 'timeout') {
+              const errorMessage =
+                toStringValue(jobPayload?.error_message) ||
+                toStringValue(pollData.message) ||
+                'Falha no processamento OCR da área selecionada.'
+              throw new Error(errorMessage)
+            }
+          }
+
+          await new Promise((resolve) => window.setTimeout(resolve, OCR_QUEUE_POLL_INTERVAL_MS))
+        }
+
+        if (!finalJobPayload) {
+          throw new Error('Timeout aguardando OCR da área selecionada na fila.')
+        }
+
+        const extractedText = toStringValue(finalJobPayload.extracted_text) ?? ''
+        const baseText = extractedText || '[sem texto detectado]'
+
+        let translatedText = baseText
+        const sourceLang = normalizeOverlaySelectionLanguage(
+          payload.sourceLang ?? image.source_lang?.trim() ?? section.source_lang ?? OCR_OVERLAY_SELECTION_SOURCE_DEFAULT,
+          OCR_OVERLAY_SELECTION_SOURCE_DEFAULT,
+          OCR_OVERLAY_SELECTION_LANGUAGES,
+        )
+        const targetLang = normalizeOverlaySelectionLanguage(
+          payload.targetLang ?? image.target_lang?.trim() ?? section.target_lang ?? OCR_OVERLAY_SELECTION_TARGET_DEFAULT,
+          OCR_OVERLAY_SELECTION_TARGET_DEFAULT,
+          OCR_OVERLAY_SELECTION_TARGET_LANGUAGES,
+        )
+        const providerLang = resolveOcrOverlayProvider(section.provider_lang)
+        const translateEndpoint = '/api/translate/text-batch'
+
+        const translateResponse = await fetch(translateEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            source_lang: sourceLang,
+            target_lang: targetLang,
+            provider_lang: providerLang,
+            texts: [baseText],
+          }),
+        })
+        const translateData = (await translateResponse.json()) as OcrBatchTranslateResponse
+
+        if (translateResponse.status === 401) {
+          handleUnauthorized()
+          throw new Error('Sessão expirada. Faça login novamente.')
+        }
+        if (!translateResponse.ok) {
+          throw new Error(toErrorMessage(translateData, 'Falha ao traduzir o texto OCR da área selecionada.'))
+        }
+
+        const translatedItems = Array.isArray(translateData.translations)
+          ? translateData.translations.map((entry) => (typeof entry === 'string' ? entry.trim() : '')).filter(Boolean)
+          : []
+        if (translatedItems[0]) {
+          translatedText = translatedItems[0]
+        }
+
+        const finalizedItem: OcrOverlayItem = {
+          id: nextManualItemId,
+          box: payload.box,
+          ocrText: baseText,
+          translatedText,
+        }
+
+        setOcrOverlayManualItemsByImageId((prev) => {
+          const imageItems = prev[image.id] ?? []
+          return {
+            ...prev,
+            [image.id]: upsertOverlayItem(imageItems, finalizedItem),
+          }
+        })
+        setOcrOverlayByImageId((prev) => {
+          const hiddenIds = ocrOverlayHiddenItemIdsByImageId[image.id] ?? []
+          const imageItems = prev[image.id] ?? filterOverlayItemsByHiddenIds(toOverlaySeedItems(image), hiddenIds)
+          return {
+            ...prev,
+            [image.id]: upsertOverlayItem(imageItems, finalizedItem),
+          }
+        })
+      } catch (err) {
+        setOcrOverlayManualItemsByImageId((prev) => {
+          const imageItems = prev[image.id] ?? []
+          const nextImageItems = removeOverlayItem(imageItems, nextManualItemId)
+          if (nextImageItems.length === imageItems.length) return prev
+
+          const next = { ...prev }
+          if (nextImageItems.length === 0) {
+            delete next[image.id]
+          } else {
+            next[image.id] = nextImageItems
+          }
+          return next
+        })
+
+        setOcrOverlayByImageId((prev) => {
+          const imageItems = prev[image.id] ?? []
+          const nextImageItems = removeOverlayItem(imageItems, nextManualItemId)
+          if (nextImageItems.length === imageItems.length) return prev
+
+          const next = { ...prev }
           next[image.id] = nextImageItems
-        }
-        return next
-      })
+          return next
+        })
 
-      setOcrOverlayByImageId((prev) => {
-        const imageItems = prev[image.id] ?? []
-        const nextImageItems = removeOverlayItem(imageItems, nextManualItemId)
-        if (nextImageItems.length === imageItems.length) return prev
-
-        const next = { ...prev }
-        next[image.id] = nextImageItems
-        return next
-      })
-
-      const message = err instanceof Error ? err.message : 'Falha ao criar balão manual.'
-      toast.error(message)
-    } finally {
-      setOcrOverlayCreatingSelectionByImageId((prev) => ({ ...prev, [image.id]: false }))
-    }
-  }, [
-    handleUnauthorized,
-    ocrOverlayByImageId,
-    ocrOverlayHiddenItemIdsByImageId,
-    ocrOverlayManualItemsByImageId,
-    resolveImageOverlayReferenceSize,
-    section,
-    sectionImages,
-  ])
+        const message = err instanceof Error ? err.message : 'Falha ao criar balão manual.'
+        toast.error(message)
+      } finally {
+        setOcrOverlayCreatingSelectionByImageId((prev) => ({ ...prev, [image.id]: false }))
+      }
+    },
+    [
+      handleUnauthorized,
+      ocrOverlayByImageId,
+      ocrOverlayHiddenItemIdsByImageId,
+      ocrOverlayManualItemsByImageId,
+      resolveImageOverlayReferenceSize,
+      section,
+      sectionImages,
+    ],
+  )
 
   const handleConfirmOverlaySelectionDraft = useCallback(() => {
     if (!overlaySelectionDraft) {
@@ -2027,317 +1917,276 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     setOverlaySelectionDraft(null)
     setIsOverlaySelectionMode(false)
     void handleCreateOverlaySelectionBox(payload)
-  }, [
-    handleCreateOverlaySelectionBox,
-    overlaySelectionDraft,
-    overlaySelectionSourceLang,
-    overlaySelectionTargetLang,
-  ])
+  }, [handleCreateOverlaySelectionBox, overlaySelectionDraft, overlaySelectionSourceLang, overlaySelectionTargetLang])
 
   const handleDiscardOverlaySelectionDraft = useCallback(() => {
     setOverlaySelectionDraft(null)
     setIsOverlaySelectionMode(false)
   }, [])
 
-  const canTranslateOverlayForImage = useCallback((image: SectionImage) => {
-    if (isImageTranslated(image)) return false
+  const canTranslateOverlayForImage = useCallback(
+    (image: SectionImage) => {
+      if (isImageTranslated(image)) return false
 
-    const hiddenIds = ocrOverlayHiddenItemIdsByImageId[image.id] ?? []
-    const baseItems = filterOverlayItemsByHiddenIds(
-      mergeOverlayItems(
+      const hiddenIds = ocrOverlayHiddenItemIdsByImageId[image.id] ?? []
+      const baseItems = filterOverlayItemsByHiddenIds(
         mergeOverlayItems(
-          toOverlaySeedItems(image),
-          ocrOverlayByImageId[image.id] ?? []
+          mergeOverlayItems(toOverlaySeedItems(image), ocrOverlayByImageId[image.id] ?? []),
+          ocrOverlayManualItemsByImageId[image.id] ?? [],
         ),
-        ocrOverlayManualItemsByImageId[image.id] ?? []
-      ),
-      hiddenIds
-    )
+        hiddenIds,
+      )
 
-    if (baseItems.length === 0) return false
-    if (!baseItems.some((item) => !item.translatedText)) return false
-    if (ocrOverlayLoadingByImageId[image.id]) return false
+      if (baseItems.length === 0) return false
+      if (!baseItems.some((item) => !item.translatedText)) return false
+      if (ocrOverlayLoadingByImageId[image.id]) return false
 
-    return true
-  }, [
-    ocrOverlayByImageId,
-    ocrOverlayHiddenItemIdsByImageId,
-    ocrOverlayLoadingByImageId,
-    ocrOverlayManualItemsByImageId,
-  ])
+      return true
+    },
+    [ocrOverlayByImageId, ocrOverlayHiddenItemIdsByImageId, ocrOverlayLoadingByImageId, ocrOverlayManualItemsByImageId],
+  )
 
-  const requestOverlayTranslationForImage = useCallback((image: SectionImage) => {
-    if (!canTranslateOverlayForImage(image)) return
+  const requestOverlayTranslationForImage = useCallback(
+    (image: SectionImage) => {
+      if (!canTranslateOverlayForImage(image)) return
 
-    setOcrOverlayTranslateQueue((prev) => (
-      prev.includes(image.id)
-        ? prev
-        : [...prev, image.id]
-    ))
-  }, [canTranslateOverlayForImage])
+      setOcrOverlayTranslateQueue((prev) => (prev.includes(image.id) ? prev : [...prev, image.id]))
+    },
+    [canTranslateOverlayForImage],
+  )
 
-  const ensureOverlayColorsForImage = useCallback(async (
-    imageId: number,
-    imageUrl: string,
-    items: OcrOverlayItem[],
-    referenceSize: ImageNaturalSize
-  ) => {
-    if (!imageUrl || items.length === 0 || referenceSize.width <= 0 || referenceSize.height <= 0) return
-    if (ocrOverlayColorLoadingByImageId[imageId]) return
+  const ensureOverlayColorsForImage = useCallback(
+    async (imageId: number, imageUrl: string, items: OcrOverlayItem[], referenceSize: ImageNaturalSize) => {
+      if (!imageUrl || items.length === 0 || referenceSize.width <= 0 || referenceSize.height <= 0) return
+      if (ocrOverlayColorLoadingByImageId[imageId]) return
 
-    const existing = ocrOverlayColorsByImageId[imageId]
-    if (existing && items.every((item) => existing[item.id])) return
+      const existing = ocrOverlayColorsByImageId[imageId]
+      if (existing && items.every((item) => existing[item.id])) return
 
-    setOcrOverlayColorLoadingByImageId((prev) => ({ ...prev, [imageId]: true }))
+      setOcrOverlayColorLoadingByImageId((prev) => ({ ...prev, [imageId]: true }))
 
-    try {
-      const imageElement = await loadImageForSampling(imageUrl)
-      const canvas = document.createElement('canvas')
-      canvas.width = imageElement.naturalWidth
-      canvas.height = imageElement.naturalHeight
-      const context = canvas.getContext('2d', { willReadFrequently: true })
-      if (!context) return
+      try {
+        const imageElement = await loadImageForSampling(imageUrl)
+        const canvas = document.createElement('canvas')
+        canvas.width = imageElement.naturalWidth
+        canvas.height = imageElement.naturalHeight
+        const context = canvas.getContext('2d', { willReadFrequently: true })
+        if (!context) return
 
-      context.drawImage(imageElement, 0, 0, canvas.width, canvas.height)
+        context.drawImage(imageElement, 0, 0, canvas.width, canvas.height)
 
-      const scaleX = canvas.width / referenceSize.width
-      const scaleY = canvas.height / referenceSize.height
-      const imageOverrides = ocrOverlayOverridesByImageId[imageId] ?? {}
-      const nextProfiles: Record<number, OcrOverlayItemColors> = {}
+        const scaleX = canvas.width / referenceSize.width
+        const scaleY = canvas.height / referenceSize.height
+        const imageOverrides = ocrOverlayOverridesByImageId[imageId] ?? {}
+        const nextProfiles: Record<number, OcrOverlayItemColors> = {}
 
-      for (const item of items) {
-        const [rawX1, rawY1, rawX2, rawY2] = item.box
-        const override = imageOverrides[item.id]
-        const insetX = (rawX2 - rawX1) * (ocrOverlayBoxInsetPercent / 100)
-        const insetY = (rawY2 - rawY1) * (ocrOverlayBoxInsetPercent / 100)
-        let x1 = rawX1 + insetX + (override?.dx ?? 0)
-        let y1 = rawY1 + insetY + (override?.dy ?? 0)
-        let x2 = rawX2 - insetX + (override?.dx ?? 0)
-        let y2 = rawY2 - insetY + (override?.dy ?? 0)
+        for (const item of items) {
+          const [rawX1, rawY1, rawX2, rawY2] = item.box
+          const override = imageOverrides[item.id]
+          const insetX = (rawX2 - rawX1) * (ocrOverlayBoxInsetPercent / 100)
+          const insetY = (rawY2 - rawY1) * (ocrOverlayBoxInsetPercent / 100)
+          let x1 = rawX1 + insetX + (override?.dx ?? 0)
+          let y1 = rawY1 + insetY + (override?.dy ?? 0)
+          let x2 = rawX2 - insetX + (override?.dx ?? 0)
+          let y2 = rawY2 - insetY + (override?.dy ?? 0)
 
-        x1 = clampRange(x1, 0, referenceSize.width)
-        y1 = clampRange(y1, 0, referenceSize.height)
-        x2 = clampRange(x2, 0, referenceSize.width)
-        y2 = clampRange(y2, 0, referenceSize.height)
-        if (x2 <= x1 || y2 <= y1) continue
+          x1 = clampRange(x1, 0, referenceSize.width)
+          y1 = clampRange(y1, 0, referenceSize.height)
+          x2 = clampRange(x2, 0, referenceSize.width)
+          y2 = clampRange(y2, 0, referenceSize.height)
+          if (x2 <= x1 || y2 <= y1) continue
 
-        const itemSizeScale = clampRange(
-          override?.sizeScale ?? OCR_OVERLAY_ITEM_SIZE_DEFAULT,
-          OCR_OVERLAY_ITEM_SIZE_MIN,
-          OCR_OVERLAY_ITEM_SIZE_MAX
-        )
-        const itemWidthScale = clampRange(
-          override?.widthScale ?? OCR_OVERLAY_ITEM_AXIS_SCALE_DEFAULT,
-          OCR_OVERLAY_ITEM_AXIS_SCALE_MIN,
-          OCR_OVERLAY_ITEM_AXIS_SCALE_MAX
-        )
-        const itemHeightScale = clampRange(
-          override?.heightScale ?? OCR_OVERLAY_ITEM_AXIS_SCALE_DEFAULT,
-          OCR_OVERLAY_ITEM_AXIS_SCALE_MIN,
-          OCR_OVERLAY_ITEM_AXIS_SCALE_MAX
-        )
+          const itemSizeScale = clampRange(
+            override?.sizeScale ?? OCR_OVERLAY_ITEM_SIZE_DEFAULT,
+            OCR_OVERLAY_ITEM_SIZE_MIN,
+            OCR_OVERLAY_ITEM_SIZE_MAX,
+          )
+          const itemWidthScale = clampRange(
+            override?.widthScale ?? OCR_OVERLAY_ITEM_AXIS_SCALE_DEFAULT,
+            OCR_OVERLAY_ITEM_AXIS_SCALE_MIN,
+            OCR_OVERLAY_ITEM_AXIS_SCALE_MAX,
+          )
+          const itemHeightScale = clampRange(
+            override?.heightScale ?? OCR_OVERLAY_ITEM_AXIS_SCALE_DEFAULT,
+            OCR_OVERLAY_ITEM_AXIS_SCALE_MIN,
+            OCR_OVERLAY_ITEM_AXIS_SCALE_MAX,
+          )
 
-        let boxW = x2 - x1
-        let boxH = y2 - y1
-        const centerX = x1 + boxW / 2
-        const centerY = y1 + boxH / 2
+          let boxW = x2 - x1
+          let boxH = y2 - y1
+          const centerX = x1 + boxW / 2
+          const centerY = y1 + boxH / 2
 
-        boxW = boxW * itemSizeScale * itemWidthScale
-        boxH = boxH * itemSizeScale * itemHeightScale
-        x1 = centerX - boxW / 2
-        y1 = centerY - boxH / 2
-        x2 = centerX + boxW / 2
-        y2 = centerY + boxH / 2
+          boxW = boxW * itemSizeScale * itemWidthScale
+          boxH = boxH * itemSizeScale * itemHeightScale
+          x1 = centerX - boxW / 2
+          y1 = centerY - boxH / 2
+          x2 = centerX + boxW / 2
+          y2 = centerY + boxH / 2
 
-        if (x1 < 0) {
-          const shift = -x1
-          x1 += shift
-          x2 += shift
+          if (x1 < 0) {
+            const shift = -x1
+            x1 += shift
+            x2 += shift
+          }
+          if (x2 > referenceSize.width) {
+            const shift = x2 - referenceSize.width
+            x1 -= shift
+            x2 -= shift
+          }
+          if (y1 < 0) {
+            const shift = -y1
+            y1 += shift
+            y2 += shift
+          }
+          if (y2 > referenceSize.height) {
+            const shift = y2 - referenceSize.height
+            y1 -= shift
+            y2 -= shift
+          }
+
+          x1 = clampRange(x1, 0, referenceSize.width)
+          y1 = clampRange(y1, 0, referenceSize.height)
+          x2 = clampRange(x2, 0, referenceSize.width)
+          y2 = clampRange(y2, 0, referenceSize.height)
+          if (x2 <= x1 || y2 <= y1) continue
+
+          boxW = x2 - x1
+          boxH = y2 - y1
+          const innerX = x1 + boxW * 0.18
+          const innerY = y1 + boxH * 0.18
+          const innerW = Math.max(1, boxW * 0.64)
+          const innerH = Math.max(1, boxH * 0.64)
+
+          const sampled = sampleAverageColor(context, innerX * scaleX, innerY * scaleY, innerW * scaleX, innerH * scaleY)
+
+          nextProfiles[item.id] = toOverlayColorProfile(sampled.red, sampled.green, sampled.blue)
         }
-        if (x2 > referenceSize.width) {
-          const shift = x2 - referenceSize.width
-          x1 -= shift
-          x2 -= shift
-        }
-        if (y1 < 0) {
-          const shift = -y1
-          y1 += shift
-          y2 += shift
-        }
-        if (y2 > referenceSize.height) {
-          const shift = y2 - referenceSize.height
-          y1 -= shift
-          y2 -= shift
-        }
 
-        x1 = clampRange(x1, 0, referenceSize.width)
-        y1 = clampRange(y1, 0, referenceSize.height)
-        x2 = clampRange(x2, 0, referenceSize.width)
-        y2 = clampRange(y2, 0, referenceSize.height)
-        if (x2 <= x1 || y2 <= y1) continue
+        setOcrOverlayColorsByImageId((prev) => ({
+          ...prev,
+          [imageId]: {
+            ...(prev[imageId] ?? {}),
+            ...nextProfiles,
+          },
+        }))
+      } catch {
+      } finally {
+        setOcrOverlayColorLoadingByImageId((prev) => ({ ...prev, [imageId]: false }))
+      }
+    },
+    [ocrOverlayBoxInsetPercent, ocrOverlayColorLoadingByImageId, ocrOverlayColorsByImageId, ocrOverlayOverridesByImageId],
+  )
 
-        boxW = x2 - x1
-        boxH = y2 - y1
-        const innerX = x1 + boxW * 0.18
-        const innerY = y1 + boxH * 0.18
-        const innerW = Math.max(1, boxW * 0.64)
-        const innerH = Math.max(1, boxH * 0.64)
+  const translateOcrBatchForImage = useCallback(
+    async (image: SectionImage) => {
+      const seedItems = toOverlaySeedItems(image)
+      const currentItems = ocrOverlayByImageId[image.id] ?? []
+      const manualItems = ocrOverlayManualItemsByImageId[image.id] ?? []
+      const hiddenIds = ocrOverlayHiddenItemIdsByImageId[image.id] ?? []
+      const baseItems = filterOverlayItemsByHiddenIds(mergeOverlayItems(mergeOverlayItems(seedItems, currentItems), manualItems), hiddenIds)
 
-        const sampled = sampleAverageColor(
-          context,
-          innerX * scaleX,
-          innerY * scaleY,
-          innerW * scaleX,
-          innerH * scaleY
-        )
-
-        nextProfiles[item.id] = toOverlayColorProfile(sampled.red, sampled.green, sampled.blue)
+      if (baseItems.length === 0) {
+        setOcrOverlayByImageId((prev) => (Object.prototype.hasOwnProperty.call(prev, image.id) ? prev : { ...prev, [image.id]: [] }))
+        return
       }
 
-      setOcrOverlayColorsByImageId((prev) => ({
-        ...prev,
-        [imageId]: {
-          ...(prev[imageId] ?? {}),
-          ...nextProfiles,
-        },
-      }))
-    } catch {
-    } finally {
-      setOcrOverlayColorLoadingByImageId((prev) => ({ ...prev, [imageId]: false }))
-    }
-  }, [
-    ocrOverlayBoxInsetPercent,
-    ocrOverlayColorLoadingByImageId,
-    ocrOverlayColorsByImageId,
-    ocrOverlayOverridesByImageId,
-  ])
+      const sourceLang = image.source_lang?.trim() || section?.source_lang || 'auto'
+      const targetLang = image.target_lang?.trim() || section?.target_lang || 'pt-BR'
+      const providerLang = resolveOcrOverlayProvider(section?.provider_lang)
+      const translateEndpoint = '/api/translate/text-batch'
+      const pendingItems = baseItems.filter((item) => !item.translatedText)
 
-  const translateOcrBatchForImage = useCallback(async (image: SectionImage) => {
-    const seedItems = toOverlaySeedItems(image)
-    const currentItems = ocrOverlayByImageId[image.id] ?? []
-    const manualItems = ocrOverlayManualItemsByImageId[image.id] ?? []
-    const hiddenIds = ocrOverlayHiddenItemIdsByImageId[image.id] ?? []
-    const baseItems = filterOverlayItemsByHiddenIds(
-      mergeOverlayItems(
-        mergeOverlayItems(seedItems, currentItems),
-        manualItems
-      ),
-      hiddenIds
-    )
-
-    if (baseItems.length === 0) {
-      setOcrOverlayByImageId((prev) => (
-        Object.prototype.hasOwnProperty.call(prev, image.id)
-          ? prev
-          : { ...prev, [image.id]: [] }
-      ))
-      return
-    }
-
-    const sourceLang = image.source_lang?.trim() || section?.source_lang || 'auto'
-    const targetLang = image.target_lang?.trim() || section?.target_lang || 'pt-BR'
-    const providerLang = resolveOcrOverlayProvider(section?.provider_lang)
-    const translateEndpoint = '/api/translate/text-batch'
-    const pendingItems = baseItems.filter((item) => !item.translatedText)
-
-    if (pendingItems.length === 0) {
-      setOcrOverlayByImageId((prev) => ({ ...prev, [image.id]: baseItems }))
-      return
-    }
-
-    setOcrOverlayLoadingByImageId((prev) => ({ ...prev, [image.id]: true }))
-
-    try {
-      const response = await fetch(translateEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          source_lang: sourceLang,
-          target_lang: targetLang,
-          provider_lang: providerLang,
-          texts: pendingItems.map((item) => item.ocrText),
-        }),
-      })
-      const data = (await response.json()) as OcrBatchTranslateResponse
-
-      if (!response.ok) {
-        throw new Error(toErrorMessage(data, 'Não foi possível traduzir os textos OCR em lote.'))
+      if (pendingItems.length === 0) {
+        setOcrOverlayByImageId((prev) => ({ ...prev, [image.id]: baseItems }))
+        return
       }
 
-      const translatedItems = Array.isArray(data.translations)
-        ? data.translations.map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
-        : []
+      setOcrOverlayLoadingByImageId((prev) => ({ ...prev, [image.id]: true }))
 
-      let translatedCursor = 0
-      const mergedItems = baseItems.map((item) => {
-        if (item.translatedText) return item
-        const translatedText = translatedItems[translatedCursor] || item.ocrText
-        translatedCursor += 1
-        return {
+      try {
+        const response = await fetch(translateEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            source_lang: sourceLang,
+            target_lang: targetLang,
+            provider_lang: providerLang,
+            texts: pendingItems.map((item) => item.ocrText),
+          }),
+        })
+        const data = (await response.json()) as OcrBatchTranslateResponse
+
+        if (!response.ok) {
+          throw new Error(toErrorMessage(data, 'Não foi possível traduzir os textos OCR em lote.'))
+        }
+
+        const translatedItems = Array.isArray(data.translations)
+          ? data.translations.map((entry) => (typeof entry === 'string' ? entry.trim() : ''))
+          : []
+
+        let translatedCursor = 0
+        const mergedItems = baseItems.map((item) => {
+          if (item.translatedText) return item
+          const translatedText = translatedItems[translatedCursor] || item.ocrText
+          translatedCursor += 1
+          return {
+            ...item,
+            translatedText,
+          }
+        })
+
+        setOcrOverlayByImageId((prev) => ({ ...prev, [image.id]: mergedItems }))
+        setOcrOverlayManualItemsByImageId((prev) => {
+          const imageManualItems = prev[image.id]
+          if (!imageManualItems || imageManualItems.length === 0) return prev
+
+          const nextImageManualItems = imageManualItems.map((manualItem) => {
+            const mergedItem = mergedItems.find((item) => item.id === manualItem.id)
+            return mergedItem ?? manualItem
+          })
+
+          return {
+            ...prev,
+            [image.id]: nextImageManualItems,
+          }
+        })
+      } catch {
+        const fallbackItems = baseItems.map((item) => ({
           ...item,
-          translatedText,
-        }
-      })
+          translatedText: item.translatedText || item.ocrText,
+        }))
 
-      setOcrOverlayByImageId((prev) => ({ ...prev, [image.id]: mergedItems }))
-      setOcrOverlayManualItemsByImageId((prev) => {
-        const imageManualItems = prev[image.id]
-        if (!imageManualItems || imageManualItems.length === 0) return prev
+        setOcrOverlayByImageId((prev) => ({ ...prev, [image.id]: fallbackItems }))
+        setOcrOverlayManualItemsByImageId((prev) => {
+          const imageManualItems = prev[image.id]
+          if (!imageManualItems || imageManualItems.length === 0) return prev
 
-        const nextImageManualItems = imageManualItems.map((manualItem) => {
-          const mergedItem = mergedItems.find((item) => item.id === manualItem.id)
-          return mergedItem ?? manualItem
+          const nextImageManualItems = imageManualItems.map((manualItem) => {
+            const fallbackItem = fallbackItems.find((item) => item.id === manualItem.id)
+            return fallbackItem ?? manualItem
+          })
+
+          return {
+            ...prev,
+            [image.id]: nextImageManualItems,
+          }
         })
-
-        return {
-          ...prev,
-          [image.id]: nextImageManualItems,
-        }
-      })
-    } catch {
-      const fallbackItems = baseItems.map((item) => ({
-        ...item,
-        translatedText: item.translatedText || item.ocrText,
-      }))
-
-      setOcrOverlayByImageId((prev) => ({ ...prev, [image.id]: fallbackItems }))
-      setOcrOverlayManualItemsByImageId((prev) => {
-        const imageManualItems = prev[image.id]
-        if (!imageManualItems || imageManualItems.length === 0) return prev
-
-        const nextImageManualItems = imageManualItems.map((manualItem) => {
-          const fallbackItem = fallbackItems.find((item) => item.id === manualItem.id)
-          return fallbackItem ?? manualItem
-        })
-
-        return {
-          ...prev,
-          [image.id]: nextImageManualItems,
-        }
-      })
-    } finally {
-      setOcrOverlayLoadingByImageId((prev) => ({ ...prev, [image.id]: false }))
-    }
-  }, [
-    ocrOverlayByImageId,
-    ocrOverlayHiddenItemIdsByImageId,
-    ocrOverlayManualItemsByImageId,
-    section,
-  ])
+      } finally {
+        setOcrOverlayLoadingByImageId((prev) => ({ ...prev, [image.id]: false }))
+      }
+    },
+    [ocrOverlayByImageId, ocrOverlayHiddenItemIdsByImageId, ocrOverlayManualItemsByImageId, section],
+  )
 
   useEffect(() => {
     if (!readingMode || !currentPage) return
     if (!shouldUseCurrentPageOcrOverlay) return
 
     requestOverlayTranslationForImage(currentPage)
-  }, [
-    currentPage,
-    readingMode,
-    requestOverlayTranslationForImage,
-    shouldUseCurrentPageOcrOverlay,
-  ])
+  }, [currentPage, readingMode, requestOverlayTranslationForImage, shouldUseCurrentPageOcrOverlay])
 
   useEffect(() => {
     if (ocrOverlayTranslateWorkerBusyRef.current) return
@@ -2358,23 +2207,13 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
         ocrOverlayTranslateWorkerBusyRef.current = false
       }
     })()
-  }, [
-    canTranslateOverlayForImage,
-    ocrOverlayTranslateQueue,
-    sectionImages,
-    translateOcrBatchForImage,
-  ])
+  }, [canTranslateOverlayForImage, ocrOverlayTranslateQueue, sectionImages, translateOcrBatchForImage])
 
   useEffect(() => {
     if (!readingMode || !currentPage || !shouldUseCurrentPageOcrOverlay) return
     if (currentPageOverlayItems.length === 0 || !currentPageOverlayReferenceSize) return
 
-    void ensureOverlayColorsForImage(
-      currentPage.id,
-      readingDisplayUrl,
-      currentPageOverlayItems,
-      currentPageOverlayReferenceSize
-    )
+    void ensureOverlayColorsForImage(currentPage.id, readingDisplayUrl, currentPageOverlayItems, currentPageOverlayReferenceSize)
   }, [
     currentPage,
     currentPageOverlayItems,
@@ -2393,13 +2232,10 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
       if (!isImageOcrReady(image)) return
       const items = filterOverlayItemsByHiddenIds(
         mergeOverlayItems(
-          mergeOverlayItems(
-            toOverlaySeedItems(image),
-            ocrOverlayByImageId[image.id] ?? []
-          ),
-          ocrOverlayManualItemsByImageId[image.id] ?? []
+          mergeOverlayItems(toOverlaySeedItems(image), ocrOverlayByImageId[image.id] ?? []),
+          ocrOverlayManualItemsByImageId[image.id] ?? [],
         ),
-        ocrOverlayHiddenItemIdsByImageId[image.id] ?? []
+        ocrOverlayHiddenItemIdsByImageId[image.id] ?? [],
       )
       if (items.length === 0) return
 
@@ -2407,12 +2243,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
       if (!referenceSize) return
 
       const sourceUrl = buildImageViewUrl(section.id, image.id, 'original')
-      void ensureOverlayColorsForImage(
-        image.id,
-        sourceUrl,
-        items,
-        referenceSize
-      )
+      void ensureOverlayColorsForImage(image.id, sourceUrl, items, referenceSize)
     })
   }, [
     ensureOverlayColorsForImage,
@@ -2456,14 +2287,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
       preloadImage.onload = () => markImageAsLoaded(adjacentUrl)
       preloadImage.onerror = () => markImageAsLoaded(adjacentUrl)
     })
-  }, [
-    currentReadingPage,
-    loadedImageUrls,
-    markImageAsLoaded,
-    readingMode,
-    section,
-    sectionImages,
-  ])
+  }, [currentReadingPage, loadedImageUrls, markImageAsLoaded, readingMode, section, sectionImages])
 
   useEffect(() => {
     autoQueueAttemptedRef.current = false
@@ -2471,88 +2295,89 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     autoReprocessAcceptedRef.current = false
   }, [sectionId])
 
-  const handleQueueSection = useCallback(async (options?: QueueActionOptions): Promise<boolean> => {
-    if (!section) return false
+  const handleQueueSection = useCallback(
+    async (options?: QueueActionOptions): Promise<boolean> => {
+      if (!section) return false
 
-    setError('')
-    if (!options?.silent) {
-      setSuccess('')
-    }
-    setQueueActionLoading('queue')
-
-    try {
-      const response = await fetch(`/api/sections/${section.id}/queue?v2=true`, { method: 'POST' })
-      const data = await response.json().catch(() => ({}))
-
-      if (response.status === 401) {
-        handleUnauthorized()
-        return false
-      }
-
-      if (!response.ok) {
-        throw new Error(toErrorMessage(data, 'Não foi possível processar a seção.'))
-      }
-
+      setError('')
       if (!options?.silent) {
-        setSuccess(toErrorMessage(data, 'Seção enviada para processamento com sucesso.'))
+        setSuccess('')
       }
-      triggerForcedPolling()
-      await fetchSection({ silent: true })
-      return true
-    } catch (err) {
-      const fallbackMessage = options?.automatic
-        ? 'Erro ao iniciar processamento automático da seção.'
-        : 'Erro ao processar seção.'
-      setError(err instanceof Error ? err.message : fallbackMessage)
-      return false
-    } finally {
-      setQueueActionLoading(null)
-    }
-  }, [fetchSection, handleUnauthorized, section, triggerForcedPolling])
+      setQueueActionLoading('queue')
 
-  const handleReprocessSection = useCallback(async (options?: QueueActionOptions): Promise<boolean> => {
-    if (!section) return false
+      try {
+        const response = await fetch(`/api/sections/${section.id}/queue?v2=true`, { method: 'POST' })
+        const data = await response.json().catch(() => ({}))
 
-    setError('')
-    if (!options?.silent) {
-      setSuccess('')
-    }
-    setQueueActionLoading('reprocess')
+        if (response.status === 401) {
+          handleUnauthorized()
+          return false
+        }
 
-    const providerLang = resolveOcrOverlayProvider(section.provider_lang)
+        if (!response.ok) {
+          throw new Error(toErrorMessage(data, 'Não foi possível processar a seção.'))
+        }
 
-    try {
-      const response = await fetch(
-        `/api/sections/${section.id}/reprocess?v2=true&provider_lang=${encodeURIComponent(providerLang)}`,
-        { method: 'POST' }
-      )
-      const data = await response.json().catch(() => ({}))
-
-      if (response.status === 401) {
-        handleUnauthorized()
+        if (!options?.silent) {
+          setSuccess(toErrorMessage(data, 'Seção enviada para processamento com sucesso.'))
+        }
+        triggerForcedPolling()
+        await fetchSection({ silent: true })
+        return true
+      } catch (err) {
+        const fallbackMessage = options?.automatic ? 'Erro ao iniciar processamento automático da seção.' : 'Erro ao processar seção.'
+        setError(err instanceof Error ? err.message : fallbackMessage)
         return false
+      } finally {
+        setQueueActionLoading(null)
       }
+    },
+    [fetchSection, handleUnauthorized, section, triggerForcedPolling],
+  )
 
-      if (!response.ok) {
-        throw new Error(toErrorMessage(data, 'Não foi possível reprocessar a seção.'))
-      }
+  const handleReprocessSection = useCallback(
+    async (options?: QueueActionOptions): Promise<boolean> => {
+      if (!section) return false
 
+      setError('')
       if (!options?.silent) {
-        setSuccess(toErrorMessage(data, 'Reprocessamento iniciado com sucesso.'))
+        setSuccess('')
       }
-      triggerForcedPolling()
-      await fetchSection({ silent: true })
-      return true
-    } catch (err) {
-      const fallbackMessage = options?.automatic
-        ? 'Erro ao iniciar reprocessamento automático da seção.'
-        : 'Erro ao reprocessar seção.'
-      setError(err instanceof Error ? err.message : fallbackMessage)
-      return false
-    } finally {
-      setQueueActionLoading(null)
-    }
-  }, [fetchSection, handleUnauthorized, section, triggerForcedPolling])
+      setQueueActionLoading('reprocess')
+
+      const providerLang = resolveOcrOverlayProvider(section.provider_lang)
+
+      try {
+        const response = await fetch(`/api/sections/${section.id}/reprocess?v2=true&provider_lang=${encodeURIComponent(providerLang)}`, {
+          method: 'POST',
+        })
+        const data = await response.json().catch(() => ({}))
+
+        if (response.status === 401) {
+          handleUnauthorized()
+          return false
+        }
+
+        if (!response.ok) {
+          throw new Error(toErrorMessage(data, 'Não foi possível reprocessar a seção.'))
+        }
+
+        if (!options?.silent) {
+          setSuccess(toErrorMessage(data, 'Reprocessamento iniciado com sucesso.'))
+        }
+        triggerForcedPolling()
+        await fetchSection({ silent: true })
+        return true
+      } catch (err) {
+        const fallbackMessage = options?.automatic ? 'Erro ao iniciar reprocessamento automático da seção.' : 'Erro ao reprocessar seção.'
+        setError(err instanceof Error ? err.message : fallbackMessage)
+        return false
+      } finally {
+        setQueueActionLoading(null)
+      }
+    },
+    [fetchSection, handleUnauthorized, section, triggerForcedPolling],
+  )
 
   useEffect(() => {
     if (!isAutoProcessingEnabled) return
@@ -2639,62 +2464,63 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     setIsEditingSectionName(false)
   }
 
-  const handlePersistSectionCategory = useCallback(async (rawValue?: string) => {
-    const normalizedCategory = normalizeSectionCategoryValue(rawValue ?? sectionCategoryDraft)
-    setSectionCategoryDraft(normalizedCategory)
+  const handlePersistSectionCategory = useCallback(
+    async (rawValue?: string) => {
+      const normalizedCategory = normalizeSectionCategoryValue(rawValue ?? sectionCategoryDraft)
+      setSectionCategoryDraft(normalizedCategory)
 
-    if (normalizedCategory === sectionCategoryLastSavedRef.current) return true
+      if (normalizedCategory === sectionCategoryLastSavedRef.current) return true
 
-    setIsSectionCategorySaving(true)
-    const requestId = sectionCategorySaveRequestRef.current + 1
-    sectionCategorySaveRequestRef.current = requestId
+      setIsSectionCategorySaving(true)
+      const requestId = sectionCategorySaveRequestRef.current + 1
+      sectionCategorySaveRequestRef.current = requestId
 
-    try {
-      const response = await fetch(`/api/sections/${sectionId}/category`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          category: normalizedCategory || null,
-        }),
-      })
-      const data = (await response.json()) as SectionCategoryResponse
+      try {
+        const response = await fetch(`/api/sections/${sectionId}/category`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            category: normalizedCategory || null,
+          }),
+        })
+        const data = (await response.json()) as SectionCategoryResponse
 
-      if (response.status === 401) {
-        handleUnauthorized()
+        if (response.status === 401) {
+          handleUnauthorized()
+          return false
+        }
+
+        if (!response.ok) {
+          throw new Error(toErrorMessage(data, 'Não foi possível salvar a categoria.'))
+        }
+
+        if (requestId !== sectionCategorySaveRequestRef.current) return false
+
+        const nextCategory = normalizeSectionCategoryValue(data.category)
+        const nextOptions = normalizeSectionCategoryOptions(data.categories)
+        const nextCategoryPreferences = normalizeSectionCategoryOverlayPreferences(data.category_preferences)
+        setSectionCategoryDraft(nextCategory)
+        setSectionCategoryOptions(nextOptions)
+        setSectionCategoryOverlayPreferences(nextCategoryPreferences)
+        setSectionCategoryQuery('')
+        sectionCategoryLastSavedRef.current = nextCategory
+
+        toast.success(data.message || 'Categoria salva com sucesso.')
+        return true
+      } catch (err) {
+        if (requestId !== sectionCategorySaveRequestRef.current) return false
+        toast.error(err instanceof Error ? err.message : 'Erro ao salvar categoria.')
         return false
+      } finally {
+        if (requestId === sectionCategorySaveRequestRef.current) {
+          setIsSectionCategorySaving(false)
+        }
       }
-
-      if (!response.ok) {
-        throw new Error(toErrorMessage(data, 'Não foi possível salvar a categoria.'))
-      }
-
-      if (requestId !== sectionCategorySaveRequestRef.current) return false
-
-      const nextCategory = normalizeSectionCategoryValue(data.category)
-      const nextOptions = normalizeSectionCategoryOptions(data.categories)
-      const nextCategoryPreferences = normalizeSectionCategoryOverlayPreferences(
-        data.category_preferences
-      )
-      setSectionCategoryDraft(nextCategory)
-      setSectionCategoryOptions(nextOptions)
-      setSectionCategoryOverlayPreferences(nextCategoryPreferences)
-      setSectionCategoryQuery('')
-      sectionCategoryLastSavedRef.current = nextCategory
-
-      toast.success(data.message || 'Categoria salva com sucesso.')
-      return true
-    } catch (err) {
-      if (requestId !== sectionCategorySaveRequestRef.current) return false
-      toast.error(err instanceof Error ? err.message : 'Erro ao salvar categoria.')
-      return false
-    } finally {
-      if (requestId === sectionCategorySaveRequestRef.current) {
-        setIsSectionCategorySaving(false)
-      }
-    }
-  }, [handleUnauthorized, sectionCategoryDraft, sectionId])
+    },
+    [handleUnauthorized, sectionCategoryDraft, sectionId],
+  )
 
   const filteredSectionCategoryOptions = useMemo(() => {
     const normalizedQuery = normalizeSectionCategoryValue(sectionCategoryQuery)
@@ -2714,13 +2540,16 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     return !sectionCategoryOptions.some((category) => toSectionCategoryKey(category) === queryKey)
   }, [sectionCategoryOptions, sectionCategoryQuery])
 
-  const handleSelectSectionCategory = useCallback((category: string) => {
-    const normalizedCategory = normalizeSectionCategoryValue(category)
-    sectionCategorySkipCloseCommitRef.current = true
-    setSectionCategoryQuery('')
-    setIsSectionCategoryPopoverOpen(false)
-    void handlePersistSectionCategory(normalizedCategory)
-  }, [handlePersistSectionCategory])
+  const handleSelectSectionCategory = useCallback(
+    (category: string) => {
+      const normalizedCategory = normalizeSectionCategoryValue(category)
+      sectionCategorySkipCloseCommitRef.current = true
+      setSectionCategoryQuery('')
+      setIsSectionCategoryPopoverOpen(false)
+      void handlePersistSectionCategory(normalizedCategory)
+    },
+    [handlePersistSectionCategory],
+  )
 
   const handleOpenDeleteCategoryDialog = useCallback((category: string) => {
     const normalizedCategory = normalizeSectionCategoryValue(category)
@@ -2772,10 +2601,8 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
       const deletedCountRaw = toFiniteNumber(data.deleted_sections_count)
       const deletedCount = deletedCountRaw === null ? 0 : Math.max(0, Math.floor(deletedCountRaw))
       toast.success(
-        data.message
-        || (deletedCount > 0
-          ? `Categoria removida. ${deletedCount} seção(ões) ficaram sem categoria.`
-          : 'Categoria removida com sucesso.')
+        data.message ||
+          (deletedCount > 0 ? `Categoria removida. ${deletedCount} seção(ões) ficaram sem categoria.` : 'Categoria removida com sucesso.'),
       )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Erro ao excluir categoria.')
@@ -2784,23 +2611,26 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
     }
   }, [categoryToDelete, handleUnauthorized, sectionId])
 
-  const handleSectionCategoryPopoverChange = useCallback((open: boolean) => {
-    if (!open) {
-      if (sectionCategorySkipCloseCommitRef.current) {
-        sectionCategorySkipCloseCommitRef.current = false
-      } else {
-        const normalizedQuery = normalizeSectionCategoryValue(sectionCategoryQuery)
-        if (normalizedQuery) {
-          void handlePersistSectionCategory(normalizedQuery)
+  const handleSectionCategoryPopoverChange = useCallback(
+    (open: boolean) => {
+      if (!open) {
+        if (sectionCategorySkipCloseCommitRef.current) {
+          sectionCategorySkipCloseCommitRef.current = false
+        } else {
+          const normalizedQuery = normalizeSectionCategoryValue(sectionCategoryQuery)
+          if (normalizedQuery) {
+            void handlePersistSectionCategory(normalizedQuery)
+          }
         }
+        setSectionCategoryQuery('')
+      } else {
+        setSectionCategoryQuery(sectionCategoryDraft)
       }
-      setSectionCategoryQuery('')
-    } else {
-      setSectionCategoryQuery(sectionCategoryDraft)
-    }
 
-    setIsSectionCategoryPopoverOpen(open)
-  }, [handlePersistSectionCategory, sectionCategoryDraft, sectionCategoryQuery])
+      setIsSectionCategoryPopoverOpen(open)
+    },
+    [handlePersistSectionCategory, sectionCategoryDraft, sectionCategoryQuery],
+  )
 
   const handleRenameSection = async () => {
     if (!section) return
@@ -3002,12 +2832,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
         <div className="flex-none bg-card border-b border-border p-2 sm:p-3">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center justify-between gap-2 sm:gap-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={closeReadingMode}
-                className="h-8 px-2 sm:h-9 sm:px-3"
-              >
+              <Button variant="ghost" size="sm" onClick={closeReadingMode} className="h-8 px-2 sm:h-9 sm:px-3">
                 <X className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span className="hidden sm:inline ml-2">Fechar</span>
               </Button>
@@ -3016,7 +2841,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setReadingViewMode((prev) => prev === 'paginated' ? 'scroll' : 'paginated')}
+                  onClick={() => setReadingViewMode((prev) => (prev === 'paginated' ? 'scroll' : 'paginated'))}
                   className={cn('h-8 w-8 p-0 sm:h-9 sm:w-9', readingViewMode === 'scroll' && 'bg-muted text-foreground')}
                   aria-label={readingViewMode === 'paginated' ? 'Alternar para scroll contínuo' : 'Alternar para paginação'}
                   title={readingViewMode === 'paginated' ? 'Scroll contínuo' : 'Paginação'}
@@ -3041,17 +2866,15 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                   <ZoomIn className="h-4 w-4" />
                 </Button>
                 {shouldUseCurrentPageOcrOverlay && (
-                  <Popover
-                    open={isOverlayFontPopoverOpen}
-                    onOpenChange={setIsOverlayFontPopoverOpen}
-                  >
+                  <Popover open={isOverlayFontPopoverOpen} onOpenChange={setIsOverlayFontPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         size="sm"
                         className={cn(
                           'h-8 min-w-12 gap-1 border-primary/40 bg-primary/12 px-2 text-primary hover:bg-primary/20 hover:text-primary sm:h-9 sm:min-w-14 sm:px-2.5',
-                          isOverlayFontPopoverOpen && 'border-primary bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground'
+                          isOverlayFontPopoverOpen &&
+                            'border-primary bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground',
                         )}
                         aria-label="Abrir ajuste de fonte do overlay OCR"
                       >
@@ -3059,12 +2882,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                         <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', isOverlayFontPopoverOpen && 'rotate-180')} />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent
-                      side="bottom"
-                      align="end"
-                      sideOffset={8}
-                      className="z-[10000] w-56 p-2.5"
-                    >
+                    <PopoverContent side="bottom" align="end" sideOffset={8} className="z-[10000] w-56 p-2.5">
                       <div className="space-y-2.5">
                         <p className="text-[11px] text-muted-foreground">Tamanho da fonte</p>
                         <div className="flex items-center justify-between gap-1">
@@ -3073,25 +2891,27 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                             size="sm"
                             variant="outline"
                             className="h-7 w-7 p-0"
-                            onClick={() => setOcrOverlayFontScale((value) => (
-                              clampRange(value - OCR_OVERLAY_FONT_SCALE_STEP, OCR_OVERLAY_FONT_SCALE_MIN, OCR_OVERLAY_FONT_SCALE_MAX)
-                            ))}
+                            onClick={() =>
+                              setOcrOverlayFontScale((value) =>
+                                clampRange(value - OCR_OVERLAY_FONT_SCALE_STEP, OCR_OVERLAY_FONT_SCALE_MIN, OCR_OVERLAY_FONT_SCALE_MAX),
+                              )
+                            }
                             disabled={ocrOverlayFontScale <= OCR_OVERLAY_FONT_SCALE_MIN}
                             aria-label="Diminuir fonte do overlay OCR"
                           >
                             -
                           </Button>
-                          <span className="min-w-[64px] text-center text-sm font-semibold text-foreground">
-                            {overlayFontPercentLabel}%
-                          </span>
+                          <span className="min-w-[64px] text-center text-sm font-semibold text-foreground">{overlayFontPercentLabel}%</span>
                           <Button
                             type="button"
                             size="sm"
                             variant="outline"
                             className="h-7 w-7 p-0"
-                            onClick={() => setOcrOverlayFontScale((value) => (
-                              clampRange(value + OCR_OVERLAY_FONT_SCALE_STEP, OCR_OVERLAY_FONT_SCALE_MIN, OCR_OVERLAY_FONT_SCALE_MAX)
-                            ))}
+                            onClick={() =>
+                              setOcrOverlayFontScale((value) =>
+                                clampRange(value + OCR_OVERLAY_FONT_SCALE_STEP, OCR_OVERLAY_FONT_SCALE_MIN, OCR_OVERLAY_FONT_SCALE_MAX),
+                              )
+                            }
                             disabled={ocrOverlayFontScale >= OCR_OVERLAY_FONT_SCALE_MAX}
                             aria-label="Aumentar fonte do overlay OCR"
                           >
@@ -3109,12 +2929,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                             </SelectTrigger>
                             <SelectContent className="z-[10001]">
                               {Object.entries(OCR_OVERLAY_FONT_FAMILIES).map(([fontKey, fontConfig]) => (
-                                <SelectItem
-                                  key={fontKey}
-                                  value={fontKey}
-                                  className="text-xs"
-                                  style={{ fontFamily: fontConfig.css }}
-                                >
+                                <SelectItem key={fontKey} value={fontKey} className="text-xs" style={{ fontFamily: fontConfig.css }}>
                                   {fontConfig.label}
                                 </SelectItem>
                               ))}
@@ -3152,25 +2967,27 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                               size="sm"
                               variant="outline"
                               className="h-7 w-7 p-0"
-                              onClick={() => setOcrOverlayDensity((value) => (
-                                clampRange(value - OCR_OVERLAY_DENSITY_STEP, OCR_OVERLAY_DENSITY_MIN, OCR_OVERLAY_DENSITY_MAX)
-                              ))}
+                              onClick={() =>
+                                setOcrOverlayDensity((value) =>
+                                  clampRange(value - OCR_OVERLAY_DENSITY_STEP, OCR_OVERLAY_DENSITY_MIN, OCR_OVERLAY_DENSITY_MAX),
+                                )
+                              }
                               disabled={ocrOverlayDensity <= OCR_OVERLAY_DENSITY_MIN}
                               aria-label="Diminuir densidade do overlay OCR"
                             >
                               -
                             </Button>
-                            <span className="min-w-[64px] text-center text-sm font-semibold text-foreground">
-                              {overlayDensityLabel}
-                            </span>
+                            <span className="min-w-[64px] text-center text-sm font-semibold text-foreground">{overlayDensityLabel}</span>
                             <Button
                               type="button"
                               size="sm"
                               variant="outline"
                               className="h-7 w-7 p-0"
-                              onClick={() => setOcrOverlayDensity((value) => (
-                                clampRange(value + OCR_OVERLAY_DENSITY_STEP, OCR_OVERLAY_DENSITY_MIN, OCR_OVERLAY_DENSITY_MAX)
-                              ))}
+                              onClick={() =>
+                                setOcrOverlayDensity((value) =>
+                                  clampRange(value + OCR_OVERLAY_DENSITY_STEP, OCR_OVERLAY_DENSITY_MIN, OCR_OVERLAY_DENSITY_MAX),
+                                )
+                              }
                               disabled={ocrOverlayDensity >= OCR_OVERLAY_DENSITY_MAX}
                               aria-label="Aumentar densidade do overlay OCR"
                             >
@@ -3186,25 +3003,23 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                               size="sm"
                               variant="outline"
                               className="h-7 w-7 p-0"
-                              onClick={() => setOcrOverlayOpacity((value) => (
-                                clampRange(value - 0.05, OCR_OVERLAY_OPACITY_MIN, OCR_OVERLAY_OPACITY_MAX)
-                              ))}
+                              onClick={() =>
+                                setOcrOverlayOpacity((value) => clampRange(value - 0.05, OCR_OVERLAY_OPACITY_MIN, OCR_OVERLAY_OPACITY_MAX))
+                              }
                               disabled={ocrOverlayOpacity <= OCR_OVERLAY_OPACITY_MIN}
                               aria-label="Diminuir opacidade do overlay OCR"
                             >
                               -
                             </Button>
-                            <span className="min-w-[64px] text-center text-sm font-semibold text-foreground">
-                              {overlayOpacityLabel}
-                            </span>
+                            <span className="min-w-[64px] text-center text-sm font-semibold text-foreground">{overlayOpacityLabel}</span>
                             <Button
                               type="button"
                               size="sm"
                               variant="outline"
                               className="h-7 w-7 p-0"
-                              onClick={() => setOcrOverlayOpacity((value) => (
-                                clampRange(value + 0.05, OCR_OVERLAY_OPACITY_MIN, OCR_OVERLAY_OPACITY_MAX)
-                              ))}
+                              onClick={() =>
+                                setOcrOverlayOpacity((value) => clampRange(value + 0.05, OCR_OVERLAY_OPACITY_MIN, OCR_OVERLAY_OPACITY_MAX))
+                              }
                               disabled={ocrOverlayOpacity >= OCR_OVERLAY_OPACITY_MAX}
                               aria-label="Aumentar opacidade do overlay OCR"
                             >
@@ -3278,11 +3093,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
               {shouldUseCurrentPageOcrOverlay && !translatedAvailable && (
                 <span className="text-[10px] sm:text-xs bg-blue-500/15 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded-full">
                   <span className="sm:hidden">
-                    {currentPageOverlayLoading
-                      ? 'OCR...'
-                      : currentPageOverlayItems.length > 0
-                        ? 'Overlay OCR'
-                        : 'Sem boxes'}
+                    {currentPageOverlayLoading ? 'OCR...' : currentPageOverlayItems.length > 0 ? 'Overlay OCR' : 'Sem boxes'}
                   </span>
                   <span className="hidden sm:inline">
                     {currentPageOverlayLoading
@@ -3318,9 +3129,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
               onTouchEnd={handleReadingTouchEnd}
               style={{ touchAction: 'pan-y' }}
             >
-              {isOverlaySelectionMode && (
-                <div className="pointer-events-none absolute inset-0 z-[1] bg-black/25" />
-              )}
+              {isOverlaySelectionMode && <div className="pointer-events-none absolute inset-0 z-[1] bg-black/25" />}
               <div className="min-h-full flex items-center justify-center p-2 sm:p-4">
                 <div
                   className="relative w-full min-h-[280px] sm:min-h-[420px]"
@@ -3348,7 +3157,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                       alt={`Página ${currentPage.order_index + 1}`}
                       className={cn(
                         'w-full h-auto block mx-auto transition-opacity duration-200',
-                        isReadingImageLoading ? 'opacity-0' : isCurrentProcessing ? 'opacity-40' : 'opacity-100'
+                        isReadingImageLoading ? 'opacity-0' : isCurrentProcessing ? 'opacity-40' : 'opacity-100',
                       )}
                       loading="eager"
                       decoding="async"
@@ -3359,24 +3168,15 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                           width: event.currentTarget.naturalWidth,
                           height: event.currentTarget.naturalHeight,
                         }
-                        updateImageNaturalSize(
-                          currentPage.id,
-                          nextReferenceSize.width,
-                          nextReferenceSize.height
-                        )
+                        updateImageNaturalSize(currentPage.id, nextReferenceSize.width, nextReferenceSize.height)
 
                         if (
-                          shouldUseCurrentPageOcrOverlay
-                          && currentPageOverlayItems.length > 0
-                          && nextReferenceSize.width > 0
-                          && nextReferenceSize.height > 0
+                          shouldUseCurrentPageOcrOverlay &&
+                          currentPageOverlayItems.length > 0 &&
+                          nextReferenceSize.width > 0 &&
+                          nextReferenceSize.height > 0
                         ) {
-                          void ensureOverlayColorsForImage(
-                            currentPage.id,
-                            displayUrl,
-                            currentPageOverlayItems,
-                            nextReferenceSize
-                          )
+                          void ensureOverlayColorsForImage(currentPage.id, displayUrl, currentPageOverlayItems, nextReferenceSize)
                         }
                       }}
                       onError={() => markImageAsLoaded(displayUrl)}
@@ -3403,11 +3203,11 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                         onMoveItem={handleMoveOverlayItem}
                         onResizeItem={handleResizeOverlayItem}
                         onOpenQuickEditor={handleOpenOverlayQuickEditor}
-                        dragEnabledItemId={(
+                        dragEnabledItemId={
                           overlayDragEnabledTarget && overlayDragEnabledTarget.imageId === currentPage.id
                             ? overlayDragEnabledTarget.itemId
                             : null
-                        )}
+                        }
                         selectionModeEnabled={overlaySelectionEnabled}
                         showTranslatingPlaceholder={currentPageOverlayLoading}
                         textMode={ocrOverlayTextMode}
@@ -3461,10 +3261,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                             <div className="grid grid-cols-2 gap-2">
                               <div className="space-y-1">
                                 <p className="text-[10px] text-muted-foreground">Entrada</p>
-                                <Select
-                                  value={overlaySelectionSourceLang}
-                                  onValueChange={setOverlaySelectionSourceLang}
-                                >
+                                <Select value={overlaySelectionSourceLang} onValueChange={setOverlaySelectionSourceLang}>
                                   <SelectTrigger data-ocr-overlay-selection-lang-select="true" className="h-7 px-2 text-[11px]">
                                     <SelectValue placeholder="Origem" />
                                   </SelectTrigger>
@@ -3479,10 +3276,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                               </div>
                               <div className="space-y-1">
                                 <p className="text-[10px] text-muted-foreground">Saída</p>
-                                <Select
-                                  value={overlaySelectionTargetLang}
-                                  onValueChange={setOverlaySelectionTargetLang}
-                                >
+                                <Select value={overlaySelectionTargetLang} onValueChange={setOverlaySelectionTargetLang}>
                                   <SelectTrigger data-ocr-overlay-selection-lang-select="true" className="h-7 px-2 text-[11px]">
                                     <SelectValue placeholder="Destino" />
                                   </SelectTrigger>
@@ -3506,12 +3300,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                               >
                                 Descartar
                               </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                className="h-7 px-2 text-[11px]"
-                                onClick={handleConfirmOverlaySelectionDraft}
-                              >
+                              <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={handleConfirmOverlaySelectionDraft}>
                                 Confirmar
                               </Button>
                             </div>
@@ -3739,7 +3528,6 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
             {currentReadingPage === sectionImages.length - 1 && suggestedSections.length > 0 && (
               <div className="flex-none border-t border-border bg-card/95 px-3 py-2">
                 {!showSuggestions ? (
-                  
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -3751,7 +3539,8 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                           src={buildImageViewUrl(suggestedSections[0].id, suggestedSections[0].cover.image_id, 'original')}
                           alt=""
                           className="h-7 w-5 rounded object-cover shrink-0"
-                          loading="lazy" decoding="async"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <BookOpen className="h-4 w-4 shrink-0 text-muted-foreground/40" />
@@ -3770,14 +3559,17 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                     </Link>
                   </div>
                 ) : (
-                  
                   <div className="overflow-hidden rounded-xl border border-border">
                     <div className="flex items-center justify-between border-b border-border bg-muted/30 px-3 py-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-[10px] text-muted-foreground shrink-0">Lendo</span>
                         <span className="truncate text-[10px] font-semibold text-foreground">{section?.name ?? '—'}</span>
                       </div>
-                      <button type="button" onClick={() => setShowSuggestions(false)} className="ml-2 shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground">
+                      <button
+                        type="button"
+                        onClick={() => setShowSuggestions(false)}
+                        className="ml-2 shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                      >
                         <ChevronDown className="h-3.5 w-3.5" />
                       </button>
                     </div>
@@ -3786,7 +3578,13 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                       className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 transition-colors group"
                     >
                       {suggestedSections[0].cover?.image_id ? (
-                        <img src={buildImageViewUrl(suggestedSections[0].id, suggestedSections[0].cover.image_id, 'original')} alt="" className="h-9 w-7 rounded object-cover shrink-0" loading="lazy" decoding="async" />
+                        <img
+                          src={buildImageViewUrl(suggestedSections[0].id, suggestedSections[0].cover.image_id, 'original')}
+                          alt=""
+                          className="h-9 w-7 rounded object-cover shrink-0"
+                          loading="lazy"
+                          decoding="async"
+                        />
                       ) : (
                         <div className="h-9 w-7 rounded bg-muted shrink-0 flex items-center justify-center">
                           <BookOpen className="h-3.5 w-3.5 text-muted-foreground/40" />
@@ -3806,12 +3604,24 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                           {suggestedSections.map((s, idx) => {
                             const coverUrl = s.cover?.image_id ? buildImageViewUrl(s.id, s.cover.image_id, 'original') : null
                             return (
-                              <Link key={s.id} href={`/inicio/secoes/${s.id}`} className="group relative shrink-0 snap-start w-20 overflow-hidden block">
+                              <Link
+                                key={s.id}
+                                href={`/inicio/secoes/${s.id}`}
+                                className="group relative shrink-0 snap-start w-20 overflow-hidden block"
+                              >
                                 <div className="relative aspect-3/4 w-full">
                                   {coverUrl ? (
-                                    <img src={coverUrl} alt={s.name} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" decoding="async" />
+                                    <img
+                                      src={coverUrl}
+                                      alt={s.name}
+                                      className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                      loading="lazy"
+                                      decoding="async"
+                                    />
                                   ) : (
-                                    <div className="h-full w-full flex items-center justify-center bg-muted"><BookOpen className="h-4 w-4 text-muted-foreground/20" /></div>
+                                    <div className="h-full w-full flex items-center justify-center bg-muted">
+                                      <BookOpen className="h-4 w-4 text-muted-foreground/20" />
+                                    </div>
                                   )}
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
                                   <div className="absolute top-1 left-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-black/50 px-1">
@@ -3879,12 +3689,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                     <span>Concluir</span>
                   </Button>
                 ) : (
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={goToNextPage}
-                    className="h-12 w-20 sm:w-24"
-                  >
+                  <Button variant="outline" size="lg" onClick={goToNextPage} className="h-12 w-20 sm:w-24">
                     <span className="hidden sm:inline mr-1">Próx.</span>
                     <ChevronRight className="h-5 w-5" />
                   </Button>
@@ -3893,14 +3698,8 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
             </div>
           </>
         ) : (
-          <div
-            ref={readingInteractionZoneRef}
-            className="relative flex-1 overflow-auto bg-muted/30"
-            style={{ touchAction: 'pan-y' }}
-          >
-            {isOverlaySelectionMode && (
-              <div className="pointer-events-none absolute inset-0 z-[1] bg-black/25" />
-            )}
+          <div ref={readingInteractionZoneRef} className="relative flex-1 overflow-auto bg-muted/30" style={{ touchAction: 'pan-y' }}>
+            {isOverlaySelectionMode && <div className="pointer-events-none absolute inset-0 z-[1] bg-black/25" />}
             <div className="flex flex-col items-center p-2 sm:p-4">
               {sectionImages.map((image) => {
                 const imgTranslated = isImageTranslated(image)
@@ -3911,41 +3710,31 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                 const shouldUseImageOcrOverlay = !imgTranslated
                 const imageOverlayItems = filterOverlayItemsByHiddenIds(
                   mergeOverlayItems(
-                    mergeOverlayItems(
-                      toOverlaySeedItems(image),
-                      ocrOverlayByImageId[image.id] ?? []
-                    ),
-                    ocrOverlayManualItemsByImageId[image.id] ?? []
+                    mergeOverlayItems(toOverlaySeedItems(image), ocrOverlayByImageId[image.id] ?? []),
+                    ocrOverlayManualItemsByImageId[image.id] ?? [],
                   ),
-                  ocrOverlayHiddenItemIdsByImageId[image.id] ?? []
+                  ocrOverlayHiddenItemIdsByImageId[image.id] ?? [],
                 )
                 const imageOverlayReferenceSize = resolveImageOverlayReferenceSize(image)
                 const imageOverlayLoading = Boolean(
-                  ocrOverlayLoadingByImageId[image.id]
-                  || ocrOverlayCreatingSelectionByImageId[image.id]
-                  || ocrOverlayQueuedImageIds.has(image.id)
+                  ocrOverlayLoadingByImageId[image.id] ||
+                  ocrOverlayCreatingSelectionByImageId[image.id] ||
+                  ocrOverlayQueuedImageIds.has(image.id),
                 )
-                const overlayQuickEditorForImage = (
-                  overlayQuickEditorState && overlayQuickEditorState.imageId === image.id
-                )
-                  ? overlayQuickEditorState
-                  : null
-                const quickEditorPlacementForImage = (
-                  overlayQuickEditorForImage
-                  && overlayQuickEditorPlacement
-                  && overlayQuickEditorPlacement.imageId === overlayQuickEditorForImage.imageId
-                  && overlayQuickEditorPlacement.itemId === overlayQuickEditorForImage.itemId
-                )
-                  ? {
-                    side: overlayQuickEditorPlacement.side,
-                    align: overlayQuickEditorPlacement.align,
-                  }
-                  : resolveQuickEditorPlacement(overlayQuickEditorForImage)
-                const selectedOverlayOnImage = (
-                  selectedOverlayTarget && selectedOverlayTarget.imageId === image.id
-                )
-                  ? selectedOverlayTarget
-                  : null
+                const overlayQuickEditorForImage =
+                  overlayQuickEditorState && overlayQuickEditorState.imageId === image.id ? overlayQuickEditorState : null
+                const quickEditorPlacementForImage =
+                  overlayQuickEditorForImage &&
+                  overlayQuickEditorPlacement &&
+                  overlayQuickEditorPlacement.imageId === overlayQuickEditorForImage.imageId &&
+                  overlayQuickEditorPlacement.itemId === overlayQuickEditorForImage.itemId
+                    ? {
+                        side: overlayQuickEditorPlacement.side,
+                        align: overlayQuickEditorPlacement.align,
+                      }
+                    : resolveQuickEditorPlacement(overlayQuickEditorForImage)
+                const selectedOverlayOnImage =
+                  selectedOverlayTarget && selectedOverlayTarget.imageId === image.id ? selectedOverlayTarget : null
                 const isRevealed = revealedScrollImageIds.has(image.id)
                 return (
                   <div
@@ -3961,16 +3750,14 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                     data-scroll-image-id={image.id}
                     style={{ width: `${zoom}%`, minWidth: '100px' }}
                   >
-                    {!isRevealed && (
-                      <div className="w-full bg-muted/40" style={{ aspectRatio: '3/4' }} />
-                    )}
+                    {!isRevealed && <div className="w-full bg-muted/40" style={{ aspectRatio: '3/4' }} />}
                     <img
                       src={isRevealed ? imgUrl : undefined}
                       alt={`Página ${image.order_index + 1}`}
                       className={cn(
                         'w-full h-auto block transition-opacity duration-200',
                         !isRevealed && 'hidden',
-                        isProcessing && 'opacity-40'
+                        isProcessing && 'opacity-40',
                       )}
                       decoding="async"
                       onLoad={(event) => {
@@ -3979,31 +3766,20 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                           width: event.currentTarget.naturalWidth,
                           height: event.currentTarget.naturalHeight,
                         }
-                        updateImageNaturalSize(
-                          image.id,
-                          nextReferenceSize.width,
-                          nextReferenceSize.height
-                        )
+                        updateImageNaturalSize(image.id, nextReferenceSize.width, nextReferenceSize.height)
 
                         if (!shouldUseImageOcrOverlay) return
                         const hiddenIds = ocrOverlayHiddenItemIdsByImageId[image.id] ?? []
                         const hasSeedOverlay = filterOverlayItemsByHiddenIds(toOverlaySeedItems(image), hiddenIds).length > 0
-                        const hasManualOverlay = filterOverlayItemsByHiddenIds(
-                          ocrOverlayManualItemsByImageId[image.id] ?? [],
-                          hiddenIds
-                        ).length > 0
+                        const hasManualOverlay =
+                          filterOverlayItemsByHiddenIds(ocrOverlayManualItemsByImageId[image.id] ?? [], hiddenIds).length > 0
                         if (!hasSeedOverlay && !hasManualOverlay) {
                           return
                         }
                         requestOverlayTranslationForImage(image)
 
                         if (imageOverlayItems.length > 0) {
-                          void ensureOverlayColorsForImage(
-                            image.id,
-                            imgUrl,
-                            imageOverlayItems,
-                            nextReferenceSize
-                          )
+                          void ensureOverlayColorsForImage(image.id, imgUrl, imageOverlayItems, nextReferenceSize)
                         }
                       }}
                     />
@@ -4027,20 +3803,16 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                         onMoveItem={handleMoveOverlayItem}
                         onResizeItem={handleResizeOverlayItem}
                         onOpenQuickEditor={handleOpenOverlayQuickEditor}
-                        dragEnabledItemId={(
-                          overlayDragEnabledTarget && overlayDragEnabledTarget.imageId === image.id
-                            ? overlayDragEnabledTarget.itemId
-                            : null
-                        )}
+                        dragEnabledItemId={
+                          overlayDragEnabledTarget && overlayDragEnabledTarget.imageId === image.id ? overlayDragEnabledTarget.itemId : null
+                        }
                         selectionModeEnabled={overlaySelectionEnabled}
                         showTranslatingPlaceholder={imageOverlayLoading}
                         textMode={ocrOverlayTextMode}
                         onSelectionDraftReady={handleOverlaySelectionDraftReady}
-                        selectionPreviewBox={(
-                          overlaySelectionDraft && overlaySelectionDraft.imageId === image.id
-                            ? overlaySelectionDraft.box
-                            : null
-                        )}
+                        selectionPreviewBox={
+                          overlaySelectionDraft && overlaySelectionDraft.imageId === image.id ? overlaySelectionDraft.box : null
+                        }
                         onSelectionPreviewChange={handleOverlaySelectionDraftChange}
                       />
                     )}
@@ -4088,10 +3860,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                             <div className="grid grid-cols-2 gap-2">
                               <div className="space-y-1">
                                 <p className="text-[10px] text-muted-foreground">Entrada</p>
-                                <Select
-                                  value={overlaySelectionSourceLang}
-                                  onValueChange={setOverlaySelectionSourceLang}
-                                >
+                                <Select value={overlaySelectionSourceLang} onValueChange={setOverlaySelectionSourceLang}>
                                   <SelectTrigger data-ocr-overlay-selection-lang-select="true" className="h-7 px-2 text-[11px]">
                                     <SelectValue placeholder="Origem" />
                                   </SelectTrigger>
@@ -4106,10 +3875,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                               </div>
                               <div className="space-y-1">
                                 <p className="text-[10px] text-muted-foreground">Saída</p>
-                                <Select
-                                  value={overlaySelectionTargetLang}
-                                  onValueChange={setOverlaySelectionTargetLang}
-                                >
+                                <Select value={overlaySelectionTargetLang} onValueChange={setOverlaySelectionTargetLang}>
                                   <SelectTrigger data-ocr-overlay-selection-lang-select="true" className="h-7 px-2 text-[11px]">
                                     <SelectValue placeholder="Destino" />
                                   </SelectTrigger>
@@ -4133,12 +3899,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                               >
                                 Descartar
                               </Button>
-                              <Button
-                                type="button"
-                                size="sm"
-                                className="h-7 px-2 text-[11px]"
-                                onClick={handleConfirmOverlaySelectionDraft}
-                              >
+                              <Button type="button" size="sm" className="h-7 px-2 text-[11px]" onClick={handleConfirmOverlaySelectionDraft}>
                                 Confirmar
                               </Button>
                             </div>
@@ -4185,9 +3946,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                                 className="min-w-0 flex-1 cursor-move touch-none rounded border border-border/70 bg-muted/40 px-2 py-1"
                                 onPointerDown={(event) => handleStartOverlayQuickEditorDrag(selectedOverlayOnImage.imageId, event)}
                               >
-                                <p className="truncate text-[11px] font-semibold text-foreground">
-                                  Balão #{selectedOverlayOnImage.itemId}
-                                </p>
+                                <p className="truncate text-[11px] font-semibold text-foreground">Balão #{selectedOverlayOnImage.itemId}</p>
                               </div>
                               <Button
                                 type="button"
@@ -4366,121 +4125,138 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
               })}
 
               {sectionImages.length > 0 && (
-              <div className="w-full pt-8 pb-4 flex flex-col items-center gap-4 border-t border-border mt-4">
-                <div className="text-center space-y-1">
-                  <p className="text-sm font-medium text-foreground">Chegou ao fim da seção!</p>
-                  {section?.name && (
-                    <p className="text-xs text-muted-foreground truncate max-w-[20ch]" title={section.name}>
-                      {section.name}
-                    </p>
-                  )}
-                </div>
-
-                {suggestedSections.length > 0 && (
-                  <div className="w-full max-w-xl">
-                    {!showSuggestions ? (
-                      
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setShowSuggestions(true)}
-                          className="flex flex-1 min-w-0 items-center gap-3 rounded-2xl border border-border bg-muted/40 px-4 py-2.5 text-left transition-colors hover:bg-muted/70"
-                        >
-                          {suggestedSections[0].cover?.image_id ? (
-                            <img
-                              src={buildImageViewUrl(suggestedSections[0].id, suggestedSections[0].cover.image_id, 'original')}
-                              alt=""
-                              className="h-9 w-7 rounded-md object-cover shrink-0"
-                              loading="lazy" decoding="async"
-                            />
-                          ) : (
-                            <BookOpen className="h-5 w-5 shrink-0 text-muted-foreground/40" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-bold uppercase tracking-wide text-primary leading-none mb-0.5">Próximo</p>
-                            <p className="truncate text-sm font-semibold text-foreground">{suggestedSections[0].name}</p>
-                          </div>
-                          <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
-                        </button>
-                        <Link
-                          href={`/inicio/secoes/${suggestedSections[0].id}`}
-                          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm hover:scale-105 transition-transform"
-                        >
-                          <ChevronRight className="h-6 w-6" />
-                        </Link>
-                      </div>
-                    ) : (
-                      
-                      <div className="overflow-hidden rounded-2xl border border-border">
-                        <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-2.5">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-xs text-muted-foreground shrink-0">Lendo</span>
-                            <span className="truncate text-xs font-semibold text-foreground">{section?.name ?? '—'}</span>
-                          </div>
-                          <button type="button" onClick={() => setShowSuggestions(false)} className="ml-2 shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground">
-                            <ChevronDown className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <Link
-                          href={`/inicio/secoes/${suggestedSections[0].id}`}
-                          className="flex items-center gap-4 px-4 py-3.5 hover:bg-muted/40 transition-colors group"
-                        >
-                          {suggestedSections[0].cover?.image_id ? (
-                            <img src={buildImageViewUrl(suggestedSections[0].id, suggestedSections[0].cover.image_id, 'original')} alt="" className="h-12 w-9 rounded-lg object-cover shrink-0 shadow-sm" loading="lazy" decoding="async" />
-                          ) : (
-                            <div className="h-12 w-9 rounded-lg bg-muted shrink-0 flex items-center justify-center">
-                              <BookOpen className="h-4 w-4 text-muted-foreground/40" />
-                            </div>
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-bold uppercase tracking-wide text-primary">Próximo</p>
-                            <p className="truncate text-sm font-bold text-foreground">{suggestedSections[0].name}</p>
-                          </div>
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm group-hover:scale-105 transition-transform">
-                            <ChevronRight className="h-5 w-5" />
-                          </div>
-                        </Link>
-                        {suggestedSections.length > 1 && (
-                          <div className="border-t border-border">
-                            <div className="flex gap-0 overflow-x-auto snap-x snap-mandatory scrollbar-none divide-x divide-border">
-                              {suggestedSections.map((s, idx) => {
-                                const coverUrl = s.cover?.image_id ? buildImageViewUrl(s.id, s.cover.image_id, 'original') : null
-                                return (
-                                  <Link key={s.id} href={`/inicio/secoes/${s.id}`} className="group relative shrink-0 snap-start w-24 overflow-hidden block">
-                                    <div className="relative aspect-3/4 w-full">
-                                      {coverUrl ? (
-                                        <img src={coverUrl} alt={s.name} className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" decoding="async" />
-                                      ) : (
-                                        <div className="h-full w-full flex items-center justify-center bg-muted"><BookOpen className="h-5 w-5 text-muted-foreground/20" /></div>
-                                      )}
-                                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
-                                      <div className="absolute top-1.5 left-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-black/50 px-1">
-                                        <span className="text-[9px] font-bold text-white/80">{idx + 1}</span>
-                                      </div>
-                                      <div className="absolute inset-x-0 bottom-0 p-2">
-                                        <p className="text-[10px] font-semibold leading-tight text-white line-clamp-2">{s.name}</p>
-                                      </div>
-                                    </div>
-                                  </Link>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                <div className="w-full pt-8 pb-4 flex flex-col items-center gap-4 border-t border-border mt-4">
+                  <div className="text-center space-y-1">
+                    <p className="text-sm font-medium text-foreground">Chegou ao fim da seção!</p>
+                    {section?.name && (
+                      <p className="text-xs text-muted-foreground truncate max-w-[20ch]" title={section.name}>
+                        {section.name}
+                      </p>
                     )}
                   </div>
-                )}
 
-                <Button
-                  size="sm"
-                  onClick={closeReadingMode}
-                  className="bg-green-600 hover:bg-green-700 text-white gap-2"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  Concluir leitura
-                </Button>
-              </div>
+                  {suggestedSections.length > 0 && (
+                    <div className="w-full max-w-xl">
+                      {!showSuggestions ? (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setShowSuggestions(true)}
+                            className="flex flex-1 min-w-0 items-center gap-3 rounded-2xl border border-border bg-muted/40 px-4 py-2.5 text-left transition-colors hover:bg-muted/70"
+                          >
+                            {suggestedSections[0].cover?.image_id ? (
+                              <img
+                                src={buildImageViewUrl(suggestedSections[0].id, suggestedSections[0].cover.image_id, 'original')}
+                                alt=""
+                                className="h-9 w-7 rounded-md object-cover shrink-0"
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            ) : (
+                              <BookOpen className="h-5 w-5 shrink-0 text-muted-foreground/40" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] font-bold uppercase tracking-wide text-primary leading-none mb-0.5">Próximo</p>
+                              <p className="truncate text-sm font-semibold text-foreground">{suggestedSections[0].name}</p>
+                            </div>
+                            <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" />
+                          </button>
+                          <Link
+                            href={`/inicio/secoes/${suggestedSections[0].id}`}
+                            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm hover:scale-105 transition-transform"
+                          >
+                            <ChevronRight className="h-6 w-6" />
+                          </Link>
+                        </div>
+                      ) : (
+                        <div className="overflow-hidden rounded-2xl border border-border">
+                          <div className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-2.5">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xs text-muted-foreground shrink-0">Lendo</span>
+                              <span className="truncate text-xs font-semibold text-foreground">{section?.name ?? '—'}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowSuggestions(false)}
+                              className="ml-2 shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <Link
+                            href={`/inicio/secoes/${suggestedSections[0].id}`}
+                            className="flex items-center gap-4 px-4 py-3.5 hover:bg-muted/40 transition-colors group"
+                          >
+                            {suggestedSections[0].cover?.image_id ? (
+                              <img
+                                src={buildImageViewUrl(suggestedSections[0].id, suggestedSections[0].cover.image_id, 'original')}
+                                alt=""
+                                className="h-12 w-9 rounded-lg object-cover shrink-0 shadow-sm"
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            ) : (
+                              <div className="h-12 w-9 rounded-lg bg-muted shrink-0 flex items-center justify-center">
+                                <BookOpen className="h-4 w-4 text-muted-foreground/40" />
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] font-bold uppercase tracking-wide text-primary">Próximo</p>
+                              <p className="truncate text-sm font-bold text-foreground">{suggestedSections[0].name}</p>
+                            </div>
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm group-hover:scale-105 transition-transform">
+                              <ChevronRight className="h-5 w-5" />
+                            </div>
+                          </Link>
+                          {suggestedSections.length > 1 && (
+                            <div className="border-t border-border">
+                              <div className="flex gap-0 overflow-x-auto snap-x snap-mandatory scrollbar-none divide-x divide-border">
+                                {suggestedSections.map((s, idx) => {
+                                  const coverUrl = s.cover?.image_id ? buildImageViewUrl(s.id, s.cover.image_id, 'original') : null
+                                  return (
+                                    <Link
+                                      key={s.id}
+                                      href={`/inicio/secoes/${s.id}`}
+                                      className="group relative shrink-0 snap-start w-24 overflow-hidden block"
+                                    >
+                                      <div className="relative aspect-3/4 w-full">
+                                        {coverUrl ? (
+                                          <img
+                                            src={coverUrl}
+                                            alt={s.name}
+                                            className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                            loading="lazy"
+                                            decoding="async"
+                                          />
+                                        ) : (
+                                          <div className="h-full w-full flex items-center justify-center bg-muted">
+                                            <BookOpen className="h-5 w-5 text-muted-foreground/20" />
+                                          </div>
+                                        )}
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                                        <div className="absolute top-1.5 left-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-black/50 px-1">
+                                          <span className="text-[9px] font-bold text-white/80">{idx + 1}</span>
+                                        </div>
+                                        <div className="absolute inset-x-0 bottom-0 p-2">
+                                          <p className="text-[10px] font-semibold leading-tight text-white line-clamp-2">{s.name}</p>
+                                        </div>
+                                      </div>
+                                    </Link>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <Button size="sm" onClick={closeReadingMode} className="bg-green-600 hover:bg-green-700 text-white gap-2">
+                    <CheckCircle className="h-4 w-4" />
+                    Concluir leitura
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -4490,9 +4266,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
           <div
             className={cn(
               'pointer-events-none fixed inset-x-0 z-[9998] flex justify-center px-3',
-              readingViewMode === 'paginated'
-                ? 'bottom-[92px] sm:bottom-[104px]'
-                : 'bottom-4 sm:bottom-6'
+              readingViewMode === 'paginated' ? 'bottom-[92px] sm:bottom-[104px]' : 'bottom-4 sm:bottom-6',
             )}
           >
             <div className="pointer-events-auto flex w-full max-w-md items-center justify-between gap-3 rounded-xl border border-primary/40 bg-background/95 px-3 py-2.5 shadow-xl backdrop-blur">
@@ -4509,7 +4283,6 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
             </div>
           </div>
         )}
-
       </div>
     )
   }
@@ -4520,100 +4293,81 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
         {(() => {
           const hasQueueActionButtons = canShowProcessButton || canShowReprocessButton
           return (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm" className="shrink-0">
-              <Link href={backToLibraryHref}>
-                <ArrowLeft className="h-4 w-4" />
-                <span className="hidden sm:inline">Voltar para biblioteca</span>
-              </Link>
-            </Button>
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <Button asChild variant="outline" size="sm" className="shrink-0">
+                  <Link href={backToLibraryHref}>
+                    <ArrowLeft className="h-4 w-4" />
+                    <span className="hidden sm:inline">Voltar para biblioteca</span>
+                  </Link>
+                </Button>
 
-            <div className="flex-1" />
+                <div className="flex-1" />
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="px-2 sm:px-3"
-              title="Atualizar"
-              onClick={() => void fetchSection()}
-            >
-              <RefreshCw className="h-4 w-4" />
-              <span className="hidden sm:inline">Atualizar</span>
-            </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="px-2 sm:px-3"
+                  title="Atualizar"
+                  onClick={() => void fetchSection()}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  <span className="hidden sm:inline">Atualizar</span>
+                </Button>
 
-            {canShowProcessButton && (
-              <Button
-                type="button"
-                size="sm"
-                className="px-2 sm:px-3"
-                title="Processar seção"
-                disabled={queueActionLoading !== null}
-                onClick={() => void handleQueueSection()}
-              >
-                {queueActionLoading === 'queue'
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
-                  : <Play className="h-4 w-4" />}
-                <span>
-                  {queueActionLoading === 'queue' ? 'Processando...' : 'Processar'}
-                </span>
-              </Button>
-            )}
+                {canShowProcessButton && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="px-2 sm:px-3"
+                    title="Processar seção"
+                    disabled={queueActionLoading !== null}
+                    onClick={() => void handleQueueSection()}
+                  >
+                    {queueActionLoading === 'queue' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                    <span>{queueActionLoading === 'queue' ? 'Processando...' : 'Processar'}</span>
+                  </Button>
+                )}
 
-            {canShowReprocessButton && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="px-2 sm:px-3"
-                title="Reprocessar seção"
-                disabled={queueActionLoading !== null}
-                onClick={() => void handleReprocessSection()}
-              >
-                {queueActionLoading === 'reprocess'
-                  ? <Loader2 className="h-4 w-4 animate-spin" />
-                  : <RotateCcw className="h-4 w-4" />}
-                <span>
-                  {queueActionLoading === 'reprocess' ? 'Reprocessando...' : 'Reprocessar'}
-                </span>
-              </Button>
-            )}
+                {canShowReprocessButton && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="px-2 sm:px-3"
+                    title="Reprocessar seção"
+                    disabled={queueActionLoading !== null}
+                    onClick={() => void handleReprocessSection()}
+                  >
+                    {queueActionLoading === 'reprocess' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+                    <span>{queueActionLoading === 'reprocess' ? 'Reprocessando...' : 'Reprocessar'}</span>
+                  </Button>
+                )}
 
-            {sectionImages.length > 0 && (
-              <Button
-                data-tour="reading-btn"
-                type="button"
-                variant="outline"
-                size="sm"
-                className="px-2 sm:px-3"
-                title="Modo Leitura"
-                onClick={() => openReadingPage(0)}
-              >
-                <BookOpen className="h-4 w-4" />
-                <span className={cn(hasQueueActionButtons ? 'hidden sm:inline' : 'inline')}>
-                  Modo Leitura
-                </span>
-              </Button>
-            )}
-
-          </div>
-        </div>
+                {sectionImages.length > 0 && (
+                  <Button
+                    data-tour="reading-btn"
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="px-2 sm:px-3"
+                    title="Modo Leitura"
+                    onClick={() => openReadingPage(0)}
+                  >
+                    <BookOpen className="h-4 w-4" />
+                    <span className={cn(hasQueueActionButtons ? 'hidden sm:inline' : 'inline')}>Modo Leitura</span>
+                  </Button>
+                )}
+              </div>
+            </div>
           )
         })()}
       </Card>
 
-      {error && (
-        <Card className="p-3 text-sm text-destructive bg-destructive/10 border-destructive/30">
-          {error}
-        </Card>
-      )}
+      {error && <Card className="p-3 text-sm text-destructive bg-destructive/10 border-destructive/30">{error}</Card>}
 
-      {success && (
-        <Card className="p-3 text-sm text-green-600 dark:text-green-400 bg-green-500/10 border-green-500/30">
-          {success}
-        </Card>
-      )}
+      {success && <Card className="p-3 text-sm text-green-600 dark:text-green-400 bg-green-500/10 border-green-500/30">{success}</Card>}
 
       {isLoadingSection ? (
         <Card className="p-8">
@@ -4623,9 +4377,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
           </div>
         </Card>
       ) : !section ? (
-        <Card className="p-6 text-sm text-muted-foreground">
-          Não foi possível carregar a seção.
-        </Card>
+        <Card className="p-6 text-sm text-muted-foreground">Não foi possível carregar a seção.</Card>
       ) : (
         <>
           <Card data-tour="section-info" className="p-4 sm:p-5 space-y-4">
@@ -4638,10 +4390,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                     <label htmlFor="section-category-select" className="text-xs font-medium text-muted-foreground">
                       Categoria
                     </label>
-                    <Popover
-                      open={isSectionCategoryPopoverOpen}
-                      onOpenChange={handleSectionCategoryPopoverChange}
-                    >
+                    <Popover open={isSectionCategoryPopoverOpen} onOpenChange={handleSectionCategoryPopoverChange}>
                       <PopoverTrigger asChild>
                         <Button
                           ref={sectionCategoryTriggerRef}
@@ -4668,11 +4417,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                         side="bottom"
                         sideOffset={6}
                         className="max-w-[calc(100vw-1rem)] p-0"
-                        style={
-                          sectionCategoryPopoverWidth
-                            ? { width: `${sectionCategoryPopoverWidth}px` }
-                            : undefined
-                        }
+                        style={sectionCategoryPopoverWidth ? { width: `${sectionCategoryPopoverWidth}px` } : undefined}
                       >
                         <Command shouldFilter={false}>
                           <CommandInput
@@ -4733,9 +4478,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                                 }}
                                 className="text-sm"
                               >
-                                <span className="truncate">
-                                  Criar categoria "{normalizeSectionCategoryValue(sectionCategoryQuery)}"
-                                </span>
+                                <span className="truncate">Criar categoria "{normalizeSectionCategoryValue(sectionCategoryQuery)}"</span>
                               </CommandItem>
                             )}
                             {sectionCategoryDraft && (
@@ -4809,12 +4552,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                       }}
                     />
                     <div className="flex items-center gap-2 sm:justify-end">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleCancelSectionNameEdit}
-                        disabled={isRenamingSection}
-                      >
+                      <Button type="button" variant="outline" onClick={handleCancelSectionNameEdit} disabled={isRenamingSection}>
                         Cancelar
                       </Button>
                       <Button
@@ -4844,25 +4582,21 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
               {(() => {
                 const priorityInfo = getSectionPriorityInfo(section.priority)
                 return (
-                  <Badge
-                    variant="outline"
-                    className={cn(priorityInfo.tier === 'admin' && 'border-primary/50 text-primary')}
-                  >
+                  <Badge variant="outline" className={cn(priorityInfo.tier === 'admin' && 'border-primary/50 text-primary')}>
                     {priorityInfo.badgeLabel}
                   </Badge>
                 )
               })()}
-              <Badge variant="outline">{section.source_lang} → {section.target_lang}</Badge>
-              {derivedQueuedCount > 0 && (
-                <Badge variant="outline">Fila {derivedQueuedCount}</Badge>
-              )}
-              {derivedProcessingCount > 0 && (
-                <Badge variant="outline">Processando {derivedProcessingCount}</Badge>
-              )}
+              <Badge variant="outline">
+                {section.source_lang} → {section.target_lang}
+              </Badge>
+              {derivedQueuedCount > 0 && <Badge variant="outline">Fila {derivedQueuedCount}</Badge>}
+              {derivedProcessingCount > 0 && <Badge variant="outline">Processando {derivedProcessingCount}</Badge>}
               <Badge variant="outline">{formatProviderLabel(section.provider_lang)}</Badge>
               {sectionStats?.estimatedTotalCostUsd !== null && sectionStats?.estimatedTotalCostUsd !== undefined && (
                 <Badge variant="secondary">
-                  Custo est.: {sectionStats.estimatedTotalCostUsd.toLocaleString('en-US', {
+                  Custo est.:{' '}
+                  {sectionStats.estimatedTotalCostUsd.toLocaleString('en-US', {
                     style: 'currency',
                     currency: 'USD',
                     minimumFractionDigits: 6,
@@ -4870,12 +4604,8 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                   })}
                 </Badge>
               )}
-              {queueState?.completed && (
-                <Badge variant="secondary">Concluída</Badge>
-              )}
-              {shouldShowQueueInProgressBadge && (
-                <Badge variant="outline">Em fila/processando</Badge>
-              )}
+              {queueState?.completed && <Badge variant="secondary">Concluída</Badge>}
+              {shouldShowQueueInProgressBadge && <Badge variant="outline">Em fila/processando</Badge>}
               {shouldPollSectionStatus && (
                 <Badge variant="outline" className="gap-1">
                   <Loader2 className={cn('h-3 w-3', isPollingStatus && 'animate-spin')} />
@@ -4890,22 +4620,28 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                   <>
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
-                      <span className="text-sm font-medium text-foreground">
-                        {queueStatusLabel}
-                      </span>
+                      <span className="text-sm font-medium text-foreground">{queueStatusLabel}</span>
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       {queuePosition !== null && (
-                        <span>Posição na fila: <span className="font-medium text-foreground">#{queuePosition}</span></span>
+                        <span>
+                          Posição na fila: <span className="font-medium text-foreground">#{queuePosition}</span>
+                        </span>
                       )}
                       {(queueJobsAhead ?? 0) > 0 && (
-                        <span>À frente: <span className="font-medium text-foreground">{queueJobsAhead}</span></span>
+                        <span>
+                          À frente: <span className="font-medium text-foreground">{queueJobsAhead}</span>
+                        </span>
                       )}
                       {(queueEstimatedWaitMinutes ?? 0) > 0 && (
-                        <span>Espera: <span className="font-medium text-foreground">~{queueEstimatedWaitMinutes} min</span></span>
+                        <span>
+                          Espera: <span className="font-medium text-foreground">~{queueEstimatedWaitMinutes} min</span>
+                        </span>
                       )}
                       {queueEstimatedStartLabel !== '—' && (
-                        <span>Início estimado: <span className="font-medium text-foreground">{queueEstimatedStartLabel}</span></span>
+                        <span>
+                          Início estimado: <span className="font-medium text-foreground">{queueEstimatedStartLabel}</span>
+                        </span>
                       )}
                     </div>
                   </>
@@ -4918,9 +4654,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                 Criada em {formatSectionDate(section.created_at)} • Atualizada em {formatSectionDate(section.updated_at)}
                 {' • '}
                 {shouldPollSectionStatus ? 'Monitorando status' : 'Sem monitoramento ativo'}
-                {lastStatusSyncAt
-                  ? ` • ${new Date(lastStatusSyncAt).toLocaleTimeString('pt-BR')}`
-                  : ''}
+                {lastStatusSyncAt ? ` • ${new Date(lastStatusSyncAt).toLocaleTimeString('pt-BR')}` : ''}
               </p>
               <div className="flex items-center gap-2">
                 <Button
@@ -4936,9 +4670,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                   className="h-7 px-2 text-xs"
                   disabled={isStatsLoading}
                 >
-                  {isStatsLoading
-                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    : <BarChart3 className="h-3.5 w-3.5" />}
+                  {isStatsLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BarChart3 className="h-3.5 w-3.5" />}
                   {isStatsExpanded ? 'Ocultar estatísticas' : 'Estatísticas'}
                 </Button>
               </div>
@@ -4954,9 +4686,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                     </div>
                   </div>
                 )}
-                {statsError && !isStatsLoading ? (
-                  <p className="text-xs text-destructive">{statsError}</p>
-                ) : null}
+                {statsError && !isStatsLoading ? <p className="text-xs text-destructive">{statsError}</p> : null}
                 {isStatsLoading && !sectionStats && (
                   <div className="space-y-2 animate-pulse">
                     <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -4986,7 +4716,8 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                           {sectionStats.totalElapsedMinutes.toLocaleString('pt-BR', {
                             minimumFractionDigits: 1,
                             maximumFractionDigits: 1,
-                          })} min
+                          })}{' '}
+                          min
                         </p>
                       </div>
                       <div>
@@ -4995,47 +4726,56 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                           {sectionStats.avgElapsedSecondsPerPage.toLocaleString('pt-BR', {
                             minimumFractionDigits: 1,
                             maximumFractionDigits: 1,
-                          })} s
+                          })}{' '}
+                          s
                         </p>
                       </div>
                       <div>
                         <p className="text-[11px] uppercase tracking-wide">Balões detectados</p>
-                        <p className="text-sm font-semibold text-foreground">
-                          {sectionStats.totalDetections.toLocaleString('pt-BR')}
-                        </p>
+                        <p className="text-sm font-semibold text-foreground">{sectionStats.totalDetections.toLocaleString('pt-BR')}</p>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-                      <span>OCR concluído: <span className="font-medium text-foreground">{sectionStats.ocrCompletedPages.toLocaleString('pt-BR')}</span></span>
-                      <span>Páginas processadas: <span className="font-medium text-foreground">{sectionStats.completedPages.toLocaleString('pt-BR')}</span></span>
-                      <span>Com tempo registrado: <span className="font-medium text-foreground">{sectionStats.pagesWithElapsedMs.toLocaleString('pt-BR')}</span></span>
-                      {sectionStats.estimatedTotalCostUsd !== null
-                        ? (
-                          <span>
-                            Custo estimado: <span className="font-medium text-foreground">
-                              {sectionStats.estimatedTotalCostUsd.toLocaleString('en-US', {
-                                style: 'currency',
-                                currency: 'USD',
-                                minimumFractionDigits: 6,
-                                maximumFractionDigits: 6,
-                              })}
-                            </span>
-                            {sectionStats.costModel ? ` (${sectionStats.costModel})` : ''}
+                      <span>
+                        OCR concluído:{' '}
+                        <span className="font-medium text-foreground">{sectionStats.ocrCompletedPages.toLocaleString('pt-BR')}</span>
+                      </span>
+                      <span>
+                        Páginas processadas:{' '}
+                        <span className="font-medium text-foreground">{sectionStats.completedPages.toLocaleString('pt-BR')}</span>
+                      </span>
+                      <span>
+                        Com tempo registrado:{' '}
+                        <span className="font-medium text-foreground">{sectionStats.pagesWithElapsedMs.toLocaleString('pt-BR')}</span>
+                      </span>
+                      {sectionStats.estimatedTotalCostUsd !== null ? (
+                        <span>
+                          Custo estimado:{' '}
+                          <span className="font-medium text-foreground">
+                            {sectionStats.estimatedTotalCostUsd.toLocaleString('en-US', {
+                              style: 'currency',
+                              currency: 'USD',
+                              minimumFractionDigits: 6,
+                              maximumFractionDigits: 6,
+                            })}
                           </span>
-                        )
-                        : null}
-                      {sectionStats.estimatedTotalCostUsd !== null
-                        ? (
-                          <span>
-                            Tokens (in/out): <span className="font-medium text-foreground">
-                              {sectionStats.estimatedInputTokens.toLocaleString('pt-BR')} / {sectionStats.estimatedOutputTokens.toLocaleString('pt-BR')}
-                            </span>
+                          {sectionStats.costModel ? ` (${sectionStats.costModel})` : ''}
+                        </span>
+                      ) : null}
+                      {sectionStats.estimatedTotalCostUsd !== null ? (
+                        <span>
+                          Tokens (in/out):{' '}
+                          <span className="font-medium text-foreground">
+                            {sectionStats.estimatedInputTokens.toLocaleString('pt-BR')} /{' '}
+                            {sectionStats.estimatedOutputTokens.toLocaleString('pt-BR')}
                           </span>
-                        )
-                        : null}
-                      {sectionStats.generatedAt
-                        ? <span>Atualizado: <span className="font-medium text-foreground">{formatSectionDate(sectionStats.generatedAt)}</span></span>
-                        : null}
+                        </span>
+                      ) : null}
+                      {sectionStats.generatedAt ? (
+                        <span>
+                          Atualizado: <span className="font-medium text-foreground">{formatSectionDate(sectionStats.generatedAt)}</span>
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
@@ -5071,136 +4811,117 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
               <>
                 <div data-tour="images-grid" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                   {sectionImages.slice(0, sectionGridVisibleCount).map((image, idx) => {
-                  const translatedAvailable = isImageTranslated(image)
-                  const originalViewUrl = buildImageViewUrl(section.id, image.id, 'original')
-                  const translatedViewUrl = buildImageViewUrl(section.id, image.id, 'translated')
-                  const previewUrl = translatedAvailable ? translatedViewUrl : originalViewUrl
-                  const isPreviewLoaded = Boolean(loadedImageUrls[previewUrl])
-                  const isProcessing = isImageProcessing(image)
-                  const shouldUseImageOcrOverlay = !translatedAvailable
-                  const imageOverlayItems = filterOverlayItemsByHiddenIds(
-                    mergeOverlayItems(
+                    const translatedAvailable = isImageTranslated(image)
+                    const originalViewUrl = buildImageViewUrl(section.id, image.id, 'original')
+                    const translatedViewUrl = buildImageViewUrl(section.id, image.id, 'translated')
+                    const previewUrl = translatedAvailable ? translatedViewUrl : originalViewUrl
+                    const isPreviewLoaded = Boolean(loadedImageUrls[previewUrl])
+                    const isProcessing = isImageProcessing(image)
+                    const shouldUseImageOcrOverlay = !translatedAvailable
+                    const imageOverlayItems = filterOverlayItemsByHiddenIds(
                       mergeOverlayItems(
-                        toOverlaySeedItems(image),
-                        ocrOverlayByImageId[image.id] ?? []
+                        mergeOverlayItems(toOverlaySeedItems(image), ocrOverlayByImageId[image.id] ?? []),
+                        ocrOverlayManualItemsByImageId[image.id] ?? [],
                       ),
-                      ocrOverlayManualItemsByImageId[image.id] ?? []
-                    ),
-                    ocrOverlayHiddenItemIdsByImageId[image.id] ?? []
-                  )
-                  const imageOverlayReferenceSize = resolveImageOverlayReferenceSize(image)
-                  const imageOverlayLoading = Boolean(
-                    ocrOverlayLoadingByImageId[image.id]
-                    || ocrOverlayCreatingSelectionByImageId[image.id]
-                    || ocrOverlayQueuedImageIds.has(image.id)
-                  )
+                      ocrOverlayHiddenItemIdsByImageId[image.id] ?? [],
+                    )
+                    const imageOverlayReferenceSize = resolveImageOverlayReferenceSize(image)
+                    const imageOverlayLoading = Boolean(
+                      ocrOverlayLoadingByImageId[image.id] ||
+                      ocrOverlayCreatingSelectionByImageId[image.id] ||
+                      ocrOverlayQueuedImageIds.has(image.id),
+                    )
 
-                  return (
-                    <article
-                      key={image.id}
-                      className="rounded-md border border-border p-2 space-y-2"
-                    >
-                      <div className="relative min-h-[180px] overflow-hidden rounded-md border border-border bg-muted/30">
-                        {!isPreviewLoaded && (
-                          <Skeleton className="absolute inset-0 rounded-none" />
-                        )}
-                        <img
-                          src={previewUrl}
-                          alt={`Página ${image.order_index + 1} - ${section.name}`}
-                          className={cn(
-                            'block h-auto w-full transition-opacity duration-200',
-                            isPreviewLoaded ? (isProcessing ? 'opacity-40' : 'opacity-100') : 'opacity-0'
-                          )}
-                          loading="lazy"
-                          decoding="async"
-                          onLoad={(event) => {
-                            markImageAsLoaded(previewUrl)
-                            const nextReferenceSize = {
-                              width: event.currentTarget.naturalWidth,
-                              height: event.currentTarget.naturalHeight,
-                            }
-                            updateImageNaturalSize(
-                              image.id,
-                              nextReferenceSize.width,
-                              nextReferenceSize.height
-                            )
+                    return (
+                      <article key={image.id} className="rounded-md border border-border p-2 space-y-2">
+                        <div className="relative min-h-[180px] overflow-hidden rounded-md border border-border bg-muted/30">
+                          {!isPreviewLoaded && <Skeleton className="absolute inset-0 rounded-none" />}
+                          <img
+                            src={previewUrl}
+                            alt={`Página ${image.order_index + 1} - ${section.name}`}
+                            className={cn(
+                              'block h-auto w-full transition-opacity duration-200',
+                              isPreviewLoaded ? (isProcessing ? 'opacity-40' : 'opacity-100') : 'opacity-0',
+                            )}
+                            loading="lazy"
+                            decoding="async"
+                            onLoad={(event) => {
+                              markImageAsLoaded(previewUrl)
+                              const nextReferenceSize = {
+                                width: event.currentTarget.naturalWidth,
+                                height: event.currentTarget.naturalHeight,
+                              }
+                              updateImageNaturalSize(image.id, nextReferenceSize.width, nextReferenceSize.height)
 
-                            if (!shouldUseImageOcrOverlay) return
+                              if (!shouldUseImageOcrOverlay) return
 
-                            if (imageOverlayItems.length > 0) {
-                              void ensureOverlayColorsForImage(
-                                image.id,
-                                previewUrl,
-                                imageOverlayItems,
-                                nextReferenceSize
-                              )
-                            }
-                          }}
-                          onError={() => markImageAsLoaded(previewUrl)}
-                        />
-                        {shouldUseImageOcrOverlay && imageOverlayItems.length > 0 && (
-                          <OcrTextOverlay
-                            imageId={image.id}
-                            items={imageOverlayItems}
-                            referenceSize={imageOverlayReferenceSize}
-                            fontScale={ocrOverlayFontScale}
-                            boxInsetPercent={ocrOverlayBoxInsetPercent}
-                            overlayDensity={ocrOverlayDensity}
-                            overlayOpacity={ocrOverlayOpacity}
-                            globalShape={ocrOverlayGlobalShape}
-                            fontFamilyCss={overlayFontFamilyCss}
-                            editable={false}
-                            itemOverrides={ocrOverlayOverridesByImageId[image.id] ?? {}}
-                            itemColors={ocrOverlayColorsByImageId[image.id] ?? {}}
-                            showTranslatingPlaceholder={imageOverlayLoading}
-                            textMode={ocrOverlayTextMode}
+                              if (imageOverlayItems.length > 0) {
+                                void ensureOverlayColorsForImage(image.id, previewUrl, imageOverlayItems, nextReferenceSize)
+                              }
+                            }}
+                            onError={() => markImageAsLoaded(previewUrl)}
                           />
-                        )}
-                        {shouldUseImageOcrOverlay && imageOverlayLoading && (
-                          <div className="absolute right-2 top-2 rounded-full border border-blue-500/35 bg-blue-500/15 px-2 py-1 text-[10px] font-medium text-blue-600 dark:text-blue-300">
-                            OCR...
-                          </div>
-                        )}
-                        {isProcessing && (
-                          <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/65">
-                            <div className="rounded-full border border-primary/30 bg-background/90 px-3 py-1.5 text-xs font-medium text-primary shadow-sm">
-                              <Loader2 className="mr-1.5 inline h-3.5 w-3.5 animate-spin align-[-2px]" />
-                              Processando
+                          {shouldUseImageOcrOverlay && imageOverlayItems.length > 0 && (
+                            <OcrTextOverlay
+                              imageId={image.id}
+                              items={imageOverlayItems}
+                              referenceSize={imageOverlayReferenceSize}
+                              fontScale={ocrOverlayFontScale}
+                              boxInsetPercent={ocrOverlayBoxInsetPercent}
+                              overlayDensity={ocrOverlayDensity}
+                              overlayOpacity={ocrOverlayOpacity}
+                              globalShape={ocrOverlayGlobalShape}
+                              fontFamilyCss={overlayFontFamilyCss}
+                              editable={false}
+                              itemOverrides={ocrOverlayOverridesByImageId[image.id] ?? {}}
+                              itemColors={ocrOverlayColorsByImageId[image.id] ?? {}}
+                              showTranslatingPlaceholder={imageOverlayLoading}
+                              textMode={ocrOverlayTextMode}
+                            />
+                          )}
+                          {shouldUseImageOcrOverlay && imageOverlayLoading && (
+                            <div className="absolute right-2 top-2 rounded-full border border-blue-500/35 bg-blue-500/15 px-2 py-1 text-[10px] font-medium text-blue-600 dark:text-blue-300">
+                              OCR...
                             </div>
-                          </div>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => openReadingPage(idx)}
-                          className="absolute inset-0"
-                          aria-label={`Ler página ${image.order_index + 1}`}
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-foreground truncate" title={image.original_name}>
-                          Pág. {image.order_index + 1}
-                        </p>
-
-                        <div className="flex flex-wrap gap-1">
-                          {!translatedAvailable && (
-                            <Badge variant="outline">{formatStatus(image.status)}</Badge>
                           )}
-                          <Badge variant={translatedAvailable ? 'secondary' : 'outline'}>
-                            {translatedAvailable ? 'Traduzida' : formatStatus(image.translation_status)}
-                          </Badge>
-                          {readPages.has(image.id) && (
-                            <Badge variant="outline" className="border-green-500/60 text-green-600 dark:text-green-400">
-                              Lida
-                            </Badge>
+                          {isProcessing && (
+                            <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center bg-background/65">
+                              <div className="rounded-full border border-primary/30 bg-background/90 px-3 py-1.5 text-xs font-medium text-primary shadow-sm">
+                                <Loader2 className="mr-1.5 inline h-3.5 w-3.5 animate-spin align-[-2px]" />
+                                Processando
+                              </div>
+                            </div>
                           )}
+
+                          <button
+                            type="button"
+                            onClick={() => openReadingPage(idx)}
+                            className="absolute inset-0"
+                            aria-label={`Ler página ${image.order_index + 1}`}
+                          />
                         </div>
-                      </div>
 
-                      {}
-                    </article>
-                  )
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-foreground truncate" title={image.original_name}>
+                            Pág. {image.order_index + 1}
+                          </p>
+
+                          <div className="flex flex-wrap gap-1">
+                            {!translatedAvailable && <Badge variant="outline">{formatStatus(image.status)}</Badge>}
+                            <Badge variant={translatedAvailable ? 'secondary' : 'outline'}>
+                              {translatedAvailable ? 'Traduzida' : formatStatus(image.translation_status)}
+                            </Badge>
+                            {readPages.has(image.id) && (
+                              <Badge variant="outline" className="border-green-500/60 text-green-600 dark:text-green-400">
+                                Lida
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+
+                        {}
+                      </article>
+                    )
                   })}
                 </div>
                 {sectionGridVisibleCount < sectionImages.length && (
@@ -5214,9 +4935,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                       size="sm"
                       className="h-9 min-w-[220px] px-4"
                       onClick={() => {
-                        setSectionGridVisibleCount((value) => (
-                          Math.min(value + SECTION_GRID_LOAD_MORE_BATCH, sectionImages.length)
-                        ))
+                        setSectionGridVisibleCount((value) => Math.min(value + SECTION_GRID_LOAD_MORE_BATCH, sectionImages.length))
                       }}
                     >
                       <ChevronDown className="h-4 w-4" />
@@ -5301,9 +5020,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
                               <span className="text-[10px] font-bold tabular-nums text-white/80">{idx + 1}</span>
                             </div>
                             <div className="absolute inset-x-0 bottom-0 p-3">
-                              <p className="text-xs font-semibold leading-snug text-white line-clamp-2 drop-shadow">
-                                {suggestion.name}
-                              </p>
+                              <p className="text-xs font-semibold leading-snug text-white line-clamp-2 drop-shadow">{suggestion.name}</p>
                             </div>
                           </div>
                         </Link>
@@ -5350,14 +5067,10 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
             <DialogTitle>{limitModalState?.title ?? 'Limite atingido'}</DialogTitle>
             <DialogDescription>{limitModalState?.description ?? ''}</DialogDescription>
           </DialogHeader>
-          {limitModalState?.details && (
-            <p className="text-xs text-muted-foreground">{limitModalState.details}</p>
-          )}
+          {limitModalState?.details && <p className="text-xs text-muted-foreground">{limitModalState.details}</p>}
           <div className="rounded-md border border-primary/30 bg-primary/10 px-3 py-2">
             <p className="text-sm font-medium text-foreground">Quer continuar traduzindo agora?</p>
-            <p className="text-xs text-muted-foreground">
-              Ajuste os limites locais da instância para continuar sem pausa.
-            </p>
+            <p className="text-xs text-muted-foreground">Ajuste os limites locais da instância para continuar sem pausa.</p>
           </div>
           <DialogFooter className="flex-wrap gap-2 sm:justify-end">
             <Button type="button" variant="ghost" onClick={() => setLimitModalState(null)}>
@@ -5381,9 +5094,8 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir categoria</AlertDialogTitle>
             <AlertDialogDescription>
-              A categoria "{categoryToDelete}" será excluída.
-              Todas as seções vinculadas a essa categoria ficarão sem categoria.
-              Esta ação não pode ser desfeita.
+              A categoria "{categoryToDelete}" será excluída. Todas as seções vinculadas a essa categoria ficarão sem categoria. Esta ação
+              não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -5421,8 +5133,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir seção</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação vai remover a seção "{section?.name ?? `#${sectionId}`}" e todos os vínculos dela.
-              Esta ação não pode ser desfeita.
+              Esta ação vai remover a seção "{section?.name ?? `#${sectionId}`}" e todos os vínculos dela. Esta ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -5448,12 +5159,7 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
         </AlertDialogContent>
       </AlertDialog>
 
-      <SpotlightTour
-        storageKey="tour-reader-v2"
-        open={isTourOpen}
-        onClose={() => setIsTourOpen(false)}
-        steps={READER_TOUR_STEPS}
-      />
+      <SpotlightTour storageKey="tour-reader-v2" open={isTourOpen} onClose={() => setIsTourOpen(false)} steps={READER_TOUR_STEPS} />
     </div>
   )
 }
@@ -5461,11 +5167,13 @@ export function SectionReader({ sectionId }: SectionReaderProps) {
 const READER_TOUR_STEPS: TourStep[] = [
   {
     title: 'Página da seção',
-    description: 'Bem-vindo! Aqui você gerencia as páginas deste capítulo — seleciona quais traduzir, acompanha o progresso e lê o resultado. Siga os passos para conhecer cada recurso.',
+    description:
+      'Bem-vindo! Aqui você gerencia as páginas deste capítulo — seleciona quais traduzir, acompanha o progresso e lê o resultado. Siga os passos para conhecer cada recurso.',
   },
   {
     title: 'Informações da seção',
-    description: 'Veja o nome, status atual, idiomas e outros detalhes. As badges mostram em tempo real se há páginas na fila, sendo processadas ou com erro.',
+    description:
+      'Veja o nome, status atual, idiomas e outros detalhes. As badges mostram em tempo real se há páginas na fila, sendo processadas ou com erro.',
     selector: 'section-info',
     tooltipSide: 'bottom',
   },
@@ -5477,7 +5185,8 @@ const READER_TOUR_STEPS: TourStep[] = [
   },
   {
     title: 'Modo de leitura',
-    description: 'Após a tradução, toque aqui para ler as páginas como um leitor de mangá. Você pode navegar por toque ou teclado, fazer zoom, e alternar entre paginação e scroll contínuo.',
+    description:
+      'Após a tradução, toque aqui para ler as páginas como um leitor de mangá. Você pode navegar por toque ou teclado, fazer zoom, e alternar entre paginação e scroll contínuo.',
     selector: 'reading-btn',
     tooltipSide: 'bottom',
   },

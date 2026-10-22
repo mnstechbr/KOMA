@@ -14,7 +14,8 @@ export async function GET() {
 export async function PUT(request: Request) {
   const auth = await requireAdmin()
   if ('response' in auth) return auth.response
-  if (process.env.KOMA_DESKTOP !== '1' || !isTrustedOrigin(request)) return NextResponse.json({ message: 'Ação não autorizada.' }, { status: 403 })
+  if (process.env.KOMA_DESKTOP !== '1' || !isTrustedOrigin(request))
+    return NextResponse.json({ message: 'Ação não autorizada.' }, { status: 403 })
   try {
     const settings = saveLanguageSettings(db, await request.json().catch(() => ({})))
     const response = NextResponse.json(settings)

@@ -12,14 +12,22 @@ export async function PATCH(request: Request, { params }: Context) {
   const detail = worksRepository.detail(numericId(id), auth.user.id)
   const chapter = detail?.chapters.find((item) => item.id === numericId(chapterId))
   if (!detail || !chapter) return NextResponse.json({ message: 'Capítulo não encontrado.' }, { status: 404 })
-  const body = await request.json().catch(() => ({})) as { pageId?: unknown; balloonId?: unknown; text?: unknown }
-  if (!Number.isInteger(body.pageId) || !Number.isInteger(body.balloonId) || typeof body.text !== 'string' || body.text.length > 600) return NextResponse.json({ message: 'Informe o balão e o novo texto (até 600 caracteres).' }, { status: 400 })
+  const body = (await request.json().catch(() => ({}))) as { pageId?: unknown; balloonId?: unknown; text?: unknown }
+  if (!Number.isInteger(body.pageId) || !Number.isInteger(body.balloonId) || typeof body.text !== 'string' || body.text.length > 600)
+    return NextResponse.json({ message: 'Informe o balão e o novo texto (até 600 caracteres).' }, { status: 400 })
   try {
     const result = await editBalloon(worksRepository.database, chapter.id, body.pageId as number, body.balloonId as number, body.text)
     if (!result) return NextResponse.json({ message: 'Balão não encontrado.' }, { status: 404 })
     const pages = result.images.map((imageId) => {
-      const page = worksRepository.database.prepare('SELECT p.id, i.translated_path FROM work_pages p JOIN section_images i ON i.id=p.image_id WHERE p.image_id=?').get(imageId) as { id: number; translated_path: string | null }
-      return { id: page.id, translatedUrl: page.translated_path ? `/api/sections/${chapter.sectionId}/images/${imageId}/translated/view?v=${encodeURIComponent(page.translated_path.split('/').pop() || '')}` : null }
+      const page = worksRepository.database
+        .prepare('SELECT p.id, i.translated_path FROM work_pages p JOIN section_images i ON i.id=p.image_id WHERE p.image_id=?')
+        .get(imageId) as { id: number; translated_path: string | null }
+      return {
+        id: page.id,
+        translatedUrl: page.translated_path
+          ? `/api/sections/${chapter.sectionId}/images/${imageId}/translated/view?v=${encodeURIComponent(page.translated_path.split('/').pop() || '')}`
+          : null,
+      }
     })
     return NextResponse.json({ pages, term: result.term })
   } catch {

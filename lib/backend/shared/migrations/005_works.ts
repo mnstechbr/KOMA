@@ -1,5 +1,7 @@
 export const migration005Works = {
-  version: 5, name: '005_works', up: `
+  version: 5,
+  name: '005_works',
+  up: `
     CREATE TABLE works (
       id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id),
       source TEXT NOT NULL, source_id TEXT NOT NULL, title TEXT NOT NULL, metadata_json TEXT NOT NULL,

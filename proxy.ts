@@ -10,21 +10,14 @@ function hasBearerToken(request: NextRequest) {
 function withCorsHeaders(response: NextResponse) {
   response.headers.set('Access-Control-Allow-Origin', '*')
   response.headers.set('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS')
-  response.headers.set(
-    'Access-Control-Allow-Headers',
-    'Authorization, Content-Type, X-API-Key, X-Requested-With'
-  )
+  response.headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-API-Key, X-Requested-With')
   response.headers.set('Access-Control-Max-Age', '86400')
   return response
 }
 
 function buildContentSecurityPolicy() {
-  const scriptSrc = process.env.NODE_ENV === 'production'
-    ? "'self' 'unsafe-inline'"
-    : "'self' 'unsafe-inline' 'unsafe-eval'"
-  const connectSrc = process.env.NODE_ENV === 'production'
-    ? "'self' https://openrouter.ai"
-    : "'self' https://openrouter.ai ws: wss:"
+  const scriptSrc = process.env.NODE_ENV === 'production' ? "'self' 'unsafe-inline'" : "'self' 'unsafe-inline' 'unsafe-eval'"
+  const connectSrc = process.env.NODE_ENV === 'production' ? "'self' https://openrouter.ai" : "'self' https://openrouter.ai ws: wss:"
 
   return [
     "default-src 'self'",
@@ -91,8 +84,8 @@ export function proxy(request: NextRequest) {
             error: 'Unauthorized',
             statusCode: 401,
           },
-          { status: 401 }
-        )
+          { status: 401 },
+        ),
       )
     }
   }
@@ -101,5 +94,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)']
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 }

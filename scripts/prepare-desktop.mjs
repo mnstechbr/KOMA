@@ -34,17 +34,34 @@ for (const name of ['sharp', 'onnxruntime-node', 'better-sqlite3']) {
     verbatimSymlinks: true,
     filter: (source) => {
       if (name !== 'onnxruntime-node') return true
-      const relative = path.relative(path.join(root, 'node_modules', name), source).split(path.sep).join('/')
+      const relative = path
+        .relative(path.join(root, 'node_modules', name), source)
+        .split(path.sep)
+        .join('/')
       if (/bin\/napi-v6\/(win32|darwin)/.test(relative) || /bin\/napi-v6\/linux\/(arm64|arm)/.test(relative)) return false
       return !/libonnxruntime_providers_(cuda|tensorrt)\.so$/.test(relative)
     },
   })
 }
 await verifyModels(root, path.join(server, 'models'))
-await fs.cp(path.join(root, 'desktop/node_modules/electron/dist'), path.join(target, 'electron'), { recursive: true, verbatimSymlinks: true })
+await fs.cp(path.join(root, 'desktop/node_modules/electron/dist'), path.join(target, 'electron'), {
+  recursive: true,
+  verbatimSymlinks: true,
+})
 const electronApp = path.join(target, 'electron/resources/app')
 await fs.mkdir(electronApp, { recursive: true })
-for (const name of ['main.cjs', 'background.cjs', 'mobile-server.cjs', 'external-links.cjs', 'paths.cjs', 'backend.cjs', 'supervisor.cjs', 'window-checks.cjs', 'package.json', 'koma.png']) {
+for (const name of [
+  'main.cjs',
+  'background.cjs',
+  'mobile-server.cjs',
+  'external-links.cjs',
+  'paths.cjs',
+  'backend.cjs',
+  'supervisor.cjs',
+  'window-checks.cjs',
+  'package.json',
+  'koma.png',
+]) {
   await fs.copyFile(path.join(root, 'desktop', name), path.join(electronApp, name))
 }
 await fs.mkdir(path.join(target, 'runtime'), { recursive: true })
@@ -52,8 +69,15 @@ await fs.copyFile(portableNode, path.join(target, 'runtime/node'))
 await fs.copyFile(path.join(portableRoot, 'LICENSE'), path.join(target, 'runtime/LICENSE-Node'))
 await fs.copyFile(path.join(root, 'LICENSE'), path.join(target, 'LICENSE'))
 await fs.copyFile(path.join(root, 'THIRD-PARTY-NOTICES'), path.join(target, 'THIRD-PARTY-NOTICES'))
-await fs.writeFile(path.join(target, 'LEIA-ME.txt'), 'KOMA — baseado em translate-manga-br (MIT).\nUso pessoal local. Modelos originais preservados; verifique as licenças dos pesos antes de redistribuir.\nDados: ~/.local/share/koma/library. Diagnóstico: ~/.local/state/koma/logs.\n')
-await fs.writeFile(path.join(target, 'koma'), '#!/usr/bin/env bash\nset -euo pipefail\nKOMA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\nunset ELECTRON_RUN_AS_NODE\nexec "$KOMA_ROOT/electron/electron" "$KOMA_ROOT/electron/resources/app" "$@"\n', { mode: 0o755 })
+await fs.writeFile(
+  path.join(target, 'LEIA-ME.txt'),
+  'KOMA — baseado em translate-manga-br (MIT).\nUso pessoal local. Modelos originais preservados; verifique as licenças dos pesos antes de redistribuir.\nDados: ~/.local/share/koma/library. Diagnóstico: ~/.local/state/koma/logs.\n',
+)
+await fs.writeFile(
+  path.join(target, 'koma'),
+  '#!/usr/bin/env bash\nset -euo pipefail\nKOMA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"\nunset ELECTRON_RUN_AS_NODE\nexec "$KOMA_ROOT/electron/electron" "$KOMA_ROOT/electron/resources/app" "$@"\n',
+  { mode: 0o755 },
+)
 async function verifyLinks(dir) {
   for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
     const file = path.join(dir, entry.name)

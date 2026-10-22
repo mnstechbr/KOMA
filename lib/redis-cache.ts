@@ -34,16 +34,16 @@ export async function redisMGetStrings(keys: string[]) {
 }
 
 export async function redisSetString(key: string, value: string, ttlSeconds?: number | null) {
-  const ttl = typeof ttlSeconds === 'number'
-    ? ttlSeconds
-    : DEFAULT_LOCAL_TTL_SECONDS
+  const ttl = typeof ttlSeconds === 'number' ? ttlSeconds : DEFAULT_LOCAL_TTL_SECONDS
   const expiresAt = ttl > 0 ? nowMs() + Math.floor(ttl * 1000) : null
 
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO kv_store (key, value, expires_at)
     VALUES (?, ?, ?)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at
-  `).run(key, value, expiresAt)
+  `,
+  ).run(key, value, expiresAt)
 }
 
 export async function redisGetJson<T>(key: string): Promise<T | null> {
@@ -59,4 +59,3 @@ export async function redisGetJson<T>(key: string): Promise<T | null> {
 export async function redisSetJson(key: string, value: unknown, ttlSeconds?: number | null) {
   return redisSetString(key, JSON.stringify(value), ttlSeconds)
 }
-

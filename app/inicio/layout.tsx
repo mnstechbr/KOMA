@@ -13,7 +13,11 @@ export default async function InicioLayout({
   // A sessão local é criada pelo aplicativo KOMA ao abrir a janela.
   if (!user) {
     const t = await serverT()
-    return <main className="grid min-h-screen place-items-center p-6 text-center">{t('Abra o KOMA pelo aplicativo para acessar sua biblioteca.')}</main>
+    return (
+      <main className="grid min-h-screen place-items-center p-6 text-center">
+        {t('Abra o KOMA pelo aplicativo para acessar sua biblioteca.')}
+      </main>
+    )
   }
 
   return <DesktopLayoutShell>{children}</DesktopLayoutShell>

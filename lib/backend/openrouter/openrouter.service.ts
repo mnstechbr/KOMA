@@ -9,9 +9,15 @@ export class OpenRouterService {
 
   async validateApiKey(apiKey: string) {
     try {
-      const response = await fetch('https://openrouter.ai/api/v1/key', { headers: { Authorization: `Bearer ${apiKey}` }, cache: 'no-store', signal: AbortSignal.timeout(15000) })
+      const response = await fetch('https://openrouter.ai/api/v1/key', {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(15000),
+      })
       return response.ok
-    } catch { return false }
+    } catch {
+      return false
+    }
   }
 
   async getStatus() {

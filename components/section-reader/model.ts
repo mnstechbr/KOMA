@@ -76,15 +76,7 @@ export interface OcrOverlayItem {
 
 export type OcrOverlayShape = 'rect' | 'oval'
 export type OcrOverlayTextMode = 'translated' | 'original'
-export type OcrOverlayFontFamily =
-  | 'sans'
-  | 'serif'
-  | 'mono'
-  | 'comic'
-  | 'manga'
-  | 'anime'
-  | 'manhwa'
-  | 'condensed'
+export type OcrOverlayFontFamily = 'sans' | 'serif' | 'mono' | 'comic' | 'manga' | 'anime' | 'manhwa' | 'condensed'
 
 export interface OcrOverlayItemOverride {
   dx: number
@@ -222,27 +214,14 @@ export function asObjectRecord(value: unknown) {
   return value as Record<string, unknown>
 }
 
-export const PROCESSING_STATUSES = new Set([
-  'processing',
-  'processando',
-  'in_progress',
-  'running',
-  'traduzindo',
-  'translating',
-])
-export const FAILED_TRANSLATION_STATUSES = new Set([
-  'failed',
-  'error',
-  'erro',
-  'timeout',
-  'timed_out',
-])
+export const PROCESSING_STATUSES = new Set(['processing', 'processando', 'in_progress', 'running', 'traduzindo', 'translating'])
+export const FAILED_TRANSLATION_STATUSES = new Set(['failed', 'error', 'erro', 'timeout', 'timed_out'])
 export const READING_PRELOAD_RADIUS = 2
 export const SWIPE_TRIGGER_PX = 56
 export const SWIPE_DIRECTION_RATIO = 1.2
 export const READ_PAGES_LS_PREFIX = 'manga-read-'
 export const SECTION_READ_LS_PREFIX = 'manga-section-read-'
-export const SECTION_READ_THRESHOLD = 0.70
+export const SECTION_READ_THRESHOLD = 0.7
 export const SECTION_CATEGORY_MAX_LENGTH = 64
 export const OCR_COMPLETED_STATUSES = new Set(['ocr_concluido', 'ocr_completed'])
 export const OCR_OVERLAY_FONT_SCALE_MIN = 0.1
@@ -305,9 +284,7 @@ export const OCR_OVERLAY_SELECTION_LANGUAGES: OverlayLanguageOption[] = [
   { code: 'id', name: 'Indonésio' },
   { code: 'th', name: 'Tailandês' },
 ]
-export const OCR_OVERLAY_SELECTION_TARGET_LANGUAGES = OCR_OVERLAY_SELECTION_LANGUAGES.filter(
-  (language) => language.code !== 'auto'
-)
+export const OCR_OVERLAY_SELECTION_TARGET_LANGUAGES = OCR_OVERLAY_SELECTION_LANGUAGES.filter((language) => language.code !== 'auto')
 
 export const OCR_OVERLAY_FONT_FAMILIES: Record<OcrOverlayFontFamily, { label: string; css: string }> = {
   sans: {
@@ -360,11 +337,7 @@ export function formatProviderLabel(value: string | null | undefined) {
   return provider
 }
 
-export function normalizeOverlaySelectionLanguage(
-  value: string | null | undefined,
-  fallback: string,
-  options: OverlayLanguageOption[]
-) {
+export function normalizeOverlaySelectionLanguage(value: string | null | undefined, fallback: string, options: OverlayLanguageOption[]) {
   const normalizedFallback = options.find((option) => option.code === fallback)?.code ?? options[0]?.code ?? fallback
   if (typeof value !== 'string') return normalizedFallback
 
@@ -421,9 +394,7 @@ export function sanitizeOverlayItemOverride(value: OcrOverlayItemOverride): OcrO
   return next
 }
 
-export function normalizeOverlayOverrides(
-  rawValue: unknown
-): Record<number, Record<number, OcrOverlayItemOverride>> {
+export function normalizeOverlayOverrides(rawValue: unknown): Record<number, Record<number, OcrOverlayItemOverride>> {
   const root = asObjectRecord(rawValue)
   if (!root) return {}
 
@@ -470,7 +441,7 @@ export function normalizeOverlayOverrides(
 }
 
 export function serializeOverlayOverrides(
-  overridesByImageId: Record<number, Record<number, OcrOverlayItemOverride>>
+  overridesByImageId: Record<number, Record<number, OcrOverlayItemOverride>>,
 ): Record<string, Record<string, OcrOverlayItemOverride>> {
   const serialized: Record<string, Record<string, OcrOverlayItemOverride>> = {}
   const imageIds = Object.keys(overridesByImageId)
@@ -502,9 +473,7 @@ export function serializeOverlayOverrides(
   return serialized
 }
 
-export function normalizeOverlayManualItems(
-  rawValue: unknown
-): Record<number, OcrOverlayItem[]> {
+export function normalizeOverlayManualItems(rawValue: unknown): Record<number, OcrOverlayItem[]> {
   const root = asObjectRecord(rawValue)
   if (!root) return {}
 
@@ -541,12 +510,13 @@ export function normalizeOverlayManualItems(
       const y2 = Math.max(y1Raw, y2Raw)
       if (x2 <= x1 || y2 <= y1) continue
 
-      const ocrText = typeof item.ocr_text === 'string'
-        ? item.ocr_text.trim()
-        : (typeof item.ocrText === 'string' ? item.ocrText.trim() : '')
-      const translatedText = typeof item.translated_text === 'string'
-        ? item.translated_text.trim()
-        : (typeof item.translatedText === 'string' ? item.translatedText.trim() : '')
+      const ocrText = typeof item.ocr_text === 'string' ? item.ocr_text.trim() : typeof item.ocrText === 'string' ? item.ocrText.trim() : ''
+      const translatedText =
+        typeof item.translated_text === 'string'
+          ? item.translated_text.trim()
+          : typeof item.translatedText === 'string'
+            ? item.translatedText.trim()
+            : ''
 
       if (!ocrText && !translatedText) continue
 
@@ -567,7 +537,7 @@ export function normalizeOverlayManualItems(
 }
 
 export function serializeOverlayManualItems(
-  manualItemsByImageId: Record<number, OcrOverlayItem[]>
+  manualItemsByImageId: Record<number, OcrOverlayItem[]>,
 ): Record<string, OcrOverlayPersistedManualItemPayload[]> {
   const serialized: Record<string, OcrOverlayPersistedManualItemPayload[]> = {}
   const imageIds = Object.keys(manualItemsByImageId)
@@ -606,9 +576,7 @@ export function serializeOverlayManualItems(
   return serialized
 }
 
-export function normalizeOverlayHiddenItemIds(
-  rawValue: unknown
-): Record<number, number[]> {
+export function normalizeOverlayHiddenItemIds(rawValue: unknown): Record<number, number[]> {
   const root = asObjectRecord(rawValue)
   if (!root) return {}
 
@@ -637,9 +605,7 @@ export function normalizeOverlayHiddenItemIds(
   return normalized
 }
 
-export function serializeOverlayHiddenItemIds(
-  hiddenItemIdsByImageId: Record<number, number[]>
-): Record<string, number[]> {
+export function serializeOverlayHiddenItemIds(hiddenItemIdsByImageId: Record<number, number[]>): Record<string, number[]> {
   const serialized: Record<string, number[]> = {}
   const imageIds = Object.keys(hiddenItemIdsByImageId)
     .map((key) => Number.parseInt(key, 10))
@@ -647,9 +613,7 @@ export function serializeOverlayHiddenItemIds(
     .sort((a, b) => a - b)
 
   for (const imageId of imageIds) {
-    const hiddenIds = Array.isArray(hiddenItemIdsByImageId[imageId])
-      ? hiddenItemIdsByImageId[imageId]
-      : []
+    const hiddenIds = Array.isArray(hiddenItemIdsByImageId[imageId]) ? hiddenItemIdsByImageId[imageId] : []
     if (hiddenIds.length === 0) continue
 
     const normalizedHiddenIds = hiddenIds
@@ -703,9 +667,10 @@ export function filterOverlayItemsByHiddenIds(items: OcrOverlayItem[], hiddenIds
   return items.filter((item) => !hiddenSet.has(item.id))
 }
 
-export function resolveQuickEditorPlacement(
-  anchor: { leftPercent: number; topPercent: number } | null
-): { side: 'top' | 'bottom'; align: 'start' | 'center' | 'end' } {
+export function resolveQuickEditorPlacement(anchor: { leftPercent: number; topPercent: number } | null): {
+  side: 'top' | 'bottom'
+  align: 'start' | 'center' | 'end'
+} {
   if (!anchor) {
     return { side: 'top', align: 'center' }
   }
@@ -726,9 +691,9 @@ export function isOverlaySelectionPopoverInternalTarget(target: EventTarget | nu
   if (!element) return false
 
   return Boolean(
-    element.closest('[data-ocr-overlay-interactive="true"]')
-    || element.closest('[data-ocr-overlay-selection-lang-select="true"]')
-    || element.closest('[data-slot="select-content"]')
+    element.closest('[data-ocr-overlay-interactive="true"]') ||
+    element.closest('[data-ocr-overlay-selection-lang-select="true"]') ||
+    element.closest('[data-slot="select-content"]'),
   )
 }
 
@@ -750,37 +715,27 @@ export function parseOverlayStateSnapshot(rawValue: unknown): OcrOverlayStateSna
   const root = asObjectRecord(rawValue)
   if (!root) return null
 
-  const rawFontFamily = typeof root.font_family === 'string'
-    ? root.font_family.trim().toLowerCase()
-    : ''
-  const fontFamily: OcrOverlayFontFamily = isOverlayFontFamily(rawFontFamily)
-    ? rawFontFamily
-    : OCR_OVERLAY_DEFAULT_FONT_FAMILY
+  const rawFontFamily = typeof root.font_family === 'string' ? root.font_family.trim().toLowerCase() : ''
+  const fontFamily: OcrOverlayFontFamily = isOverlayFontFamily(rawFontFamily) ? rawFontFamily : OCR_OVERLAY_DEFAULT_FONT_FAMILY
 
   const fontScale = clampRange(
     toFiniteNumber(root.font_scale) ?? OCR_OVERLAY_DEFAULT_FONT_SCALE,
     OCR_OVERLAY_FONT_SCALE_MIN,
-    OCR_OVERLAY_FONT_SCALE_MAX
+    OCR_OVERLAY_FONT_SCALE_MAX,
   )
   const boxInsetPercent = clampRange(
     toFiniteNumber(root.box_inset_percent) ?? OCR_OVERLAY_DEFAULT_BOX_INSET,
     OCR_OVERLAY_BOX_INSET_MIN,
-    OCR_OVERLAY_BOX_INSET_MAX
+    OCR_OVERLAY_BOX_INSET_MAX,
   )
-  const density = clampRange(
-    toFiniteNumber(root.density) ?? OCR_OVERLAY_DENSITY_DEFAULT,
-    OCR_OVERLAY_DENSITY_MIN,
-    OCR_OVERLAY_DENSITY_MAX
-  )
+  const density = clampRange(toFiniteNumber(root.density) ?? OCR_OVERLAY_DENSITY_DEFAULT, OCR_OVERLAY_DENSITY_MIN, OCR_OVERLAY_DENSITY_MAX)
   const overlayOpacity = clampRange(
     toFiniteNumber(root.overlay_opacity) ?? OCR_OVERLAY_OPACITY_DEFAULT,
     OCR_OVERLAY_OPACITY_MIN,
-    OCR_OVERLAY_OPACITY_MAX
+    OCR_OVERLAY_OPACITY_MAX,
   )
   const globalShapeRaw = typeof root.global_shape === 'string' ? root.global_shape.trim().toLowerCase() : ''
-  const globalShape: OcrOverlayShape = isOverlayShape(globalShapeRaw)
-    ? globalShapeRaw
-    : OCR_OVERLAY_DEFAULT_SHAPE
+  const globalShape: OcrOverlayShape = isOverlayShape(globalShapeRaw) ? globalShapeRaw : OCR_OVERLAY_DEFAULT_SHAPE
 
   return {
     fontFamily,
@@ -814,12 +769,7 @@ export function toOverlaySeedItems(image: SectionImage) {
     const rawY1 = Number(box[1])
     const rawX2 = Number(box[2])
     const rawY2 = Number(box[3])
-    if (
-      !Number.isFinite(rawX1)
-      || !Number.isFinite(rawY1)
-      || !Number.isFinite(rawX2)
-      || !Number.isFinite(rawY2)
-    ) {
+    if (!Number.isFinite(rawX1) || !Number.isFinite(rawY1) || !Number.isFinite(rawX2) || !Number.isFinite(rawY2)) {
       continue
     }
 
@@ -852,10 +802,7 @@ export function isImageOcrReady(image: SectionImage | null) {
 
 export function isImageProcessing(image: SectionImage | null) {
   if (!image || isImageTranslated(image)) return false
-  return (
-    PROCESSING_STATUSES.has(normalizeStatus(image.status))
-    || PROCESSING_STATUSES.has(normalizeStatus(image.translation_status))
-  )
+  return PROCESSING_STATUSES.has(normalizeStatus(image.status)) || PROCESSING_STATUSES.has(normalizeStatus(image.translation_status))
 }
 
 export function clampPercent(value: number) {
@@ -906,46 +853,31 @@ export function normalizeSectionCategoryOverlayPreferences(value: unknown): Sect
   const root = asObjectRecord(value)
   if (!root) return null
 
-  const rawFontFamily = typeof root.font_family === 'string'
-    ? root.font_family.trim().toLowerCase()
-    : ''
-  const fontFamily: OcrOverlayFontFamily = isOverlayFontFamily(rawFontFamily)
-    ? rawFontFamily
-    : OCR_OVERLAY_DEFAULT_FONT_FAMILY
+  const rawFontFamily = typeof root.font_family === 'string' ? root.font_family.trim().toLowerCase() : ''
+  const fontFamily: OcrOverlayFontFamily = isOverlayFontFamily(rawFontFamily) ? rawFontFamily : OCR_OVERLAY_DEFAULT_FONT_FAMILY
 
-  const rawShape = typeof root.global_shape === 'string'
-    ? root.global_shape.trim().toLowerCase()
-    : ''
-  const globalShape: OcrOverlayShape = isOverlayShape(rawShape)
-    ? rawShape
-    : OCR_OVERLAY_DEFAULT_SHAPE
-  const rawDefaultReadingMode = typeof root.default_reading_mode === 'string'
-    ? root.default_reading_mode.trim().toLowerCase()
-    : ''
-  const defaultReadingMode: 'paginated' | 'scroll' =
-    rawDefaultReadingMode === 'scroll' ? 'scroll' : 'paginated'
+  const rawShape = typeof root.global_shape === 'string' ? root.global_shape.trim().toLowerCase() : ''
+  const globalShape: OcrOverlayShape = isOverlayShape(rawShape) ? rawShape : OCR_OVERLAY_DEFAULT_SHAPE
+  const rawDefaultReadingMode = typeof root.default_reading_mode === 'string' ? root.default_reading_mode.trim().toLowerCase() : ''
+  const defaultReadingMode: 'paginated' | 'scroll' = rawDefaultReadingMode === 'scroll' ? 'scroll' : 'paginated'
 
   return {
     font_family: fontFamily,
     font_scale: clampRange(
       toFiniteNumber(root.font_scale) ?? OCR_OVERLAY_DEFAULT_FONT_SCALE,
       OCR_OVERLAY_FONT_SCALE_MIN,
-      OCR_OVERLAY_FONT_SCALE_MAX
+      OCR_OVERLAY_FONT_SCALE_MAX,
     ),
     box_inset_percent: clampRange(
       toFiniteNumber(root.box_inset_percent) ?? OCR_OVERLAY_DEFAULT_BOX_INSET,
       OCR_OVERLAY_BOX_INSET_MIN,
-      OCR_OVERLAY_BOX_INSET_MAX
+      OCR_OVERLAY_BOX_INSET_MAX,
     ),
-    density: clampRange(
-      toFiniteNumber(root.density) ?? OCR_OVERLAY_DENSITY_DEFAULT,
-      OCR_OVERLAY_DENSITY_MIN,
-      OCR_OVERLAY_DENSITY_MAX
-    ),
+    density: clampRange(toFiniteNumber(root.density) ?? OCR_OVERLAY_DENSITY_DEFAULT, OCR_OVERLAY_DENSITY_MIN, OCR_OVERLAY_DENSITY_MAX),
     overlay_opacity: clampRange(
       toFiniteNumber(root.overlay_opacity) ?? OCR_OVERLAY_OPACITY_DEFAULT,
       OCR_OVERLAY_OPACITY_MIN,
-      OCR_OVERLAY_OPACITY_MAX
+      OCR_OVERLAY_OPACITY_MAX,
     ),
     global_shape: globalShape,
     default_reading_mode: defaultReadingMode,
@@ -985,21 +917,20 @@ export function toOverlayColorProfile(red: number, green: number, blue: number):
   const isVeryLightBackground = bgLuminance >= 0.92
   const isLightBackground = bgLuminance >= 0.82
   const whiteBlendStrength = isVeryLightBackground && isNearNeutral ? 0.08 : 0
-  const profiledRed = Math.round(clampRange(clampedRed + ((255 - clampedRed) * whiteBlendStrength), 0, 255))
-  const profiledGreen = Math.round(clampRange(clampedGreen + ((255 - clampedGreen) * whiteBlendStrength), 0, 255))
-  const profiledBlue = Math.round(clampRange(clampedBlue + ((255 - clampedBlue) * whiteBlendStrength), 0, 255))
+  const profiledRed = Math.round(clampRange(clampedRed + (255 - clampedRed) * whiteBlendStrength, 0, 255))
+  const profiledGreen = Math.round(clampRange(clampedGreen + (255 - clampedGreen) * whiteBlendStrength, 0, 255))
+  const profiledBlue = Math.round(clampRange(clampedBlue + (255 - clampedBlue) * whiteBlendStrength, 0, 255))
 
   const textColor = useDarkText ? 'rgba(15,23,42,0.96)' : 'rgba(226,232,240,0.92)'
-  const borderColor = isVeryLightBackground && isNearNeutral
-    ? 'rgba(255,255,255,0.015)'
-    : isLightBackground
-      ? `rgba(${profiledRed},${profiledGreen},${profiledBlue},0.08)`
-      : (useDarkText ? 'rgba(15,23,42,0.34)' : 'rgba(248,250,252,0.38)')
-  const baseAlpha = isVeryLightBackground && isNearNeutral
-    ? 0.66
-    : isLightBackground
-      ? 0.72
-      : (useDarkText ? 0.84 : 0.74)
+  const borderColor =
+    isVeryLightBackground && isNearNeutral
+      ? 'rgba(255,255,255,0.015)'
+      : isLightBackground
+        ? `rgba(${profiledRed},${profiledGreen},${profiledBlue},0.08)`
+        : useDarkText
+          ? 'rgba(15,23,42,0.34)'
+          : 'rgba(248,250,252,0.38)'
+  const baseAlpha = isVeryLightBackground && isNearNeutral ? 0.66 : isLightBackground ? 0.72 : useDarkText ? 0.84 : 0.74
 
   return {
     red: profiledRed,
@@ -1040,13 +971,7 @@ export async function loadImageForSampling(src: string) {
   })
 }
 
-export function sampleAverageColor(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number
-) {
+export function sampleAverageColor(context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number) {
   const safeX = Math.max(0, Math.floor(x))
   const safeY = Math.max(0, Math.floor(y))
   const safeW = Math.max(1, Math.floor(width))
@@ -1138,11 +1063,7 @@ export function sampleAverageColor(
   }
 }
 
-export async function cropImageAreaToBlob(
-  imageSrc: string,
-  referenceSize: ImageNaturalSize,
-  box: [number, number, number, number]
-) {
+export async function cropImageAreaToBlob(imageSrc: string, referenceSize: ImageNaturalSize, box: [number, number, number, number]) {
   const image = await loadImageForSampling(imageSrc)
   const [x1Raw, y1Raw, x2Raw, y2Raw] = box
 
@@ -1170,17 +1091,7 @@ export async function cropImageAreaToBlob(
     throw new Error('Falha ao preparar recorte da área selecionada.')
   }
 
-  context.drawImage(
-    image,
-    cropX,
-    cropY,
-    cropW,
-    cropH,
-    0,
-    0,
-    cropW,
-    cropH
-  )
+  context.drawImage(image, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH)
 
   return new Promise<Blob>((resolve, reject) => {
     canvas.toBlob((blob) => {

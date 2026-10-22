@@ -28,6 +28,4 @@ export interface OverlayStateRecord {
   updated_at: string
 }
 
-export type SaveOverlayStateResult =
-  | { ok: true; state: OverlayStateRecord }
-  | { ok: false; error: 'invalid-payload' | 'too-large' }
+export type SaveOverlayStateResult = { ok: true; state: OverlayStateRecord } | { ok: false; error: 'invalid-payload' | 'too-large' }
