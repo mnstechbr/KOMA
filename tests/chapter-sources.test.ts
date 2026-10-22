@@ -23,6 +23,17 @@ describe('consolidação entre publicações e alternativas', () => {
     expect(result[0].alternatives?.map((c) => c.sourceId)).toEqual(['chapter:1'])
     expect(mergeChapterSources([result], result)).toHaveLength(2)
   })
+  it('capítulo com volume do MangaDex junta ao de mesmo número; numeração que recomeça por volume continua separada', () => {
+    const saved = [chapter('chapter:128', '128'), chapter('chapter:1', '1')]
+    const merged = mergeChapterSources([[{ ...chapter('chapter:128:volume:1', '128', '1'), sourceId: 'md-128', language: 'pl' }]], saved)
+    expect(merged.map((c) => c.key)).toEqual(['chapter:1', 'chapter:128'])
+    expect(merged[1].alternatives?.map((c) => c.sourceId)).toEqual(['md-128'])
+    const restart = mergeChapterSources(
+      [[chapter('chapter:1:volume:1', '1', '1'), chapter('chapter:1:volume:2', '1', '2')]],
+      [chapter('chapter:1', '1')],
+    )
+    expect(restart).toHaveLength(3)
+  })
   it('não escolhe um volume arbitrário quando a numeração é ambígua', () => {
     const result = mergeChapterSources([[chapter('chapter:1', '1')]], [chapter('v1', '1', '1'), chapter('v2', '1', '2')])
     expect(result).toHaveLength(3)

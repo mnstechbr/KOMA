@@ -4,6 +4,7 @@ import { worksRepository } from '@/lib/backend/works/repository'
 import { pauseRunningWork, startWorkAutomation } from '@/lib/backend/works/worker'
 import { SourceError } from '@/lib/backend/works/source-http'
 import { ensureSources } from '@/lib/backend/works/custom-sources'
+import { sectionsController } from '@/lib/backend/sections/sections.module'
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const auth = await personalAccess()
@@ -39,5 +40,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (!found) return NextResponse.json({ message: 'Obra não encontrada.' }, { status: 404 })
   if (body.action === 'pause') pauseRunningWork(id)
   startWorkAutomation()
+  return NextResponse.json({ ok: true })
+}
+// Remove a obra da biblioteca, com os capítulos e as imagens baixadas.
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const auth = await personalAccess(request)
+  if ('response' in auth) return auth.response
+  const id = numericId((await params).id)
+  pauseRunningWork(id)
+  const sections = worksRepository.removeWork(id, auth.user.id)
+  if (!sections) return NextResponse.json({ message: 'Obra não encontrada.' }, { status: 404 })
+  for (const sectionId of sections) sectionsController.deleteSection(sectionId, auth.user.id)
   return NextResponse.json({ ok: true })
 }

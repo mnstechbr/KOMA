@@ -107,6 +107,25 @@ describe('obra e atualização incremental', () => {
       ['6', false],
     ])
   })
+  it('dispensa um capítulo pendente, tenta de novo e remove a obra inteira', () => {
+    const id = repository.add(1, work)
+    repository.syncChapters(id, [chapter('1'), chapter('2')])
+    const [first] = repository.detail(id, 1)!.chapters
+    database
+      .prepare("UPDATE work_chapters SET message='Só X tem este capítulo', retry_after=? WHERE id=?")
+      .run(Date.now() + 3600000, first.id)
+    expect(repository.chapterAction(id, first.id, 1, 'retry')).toBe(true)
+    expect(database.prepare('SELECT retry_after, message FROM work_chapters WHERE id=?').get(first.id)).toEqual({
+      retry_after: 0,
+      message: '',
+    })
+    expect(repository.chapterAction(id, first.id, 1, 'skip')).toBe(true)
+    expect(repository.detail(id, 1)!.chapters[0].state).toBe('skipped')
+    expect(repository.removeWork(id, 2)).toBeNull()
+    expect(repository.removeWork(id, 1)).toEqual([])
+    expect(repository.list(1)).toHaveLength(0)
+    expect((database.prepare('SELECT COUNT(*) AS n FROM work_chapters WHERE work_id=?').get(id) as { n: number }).n).toBe(0)
+  })
   it('refresh só acrescenta capítulos novos e preserva traduções/progresso', () => {
     const id = repository.add(1, work)
     repository.syncChapters(id, [chapter('1'), chapter('2')])

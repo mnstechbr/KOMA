@@ -1,7 +1,8 @@
 'use client'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { ArrowLeft, BookOpen, RefreshCw, Pause, Play, Heart } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ArrowLeft, BookOpen, RefreshCw, Pause, Play, Heart, Trash2 } from 'lucide-react'
 import { preparationLabels, type WorkChapter, type WorkSummary } from '@/lib/works'
 import { BrushProgress, WorkCover, chapterLabel, workKind, type Translate } from '@/components/koma-ui'
 import { useT } from '@/components/i18n'
@@ -48,6 +49,7 @@ function cell(chapter: WorkChapter, work: WorkSummary, t: Translate) {
 
 export function WorkDetail({ id }: { id: number }) {
   const { t, locale } = useT()
+  const router = useRouter()
   const [detail, setDetail] = useState<{ work: WorkSummary; chapters: WorkChapter[]; sources?: Source[] } | null>(null)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
@@ -75,6 +77,50 @@ export function WorkDetail({ id }: { id: number }) {
       clearTimeout(timer)
     }
   }, [id, t])
+  // Pendência de um capítulo: tentar de novo agora ou dispensar.
+  async function chapterAction(chapter: WorkChapter, value: 'retry' | 'skip') {
+    setBusy(true)
+    setMessage('')
+    try {
+      const response = await fetch(`/api/local/works/${id}/chapters/${chapter.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: value }),
+      })
+      if (!response.ok) throw new Error((await response.json()).message || t('Não foi possível realizar esta ação.'))
+      setMessage(
+        value === 'retry'
+          ? t('Capítulo de volta à fila; as fontes serão consultadas de novo.')
+          : t('Capítulo dispensado. Ele fica como não baixado, e um clique traz de volta.'),
+      )
+      const snapshot = await fetch(`/api/local/works/${id}`, { cache: 'no-store' })
+      if (snapshot.ok) setDetail(await snapshot.json())
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : t('Não foi possível realizar a ação.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+  async function removeWork() {
+    if (
+      !detail ||
+      !window.confirm(
+        t('Remover {title} da biblioteca? Os capítulos baixados e traduzidos desta obra serão apagados do computador.', {
+          title: detail.work.title,
+        }),
+      )
+    )
+      return
+    setBusy(true)
+    try {
+      const response = await fetch(`/api/local/works/${id}`, { method: 'DELETE' })
+      if (!response.ok) throw new Error()
+      router.push('/inicio/secoes')
+    } catch {
+      setMessage(t('Não foi possível remover a obra.'))
+      setBusy(false)
+    }
+  }
   // Capítulo não escolhido ao adicionar a obra: um clique põe na fila.
   async function download(chapter: WorkChapter) {
     setBusy(true)
@@ -132,6 +178,10 @@ export function WorkDetail({ id }: { id: number }) {
   }
   const work = detail?.work
   const chapters = detail?.chapters || []
+  // Capítulos com erro ou esperando a fonte voltar (mensagem da fila).
+  const pending = chapters.filter(
+    (chapter) => chapter.state === 'error' || (['queued', 'blocked'].includes(chapter.state) && Boolean(chapter.message)),
+  )
   const next = work?.nextChapter ? chapters.find((chapter) => chapter.id === work.nextChapter?.id) : undefined
   const blocks = Array.from({ length: Math.ceil(chapters.length / BLOCK) }, (_, index) =>
     chapters.slice(index * BLOCK, (index + 1) * BLOCK),
@@ -216,7 +266,46 @@ export function WorkDetail({ id }: { id: number }) {
                 >
                   <Heart size={20} fill={work.favorite ? 'currentColor' : 'none'} aria-hidden="true" />
                 </button>
+                <button
+                  id="remove-work"
+                  aria-label={t('Remover da biblioteca')}
+                  title={t('Remover da biblioteca')}
+                  className="koma-icon-button"
+                  disabled={busy}
+                  onClick={() => void removeWork()}
+                >
+                  <Trash2 size={20} aria-hidden="true" />
+                </button>
               </div>
+              {pending.length ? (
+                <details className="koma-details" open data-pending-chapters>
+                  <summary>{t('{n} capítulo(s) com pendência', { n: pending.length })}</summary>
+                  <ul className="flex flex-col gap-2 pt-2">
+                    {pending.map((chapter) => (
+                      <li key={chapter.id} className="flex flex-wrap items-center gap-2 text-sm">
+                        <strong>{chapterLabel(chapter, t)}</strong>
+                        <span className="koma-note min-w-0 flex-1">{chapter.message || t('Esperando para tentar de novo.')}</span>
+                        <button
+                          type="button"
+                          className="koma-outline-button"
+                          disabled={busy}
+                          onClick={() => void chapterAction(chapter, 'retry')}
+                        >
+                          {t('Tentar agora')}
+                        </button>
+                        <button
+                          type="button"
+                          className="koma-outline-button"
+                          disabled={busy}
+                          onClick={() => void chapterAction(chapter, 'skip')}
+                        >
+                          {t('Dispensar')}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
               <p role="status" className="koma-status">
                 {message}
               </p>

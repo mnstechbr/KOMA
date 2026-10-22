@@ -545,13 +545,56 @@ export class WorksRepository {
    * na fila do zero, pelo mesmo caminho de uma obra nova. Os originais baixados ficam.
    * "download": capítulo não escolhido ao adicionar a obra entra na fila.
    */
-  chapterAction(workId: number, chapterId: number, userId: number, action: 'redo' | 'download') {
+  /**
+   * Remove a obra da biblioteca: capítulos, versões, vínculos e o registro da obra.
+   * Devolve as seções (pastas de imagens) para quem chamou apagar os arquivos.
+   */
+  removeWork(workId: number, userId: number): number[] | null {
+    if (!this.row(workId, userId)) return null
+    return this.database.transaction(() => {
+      const sections = (
+        this.database
+          .prepare(
+            'SELECT section_id FROM work_chapters WHERE work_id=? AND section_id IS NOT NULL UNION SELECT a.section_id FROM work_chapter_attempts a JOIN work_chapters c ON c.id=a.chapter_id WHERE c.work_id=? AND a.section_id IS NOT NULL',
+          )
+          .all(workId, workId) as Array<{ section_id: number }>
+      ).map((row) => row.section_id)
+      const chapters = 'SELECT id FROM work_chapters WHERE work_id=?'
+      for (const table of ['work_pages', 'work_chapter_attempts', 'work_chapter_cloud'])
+        this.database.prepare(`DELETE FROM ${table} WHERE chapter_id IN (${chapters})`).run(workId)
+      for (const table of ['work_chapters', 'work_source_versions', 'work_catalog_sources', 'work_source_checks'])
+        this.database.prepare(`DELETE FROM ${table} WHERE work_id=?`).run(workId)
+      for (const key of [`koma:work-names:v1:${workId}`, `koma:work-corrections:v1:${workId}`, `koma:work-titles:v1:${workId}`])
+        this.database.prepare('DELETE FROM kv_store WHERE key=?').run(key)
+      this.database.prepare('DELETE FROM works WHERE id=?').run(workId)
+      return sections
+    })()
+  }
+  /** "skip": dispensa um capítulo pendente (fica como não baixado; "download" traz de volta). */
+  chapterAction(workId: number, chapterId: number, userId: number, action: 'redo' | 'download' | 'skip' | 'retry') {
     if (!this.row(workId, userId)) return false
     const chapter = this.database.prepare('SELECT id, state FROM work_chapters WHERE id=? AND work_id=?').get(chapterId, workId) as
       { id: number; state: string } | undefined
     if (!chapter) return false
     return this.database.transaction(() => {
-      if (action === 'download') {
+      if (action === 'skip') {
+        if (['ready', 'partial', 'skipped'].includes(chapter.state)) return false
+        this.database
+          .prepare("UPDATE work_chapters SET state='skipped',attempts=0,retry_after=0,message='',updated_at=? WHERE id=?")
+          .run(now(), chapterId)
+        const pending = this.database
+          .prepare("SELECT 1 FROM work_chapters WHERE work_id=? AND state NOT IN ('ready','partial','error','skipped') LIMIT 1")
+          .get(workId)
+        if (!pending) this.database.prepare("UPDATE works SET stage='ready',message='',updated_at=? WHERE id=?").run(now(), workId)
+        return true
+      }
+      if (action === 'retry') {
+        if (['ready', 'partial', 'skipped'].includes(chapter.state)) return false
+        this.database
+          .prepare("UPDATE work_chapters SET state='queued',attempts=0,version_attempts=0,retry_after=0,message='',updated_at=? WHERE id=?")
+          .run(now(), chapterId)
+        this.database.prepare('UPDATE works SET sync_requested=1,sync_attempts=0,sync_retry_after=0 WHERE id=?').run(workId)
+      } else if (action === 'download') {
         if (chapter.state !== 'skipped') return false
         this.database
           .prepare("UPDATE work_chapters SET state='queued',attempts=0,retry_after=0,message='',updated_at=? WHERE id=?")

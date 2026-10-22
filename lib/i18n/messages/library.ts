@@ -5,6 +5,17 @@ import type { Catalog } from '../core'
 // que as telas traduzem a partir de variáveis.
 export const libraryMessages: Catalog = {
   en: {
+    'Capítulo de volta à fila; as fontes serão consultadas de novo.': 'Chapter back in the queue; the sources will be checked again.',
+    'Capítulo dispensado. Ele fica como não baixado, e um clique traz de volta.':
+      'Chapter dismissed. It stays as not downloaded, and one click brings it back.',
+    'Remover {title} da biblioteca? Os capítulos baixados e traduzidos desta obra serão apagados do computador.':
+      'Remove {title} from the library? The downloaded and translated chapters of this title will be deleted from the computer.',
+    'Não foi possível remover a obra.': 'Could not remove the title.',
+    '{n} capítulo(s) com pendência': '{n} chapter(s) with issues',
+    'Esperando para tentar de novo.': 'Waiting to try again.',
+    'Tentar agora': 'Try now',
+    Dispensar: 'Dismiss',
+    'Remover da biblioteca': 'Remove from library',
     'Não foi possível abrir a biblioteca.': 'Could not open the library.',
     'Abrindo…': 'Opening…',
     '{ready} de {total} capítulos prontos': '{ready} of {total} chapters ready',
@@ -266,6 +277,17 @@ export const libraryMessages: Catalog = {
     Espaço: 'Space',
   },
   es: {
+    'Capítulo de volta à fila; as fontes serão consultadas de novo.': 'Capítulo de vuelta en la cola; se consultarán las fuentes de nuevo.',
+    'Capítulo dispensado. Ele fica como não baixado, e um clique traz de volta.':
+      'Capítulo descartado. Queda como no descargado, y un clic lo trae de vuelta.',
+    'Remover {title} da biblioteca? Os capítulos baixados e traduzidos desta obra serão apagados do computador.':
+      '¿Quitar {title} de la biblioteca? Los capítulos descargados y traducidos de esta obra se borrarán del ordenador.',
+    'Não foi possível remover a obra.': 'No se pudo quitar la obra.',
+    '{n} capítulo(s) com pendência': '{n} capítulo(s) con pendientes',
+    'Esperando para tentar de novo.': 'Esperando para intentarlo de nuevo.',
+    'Tentar agora': 'Intentar ahora',
+    Dispensar: 'Descartar',
+    'Remover da biblioteca': 'Quitar de la biblioteca',
     'Não foi possível abrir a biblioteca.': 'No se pudo abrir la biblioteca.',
     'Abrindo…': 'Abriendo…',
     '{ready} de {total} capítulos prontos': '{ready} de {total} capítulos listos',
