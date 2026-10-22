@@ -18,12 +18,13 @@ export function mergeChapterSources(groups: SourceChapter[][], existing: SourceC
   for (const chapters of groups) {
     // Fonte que recomeça a numeração a cada volume (dois "capítulo 1" em volumes
     // diferentes): nela, o volume faz parte da identidade do capítulo.
-    const perNumber = new Map<string, number>()
-    for (const chapter of chapters) if (chapter.number) perNumber.set(chapter.number, (perNumber.get(chapter.number) || 0) + 1)
+    const volumesOf = new Map<string, Set<string>>()
+    for (const chapter of chapters)
+      if (chapter.number && chapter.volume) volumesOf.set(chapter.number, (volumesOf.get(chapter.number) || new Set()).add(chapter.volume))
     for (const chapter of chapters) {
       const numbered = chapter.number ? [...result.values()].filter((item) => item.number === chapter.number) : []
       // Capítulo com volume (como no MangaDex) junta ao de mesmo número sem ambiguidade.
-      const mergeable = numbered.length === 1 && (!chapter.volume || perNumber.get(chapter.number!) === 1)
+      const mergeable = numbered.length === 1 && (!chapter.volume || (volumesOf.get(chapter.number!)?.size ?? 0) <= 1)
       const key = result.has(chapter.key) ? chapter.key : mergeable ? numbered[0].key : chapter.key
       const previous = result.get(key)
       if (!previous) result.set(key, { ...chapter })
