@@ -32,11 +32,19 @@ export function mapCatalogWork(record: RecordValue): CatalogWork {
   }
 }
 const includes = 'includes[]=cover_art&includes[]=author&includes[]=artist'
-export async function searchCatalog(query: string, signal?: AbortSignal) {
+/** "withChapters": só obras com capítulos para ler (a busca da tela); sem ele, todas (para achar os nomes da obra). */
+export async function searchCatalog(query: string, signal?: AbortSignal, withChapters = true) {
   if (query.trim().length < 2 || query.length > 160) throw new SourceError('Digite de 2 a 160 caracteres para buscar a obra.')
-  const result = await sourceJson<{ data: RecordValue[] }>(`https://api.mangadex.org/manga?limit=30&title=${encodeURIComponent(query.trim())}&hasAvailableChapters=true&${includes}`, signal)
+  const result = await sourceJson<{ data: RecordValue[] }>(`https://api.mangadex.org/manga?limit=30&title=${encodeURIComponent(query.trim())}${withChapters ? '&hasAvailableChapters=true' : ''}&${includes}`, signal)
   if (!Array.isArray(result.data)) throw new SourceError('A fonte não retornou resultados válidos.')
   return result.data.map(mapCatalogWork).sort((a, b) => titleScore(b, query) - titleScore(a, query))
+}
+/** Listas da tela de busca vazia: mais seguidas e atualizadas recentemente (com capítulos, sem conteúdo adulto). */
+export async function featuredCatalog(kind: 'popular' | 'recent', signal?: AbortSignal) {
+  const order = kind === 'popular' ? 'order[followedCount]=desc' : 'order[latestUploadedChapter]=desc'
+  const result = await sourceJson<{ data: RecordValue[] }>(`https://api.mangadex.org/manga?limit=18&${order}&hasAvailableChapters=true&availableTranslatedLanguage[]=en&contentRating[]=safe&contentRating[]=suggestive&${includes}`, signal)
+  if (!Array.isArray(result.data)) throw new SourceError('A fonte não retornou resultados válidos.')
+  return result.data.map(mapCatalogWork)
 }
 export async function catalogWork(id: string, signal?: AbortSignal) {
   const result = await sourceJson<{ data: RecordValue }>(`https://api.mangadex.org/manga/${sourceId(id)}?${includes}`, signal)

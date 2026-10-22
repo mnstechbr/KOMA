@@ -114,7 +114,7 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
       if (bound) found = await catalogWork(bound.url.split('/').pop() || '', signal)
       else if (!recentSearch('search:mangadex')) {
         found = await findOnMangaDex(titles, signal)
-        if (found) repository.database.prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)').run(work.id, 'mangadex', `https://mangadex.org/title/${found.sourceId}`)
+        if (found) { repository.database.prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)').run(work.id, 'mangadex', `https://mangadex.org/title/${found.sourceId}`); repository.database.prepare("DELETE FROM work_source_checks WHERE work_id=? AND url='search:mangadex'").run(work.id) }
         else record('alternative', 'search:mangadex', 'not_found', 'MangaDex: obra não encontrada pelo título.')
       }
       if (found) {
@@ -145,6 +145,7 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
         const match = await findOnAggregator(connector,titles,signal)
         if (!match) { record('alternative',`search:${connector.id}`,'not_found',`${connector.name}: obra não encontrada pelo título.`); return [] }
         repository.database.prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)').run(work.id,connector.id,match.url)
+        repository.database.prepare('DELETE FROM work_source_checks WHERE work_id=? AND url=?').run(work.id,`search:${connector.id}`)
         links = [match.url]
       } catch (error) {
         if (signal.aborted) throw error
@@ -178,7 +179,7 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
 export async function findOnMangaDex(titles: string[], signal?: AbortSignal) {
   const known = new Set(titles.map((title) => normalizeTitle(title).replace(/^the /, '')))
   for (const title of titles.slice(0, 3)) {
-    const results = await searchCatalog(title, signal)
+    const results = await searchCatalog(title, signal, false)
     const match = results.find((work) => [work.title, work.originalTitle, ...work.aliases.map((alias) => alias.title)].some((name) => name && known.has(normalizeTitle(name).replace(/^the /, ''))))
     if (match) return match
   }
