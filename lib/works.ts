@@ -4,6 +4,8 @@ export interface CatalogWork {
   aliases: Array<{ language: string; title: string }>
   description: string; descriptionLanguage: string; originalLanguage: string
   publicationLinks?: Array<{ kind: 'original' | 'licensed'; url: string }>
+  /** Na busca: a mesma obra em outras fontes (o cartão junta todas). */
+  alsoIn?: Array<{ source: string; sourceName?: string; sourceId: string }>
   /** IDs da obra no AniList e no MyAnimeList, quando a fonte informa. */
   trackers?: { al?: string; mal?: string }
   authors: string[]; genres: string[]; year: number | null; coverFile: string | null; coverSourceUrl?: string

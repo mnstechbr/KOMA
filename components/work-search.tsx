@@ -25,8 +25,11 @@ export function WorkSearch() {
   const request = useRef<AbortController | null>(null)
   useEffect(() => () => request.current?.abort(), [])
   const selectedId = selected?.sourceId
+  const alsoIds = (selected?.alsoIn || []).map((item) => item.sourceId)
+  const alsoKey = alsoIds.join('|')
+  const [counts, setCounts] = useState<Record<string, { total: number; chapters: SourceChapter[] }>>({})
   useEffect(() => {
-    setAvailableChapters(null); setChapterList([]); setPicked(new Set()); setStartFrom('')
+    setAvailableChapters(null); setChapterList([]); setPicked(new Set()); setStartFrom(''); setCounts({})
     if (!selectedId) return
     const controller = new AbortController()
     // Fonte personalizada ("site:obra"): a busca traz só o resumo; os detalhes vêm da página da obra.
@@ -34,16 +37,26 @@ export function WorkSearch() {
       void fetch(`/api/local/catalog/${selectedId}`, {signal:controller.signal}).then(async response=>{
         if (!response.ok) return
         const data=await response.json()
-        if (!controller.signal.aborted) setSelected(current=>current?.sourceId===selectedId ? data.work : current)
+        if (!controller.signal.aborted) setSelected(current=>current?.sourceId===selectedId ? { ...data.work, alsoIn: current.alsoIn } : current)
       }).catch(()=>{ /* A fonte permanece identificada mesmo sem detalhes adicionais. */ })
     }
-    void fetch(`/api/local/catalog/${selectedId}/chapters`, { signal: controller.signal }).then(async (response) => {
-      if (!response.ok) return
-      const data = await response.json()
-      if (!controller.signal.aborted) { setAvailableChapters(data.total); setChapterList(data.chapters || []) }
-    }).catch(() => { /* A descoberta será tentada novamente pela fila ao adicionar. */ })
+    // A mesma obra em todas as fontes do cartão: capítulos de cada uma; a lista de escolha vem da mais completa.
+    for (const id of [selectedId, ...alsoIds]) {
+      void fetch(`/api/local/catalog/${id}/chapters`, { signal: controller.signal }).then(async (response) => {
+        if (!response.ok) { if (!controller.signal.aborted) setCounts((current) => ({ ...current, [id]: { total: 0, chapters: [] } })); return }
+        const data = await response.json()
+        if (!controller.signal.aborted) setCounts((current) => ({ ...current, [id]: { total: data.total, chapters: data.chapters || [] } }))
+      }).catch(() => { /* A descoberta será tentada novamente pela fila ao adicionar. */ })
+    }
     return () => controller.abort()
-  }, [selectedId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId, alsoKey])
+  // A lista de capítulos para escolher vem da fonte mais completa; todas ficam vinculadas à obra.
+  const best = Object.entries(counts).sort((a, b) => b[1].total - a[1].total)[0]
+  useEffect(() => {
+    if (!best) return
+    setAvailableChapters(best[1].total); setChapterList(best[1].chapters)
+  }, [best?.[0], best?.[1].total])
   async function search(event: React.FormEvent) {
     event.preventDefault(); request.current?.abort()
     const controller = new AbortController(); request.current = controller
@@ -60,13 +73,14 @@ export function WorkSearch() {
     if (!selected || adding) return
     setAdding(true); setMessage('')
     try {
-      const response = await fetch('/api/local/works', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceId: selected.sourceId, startFrom: startFrom || undefined, chapters: chapterList.filter((chapter) => picked.has(chapter.key)).map((chapter) => ({ key: chapter.key, number: chapter.number })) }) })
+      const response = await fetch('/api/local/works', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceId: selected.sourceId, also: alsoIds, startFrom: startFrom || undefined, chapters: chapterList.filter((chapter) => picked.has(chapter.key)).map((chapter) => ({ key: chapter.key, number: chapter.number })) }) })
       const data = await response.json()
       if (!response.ok) throw new Error(data.message || t('Não foi possível adicionar a obra.'))
       router.push(`/inicio/obras/${data.id}`)
     } catch (error) { setMessage(error instanceof Error ? error.message : t('Não foi possível adicionar.')); setAdding(false) }
   }
-  const sourceName = (work: CatalogWork) => work.sourceName || (work.source === 'mangadex' ? 'MangaDex' : work.source)
+  const nameOf = (source: string, name?: string) => name || (source === 'mangadex' ? 'MangaDex' : source)
+  const sourceName = (work: CatalogWork) => [nameOf(work.source, work.sourceName), ...(work.alsoIn || []).map((item) => nameOf(item.source, item.sourceName))].join(' · ')
   return <div data-work-search>
     <header className="koma-page-head"><div><p className="koma-eyebrow">{t('Mangá · Manhwa · Manhua')}</p><h1>{t('Adicionar obra')}</h1><p>{t('Busque pelo nome que você conhece. Confira a obra antes de adicionar; derivados e continuações aparecem separados.')}</p></div></header>
     <form onSubmit={(event) => void search(event)} className="mb-6 flex flex-wrap gap-3"><label className="koma-search min-w-0 flex-1"><Search size={20} aria-hidden="true" /><input id="catalog-query" required minLength={2} maxLength={160} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Ex.: Eminence in Shadow')} aria-label={t('Título da obra')} /></label><button className="koma-button" disabled={searching || query.trim().length < 2}>{searching ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : <Search size={18} aria-hidden="true" />}{t('Buscar')}</button></form>
@@ -78,6 +92,7 @@ export function WorkSearch() {
         <div className="koma-tags">{selected.aliases.slice(0, 12).map((alias, i) => <span key={`${alias.language}-${i}`}>{alias.title}</span>)}</div>
         <div><h2 className="font-bold">{selected.descriptionLanguage && !selected.descriptionLanguage.startsWith('pt') ? t('Sinopse da fonte ({language})', { language: selected.descriptionLanguage === 'en' ? t('inglês') : selected.descriptionLanguage }) : t('Sinopse')}</h2><p className="koma-synopsis is-open mt-2 max-h-64 overflow-auto">{selected.description || t('Esta fonte ainda não tem uma sinopse para a obra.')}</p></div>
         <p className="koma-note">{t('Fonte: {source}. Ao adicionar, o KOMA procura os capítulos disponíveis, consolida versões repetidas e prepara a leitura em PT-BR. A tradução usa os provedores autorizados nas preferências e consome sua cota.', { source: sourceName(selected) })}</p>
+        {selected.alsoIn?.length ? <p className="koma-note" data-sources-count>{[{ source: selected.source, sourceName: selected.sourceName, sourceId: selected.sourceId }, ...selected.alsoIn].map((item) => `${nameOf(item.source, item.sourceName)}: ${counts[item.sourceId] ? t('{n} cap.', { n: counts[item.sourceId].total }) : '…'}`).join(' · ')}</p> : null}
         <p className="font-semibold">{availableChapters === null ? t('Conferindo os capítulos disponíveis…') : availableChapters === 1 ? t('1 capítulo disponível nesta fonte, sem repetir versões.') : t('{n} capítulos disponíveis nesta fonte, sem repetir versões.', { n: availableChapters })}</p>
         {chapterList.some((chapter) => chapter.number) ? <div className="space-y-1" data-reading-from>
           <label htmlFor="reading-from" className="text-sm font-medium">{t('Já está lendo esta obra?')}</label>
