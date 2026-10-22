@@ -11,6 +11,7 @@ const { startBackend } = require('./backend.cjs')
 const { allowedExternalLink } = require('./external-links.cjs')
 const { desktopPaths, bundledNode } = require('./paths.cjs')
 const { labels, noticeText, syncAutostart } = require('./background.cjs')
+const { startMobileServer } = require('./mobile-server.cjs')
 
 const { configDir, dataDir, logDir } = desktopPaths(process.env, process.platform, os.homedir())
 for (const dir of [configDir, dataDir, logDir]) fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
@@ -57,10 +58,27 @@ async function startBackground(token, language) {
       shown.show()
     }
   }
+  // "Ler no celular": servidor da rede de casa, ligado só quando a opção está ativa.
+  let mobile = null; let mobileKey = ''
+  const syncMobile = async () => {
+    const response = await fetch(`${backend.url}/api/local/mobile`, { headers: { Cookie: `koma-session=${token}` }, signal: AbortSignal.timeout(15000) })
+    if (!response.ok) return
+    const settings = await response.json()
+    const key = settings.enabled ? `${settings.port}:${settings.token}:${settings.code}` : ''
+    if (key === mobileKey) return
+    if (mobile) { await mobile.stop(); mobile = null }
+    mobileKey = key
+    if (!key) return
+    try { mobile = await startMobileServer({ port: settings.port, token: settings.token, code: settings.code, backendUrl: backend.url, sessionToken: token, language }) }
+    catch (error) { mobileKey = ''; console.error('[KOMA] Leitura no celular não abriu', error.message) }
+  }
   try { apply(await fetchSettings(false)) } catch { setTray(true) }
-  // A cada minuto: preferências mudadas na tela e capítulos novos prontos.
-  const poll = () => { void fetchSettings(true).then(apply).catch(() => { /* Serviço ocupado: tenta no próximo minuto. */ }) }
+  void syncMobile().catch(() => undefined)
+  // A cada minuto (e logo depois de mudar a opção na tela): preferências e capítulos novos prontos.
+  const poll = () => { void fetchSettings(true).then(apply).catch(() => { /* Serviço ocupado: tenta no próximo minuto. */ }); void syncMobile().catch(() => undefined) }
   setInterval(() => { if (!quitting) poll() }, 60000).unref()
+  setInterval(() => { if (!quitting) void syncMobile().catch(() => undefined) }, 5000).unref()
+  app.on('before-quit', () => { if (mobile) void mobile.stop() })
   return { poll }
 }
 

@@ -5,6 +5,12 @@ import type { Catalog } from '../core'
 // que as telas traduzem a partir de variáveis.
 export const libraryMessages: Catalog = {
   en: {
+    'Não foi possível abrir a biblioteca.': 'Could not open the library.',
+    'Abrindo…': 'Opening…',
+    '{ready} de {total} capítulos prontos': '{ready} of {total} chapters ready',
+    'Continuar: {chapter}': 'Continue: {chapter}',
+    'Biblioteca': 'Library',
+    'Não foi possível abrir o capítulo.': 'Could not open the chapter.',
     'NÃO BAIXADO': 'NOT DOWNLOADED',
     'Capítulo na fila para baixar e preparar.': 'Chapter queued to download and prepare.',
     'Baixar {name}': 'Download {name}',
@@ -246,6 +252,12 @@ export const libraryMessages: Catalog = {
     'Espaço': 'Space',
   },
   es: {
+    'Não foi possível abrir a biblioteca.': 'No se pudo abrir la biblioteca.',
+    'Abrindo…': 'Abriendo…',
+    '{ready} de {total} capítulos prontos': '{ready} de {total} capítulos listos',
+    'Continuar: {chapter}': 'Continuar: {chapter}',
+    'Biblioteca': 'Biblioteca',
+    'Não foi possível abrir o capítulo.': 'No se pudo abrir el capítulo.',
     'NÃO BAIXADO': 'NO DESCARGADO',
     'Capítulo na fila para baixar e preparar.': 'Capítulo en cola para descargar y preparar.',
     'Baixar {name}': 'Descargar {name}',

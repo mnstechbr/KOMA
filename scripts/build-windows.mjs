@@ -125,7 +125,7 @@ await fs.rename(path.join(electron, 'electron.exe'), path.join(electron, 'KOMA.e
 await fs.rm(path.join(electron, 'resources/default_app.asar'), { force: true })
 const electronApp = path.join(electron, 'resources/app')
 await fs.mkdir(electronApp, { recursive: true })
-for (const name of ['main.cjs', 'background.cjs', 'external-links.cjs', 'paths.cjs', 'backend.cjs', 'supervisor.cjs', 'window-checks.cjs', 'package.json', 'koma.png']) {
+for (const name of ['main.cjs', 'background.cjs', 'mobile-server.cjs', 'external-links.cjs', 'paths.cjs', 'backend.cjs', 'supervisor.cjs', 'window-checks.cjs', 'package.json', 'koma.png']) {
   await fs.copyFile(path.join(root, 'desktop', name), path.join(electronApp, name))
 }
 
