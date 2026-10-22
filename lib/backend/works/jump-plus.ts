@@ -37,6 +37,9 @@ export async function jumpChapters(value:string,signal?:AbortSignal) {
 }
 export function parseJumpPages(html:string,url:string) {
   const episode=parseJumpEpisode(html,url)
+  // Páginas embaralhadas em blocos ("baku") são uma proteção do leitor do Jump+: o
+  // KOMA não desembaralha. O Jump+ fica só como índice de capítulos.
+  if(episode.pageStructure?.choJuGiga && episode.pageStructure.choJuGiga!=='usagi')throw new SourceError('O Jump+ protege as páginas deste episódio; ele é usado só como índice de capítulos.',false,'content_unavailable')
   const pages=episode.isPublic===true?episode.pageStructure?.pages?.filter((page:any)=>page.type==='main'):[]
   if(!pages?.length)throw new SourceError('Este episódio Jump+ não tem páginas públicas disponíveis.',false,'content_unavailable')
   return pages.map((page:any,index:number)=>{

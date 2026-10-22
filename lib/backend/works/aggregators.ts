@@ -65,7 +65,9 @@ export function sourceRank(chapterId: string) {
   return index < 0 ? 1 : index === 0 ? 0 : index + 1
 }
 // Publicações originais com páginas públicas coletáveis.
-const ORIGINAL_SOURCES = [/^https:\/\/comic\.naver\.com\//, /^https:\/\/shonenjumpplus\.com\//]
+const ORIGINAL_SOURCES = [/^https:\/\/comic\.naver\.com\//]
+// Fontes que só servem de índice (páginas protegidas): última opção de versão.
+const INDEX_ONLY = [/^https:\/\/shonenjumpplus\.com\//]
 // Idiomas que o OCR instalado ainda não lê ficam por último.
 const OCR_UNSUPPORTED = new Set<string>()
 /**
@@ -76,6 +78,7 @@ const OCR_UNSUPPORTED = new Set<string>()
  */
 export function versionRank(version: { sourceId: string; language: string }, target = 'pt-br') {
   const language = version.language.toLowerCase()
+  if (INDEX_ONLY.some((pattern) => pattern.test(version.sourceId))) return 2000
   if (OCR_UNSUPPORTED.has(language)) return 1000 + sourceRank(version.sourceId)
   if (ORIGINAL_SOURCES.some((pattern) => pattern.test(version.sourceId))) return 0
   if (sameLanguage(language, target)) return 10 + sourceRank(version.sourceId)
