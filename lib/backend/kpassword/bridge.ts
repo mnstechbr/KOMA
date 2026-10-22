@@ -60,7 +60,7 @@ class BridgeClient {
     this.child.on('close', () => this.close())
     this.child.stdin.on('error', () => this.close())
     this.ready = this.rpc('initialize', {
-      protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'KOMA', version: '1.0.1' },
+      protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'KOMA', version: '1.0.2' },
     }).then((reply) => {
       const result = reply.result as { serverInfo?: { name?: string } } | undefined
       if (result?.serverInfo?.name !== 'KPassword Secrets Bridge') throw new TranslationError('invalid_bridge', 'O conector não identificou o KPassword.', 503)
