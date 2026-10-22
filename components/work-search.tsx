@@ -23,6 +23,13 @@ export function WorkSearch() {
   // "Já está lendo?": capítulo em que parou; a fila começa nele e volta ao início depois.
   const [startFrom, setStartFrom] = useState('')
   const request = useRef<AbortController | null>(null)
+  // Tela vazia: listas do MangaDex para começar sem digitar.
+  const [featured, setFeatured] = useState<{ popular: CatalogWork[]; recent: CatalogWork[] } | null>(null)
+  useEffect(() => {
+    const controller = new AbortController()
+    void fetch('/api/local/catalog/featured', { signal: controller.signal, cache: 'no-store' }).then((response) => response.ok ? response.json() : null).then((data) => { if (data && !controller.signal.aborted) setFeatured(data) }).catch(() => { if (!controller.signal.aborted) setFeatured({ popular: [], recent: [] }) })
+    return () => controller.abort()
+  }, [])
   useEffect(() => () => request.current?.abort(), [])
   const selectedId = selected?.sourceId
   const alsoIds = (selected?.alsoIn || []).map((item) => item.sourceId)
@@ -81,6 +88,10 @@ export function WorkSearch() {
   }
   const nameOf = (source: string, name?: string) => name || (source === 'mangadex' ? 'MangaDex' : source)
   const sourceName = (work: CatalogWork) => [nameOf(work.source, work.sourceName), ...(work.alsoIn || []).map((item) => nameOf(item.source, item.sourceName))].join(' · ')
+  const card = (work: CatalogWork) => <button key={work.sourceId} data-source-id={work.sourceId} className="koma-result" onClick={() => setSelected(work)}>
+      <span className="koma-result-thumb">{work.coverFile ? <Image src={`/api/local/catalog/${work.sourceId}/cover`} alt="" fill sizes="96px" unoptimized /> : <BookOpen className="m-7" size={30} aria-hidden="true" />}</span>
+      <span className="flex min-w-0 flex-col gap-1"><span className="koma-book-kind">{sourceName(work)}</span><span className="koma-result-title">{work.title}</span><span className="koma-result-meta line-clamp-2">{work.originalTitle}</span><span className="koma-result-meta">{work.authors.join(' · ')}{work.year ? ` · ${work.year}` : ''}</span><span className="koma-text-link mt-auto">{t('Ver detalhes →')}</span></span>
+    </button>
   return <div data-work-search>
     <header className="koma-page-head"><div><p className="koma-eyebrow">{t('Mangá · Manhwa · Manhua')}</p><h1>{t('Adicionar obra')}</h1><p>{t('Busque pelo nome que você conhece. Confira a obra antes de adicionar; derivados e continuações aparecem separados.')}</p></div></header>
     <form onSubmit={(event) => void search(event)} className="mb-6 flex flex-wrap gap-3"><label className="koma-search min-w-0 flex-1"><Search size={20} aria-hidden="true" /><input id="catalog-query" required minLength={2} maxLength={160} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('Ex.: Eminence in Shadow')} aria-label={t('Título da obra')} /></label><button className="koma-button" disabled={searching || query.trim().length < 2}>{searching ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : <Search size={18} aria-hidden="true" />}{t('Buscar')}</button></form>
@@ -111,10 +122,12 @@ export function WorkSearch() {
         </details> : null}
         <div className="koma-actions"><button id="add-work" className="koma-button" disabled={adding} onClick={() => void add()}>{adding ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : <Plus size={18} aria-hidden="true" />}{t('Adicionar à biblioteca')}</button><button className="koma-outline-button" disabled={adding} onClick={() => setSelected(null)}>{t('Voltar aos resultados')}</button></div>
       </div>
-    </section> : <div className="koma-result-grid">{results.map((work) => <button key={work.sourceId} data-source-id={work.sourceId} className="koma-result" onClick={() => setSelected(work)}>
-      <span className="koma-result-thumb">{work.coverFile ? <Image src={`/api/local/catalog/${work.sourceId}/cover`} alt="" fill sizes="96px" unoptimized /> : <BookOpen className="m-7" size={30} aria-hidden="true" />}</span>
-      <span className="flex min-w-0 flex-col gap-1"><span className="koma-book-kind">{sourceName(work)}</span><span className="koma-result-title">{work.title}</span><span className="koma-result-meta line-clamp-2">{work.originalTitle}</span><span className="koma-result-meta">{work.authors.join(' · ')}{work.year ? ` · ${work.year}` : ''}</span><span className="koma-text-link mt-auto">{t('Ver detalhes →')}</span></span>
-    </button>)}</div>}
+    </section> : !searched && !results.length ? <div className="flex flex-col gap-8" data-featured>
+      {([['popular', t('Mais seguidas no MangaDex')], ['recent', t('Atualizadas recentemente no MangaDex')]] as const).map(([kind, label]) => <section key={kind} className="flex flex-col gap-3">
+        <h2 className="koma-section-title">{label}</h2>
+        {featured ? <div className="koma-result-grid">{featured[kind].map(card)}</div> : <div className="koma-book-grid" aria-busy="true">{[1, 2, 3, 4].map((id) => <div key={id} className="koma-cover-skeleton" />)}</div>}
+      </section>)}
+    </div> : <div className="koma-result-grid">{results.map(card)}</div>}
     {searched && !searching && !results.length ? <p className="koma-empty">{t('Nenhuma correspondência nas fontes consultadas. Tente outro título ou uma romanização. A busca consulta os títulos alternativos cadastrados no catálogo.')}</p> : null}
     <p className="koma-note mt-8">{t('A busca consulta o MangaDex e as fontes que você adicionou nas Preferências, cada uma de forma independente. Uma fonte indisponível não impede resultados das outras. O KOMA não confunde um resultado sem capítulos com uma obra já preparada.')}</p>
   </div>
