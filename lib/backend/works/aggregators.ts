@@ -25,20 +25,22 @@ const webtoons: AggregatorConnector = {
     }
     return [...results].map(([url, title]) => ({ title, url }))
   },
-  async chapters(url, signal) {
+  async chapters(url, signal, known) {
     if (!this.work(url)) throw new SourceError('Link de obra inválido para WEBTOON.')
     const items = new Map<string, SourceChapter>()
     for (let page = 1; page <= 200; page++) {
       const doc = await html(`${url}&page=${page}`, signal)
-      let added = 0
+      let added = 0; let fresh = 0
       for (const item of DomUtils.findAll((node) => node.name === 'li' && hasClass(node, '_episodeItem'), doc.children)) {
         const anchor = DomUtils.findOne((node) => node.name === 'a' && this.owns(node.attribs.href || ''), item.children)
         if (!anchor || items.has(anchor.attribs.href)) continue
         const title = text(DomUtils.findOne((node) => hasClass(node, 'subj'), item.children))
         // Numerar pelo título ("Episode 12"); sem número explícito, não mesclar com outras fontes.
         items.set(anchor.attribs.href, chapter(anchor.attribs.href, chapterNumber(title), title)); added++
+        if (!known?.has(anchor.attribs.href)) fresh++
       }
-      if (!added) break
+      // A lista vem do mais novo ao mais antigo: página sem episódio novo encerra a procura.
+      if (!added || known?.size && !fresh) break
     }
     return ordered([...items.values()], 'WEBTOON')
   },

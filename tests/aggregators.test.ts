@@ -44,6 +44,18 @@ describe('fontes alternativas por título', () => {
     expect(connector('webtoons').work('https://www.webtoons.com/en/canvas/fanfic/list?title_no=1')).toBe(false)
   })
 
+  it('para de ler o índice do WEBTOON no primeiro episódio já conhecido', async () => {
+    const list = 'https://www.webtoons.com/en/action/obra/list?title_no=9'
+    const href = (n: number) => `https://www.webtoons.com/en/action/obra/episode-${n}/viewer?title_no=9&episode_no=${n}`
+    const item = (n: number) => `<li class="_episodeItem"><a href="${href(n)}"><span class="subj"><span>Episode ${n}</span></span></a></li>`
+    pages.set(`${list}&page=1`, item(12) + item(11)); pages.set(`${list}&page=2`, item(10) + item(9)); pages.set(`${list}&page=3`, '')
+    const chapters = await connector('webtoons').chapters(list, undefined, new Set([href(10), href(9)]))
+    expect(chapters.map((chapter) => chapter.number)).toEqual(['9', '10', '11', '12'])
+    pages.delete(`${list}&page=2`)
+    const fresh = await connector('webtoons').chapters(list, undefined, new Set([href(12), href(11)]))
+    expect(fresh.map((chapter) => chapter.number)).toEqual(['11', '12'])
+  })
+
   it('prefere a publicação oficial entre versões do mesmo capítulo', () => {
     expect(sourceRank('https://www.webtoons.com/en/action/x/episode-1/viewer?title_no=1&episode_no=1')).toBeLessThan(sourceRank('11111111-1111-4111-8111-111111111111'))
   })

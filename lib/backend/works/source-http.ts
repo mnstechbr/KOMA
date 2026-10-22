@@ -45,8 +45,10 @@ export interface SourceRequestOptions { method?: 'GET' | 'POST'; form?: Record<s
 // tempo por site, somando todos os capítulos. Um site que responde 429 fica em
 // espera pelo tempo que pediu (Retry-After) antes de receber outro pedido.
 const IMAGE_SLOTS = 6
-const network = (globalThis as typeof globalThis & { __komaSourceNetwork?: { agent: https.Agent; busy: Map<string, number>; waiting: Map<string, Array<() => void>>; blockedUntil: Map<string, number> } })
-  .__komaSourceNetwork ||= { agent: new https.Agent({ keepAlive: true, maxSockets: 8, maxFreeSockets: 4, timeout: 60000 }), busy: new Map(), waiting: new Map(), blockedUntil: new Map() }
+const network = (globalThis as typeof globalThis & { __komaSourceNetwork?: { requests?: number; agent: https.Agent; busy: Map<string, number>; waiting: Map<string, Array<() => void>>; blockedUntil: Map<string, number> } })
+  .__komaSourceNetwork ||= { requests: 0, agent: new https.Agent({ keepAlive: true, maxSockets: 8, maxFreeSockets: 4, timeout: 60000 }), busy: new Map(), waiting: new Map(), blockedUntil: new Map() }
+/** Pedidos feitos às fontes desde que o processo abriu (para medir a sincronização). */
+export function sourceRequestCount() { return network.requests || 0 }
 async function imageSlot(host: string, signal?: AbortSignal) {
   if ((network.busy.get(host) || 0) >= IMAGE_SLOTS) await new Promise<void>((resolve, reject) => {
     const queue = network.waiting.get(host) || []
@@ -70,6 +72,7 @@ export async function sourceBytes(value: string, image = false, signal?: AbortSi
 }
 async function requestBytes(value: string, image: boolean, signal: AbortSignal | undefined, redirects: number, options: SourceRequestOptions): Promise<{ bytes: Buffer; mime: string }> {
   const url = checkedSourceUrl(value)
+  network.requests = (network.requests || 0) + 1
   if (url.hostname === 'api.mangadex.org') {
     const previous = rateTail
     let release!: () => void
