@@ -6,7 +6,6 @@ import { versionRank } from './aggregators'
 import { getLanguageSettings } from '../shared/language-settings'
 import { localizeMetadata } from './synopsis'
 import { pendingRenderPages } from './render'
-import { SourceError } from './source-http'
 import { customWorkUrl } from './catalog'
 import { SAME_LANGUAGE_SQL } from '@/lib/languages'
 
