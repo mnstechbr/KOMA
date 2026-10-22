@@ -5,6 +5,7 @@ import type { Catalog } from '../core'
 // e as notas das fontes (lib/backend/works/source-registry), traduzidas por t(valor).
 export const pagesMessages: Catalog = {
   en: {
+    '{n} cap.': '{n} ch.',
     'Pesquisa automática pelo título, índice completo e imagens públicas; mangá e manhwa.': 'Automatic title search, full chapter index and public images; manga and manhwa.',
     'Revisando leitura e desenho das páginas': 'Re-reading and redrawing pages',
     '{done} de {total} páginas revisadas': '{done} of {total} pages revised',
@@ -183,6 +184,7 @@ export const pagesMessages: Catalog = {
     'Fontes tipográficas: Dela Gothic One e IBM Plex Sans, ambas sob a SIL Open Font License 1.1.': 'Typefaces: Dela Gothic One and IBM Plex Sans, both under the SIL Open Font License 1.1.',
   },
   es: {
+    '{n} cap.': '{n} cap.',
     'Pesquisa automática pelo título, índice completo e imagens públicas; mangá e manhwa.': 'Búsqueda automática por título, índice completo e imágenes públicas; manga y manhwa.',
     'Revisando leitura e desenho das páginas': 'Revisando lectura y dibujo de las páginas',
     '{done} de {total} páginas revisadas': '{done} de {total} páginas revisadas',

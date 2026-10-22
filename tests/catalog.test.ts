@@ -28,3 +28,19 @@ describe('nomes escondidos na descrição dos sites Madara', () => {
     expect(seoTitles('Sinopse comum, sem frase de site.')).toEqual({ titles: [], rest: 'Sinopse comum, sem frase de site.' })
   })
 })
+
+describe('mesma obra em várias fontes', () => {
+  it('junta num resultado só, com o MangaDex à frente', async () => {
+    const { groupSameWork } = await import('../lib/backend/works/catalog')
+    const base = { originalTitle: '', aliases: [], description: '', descriptionLanguage: 'en', originalLanguage: 'ko', authors: [], genres: [], year: null, coverFile: null }
+    const grouped = groupSameWork([
+      { ...base, source: 'manhwatop', sourceName: 'ManhwaTop', sourceId: 'manhwatop:barbarian', title: 'Barbarian’s Adventure in a Fantasy World', description: 'Read manhwa online Surviving as a Barbarian in a Fantasy World, Barbarian’s Adventure in a Fantasy World at manhwa website' },
+      { ...base, source: 'mangadex', sourceId: 'd6cf150f-7e90-43f3-9555-d1bc9ed78f73', title: 'Surviving as a Barbarian in a Fantasy World' },
+      { ...base, source: 'mangaread', sourceName: 'MangaRead', sourceId: 'mangaread:surviving', title: 'Surviving As A Barbarian In A Fantasy World' },
+      { ...base, source: 'mangadex', sourceId: '11111111-1111-4111-8111-111111111111', title: 'Outra obra' },
+    ])
+    expect(grouped).toHaveLength(2)
+    expect(grouped[0].source).toBe('mangadex')
+    expect(grouped[0].alsoIn?.map((item) => item.source)).toEqual(['manhwatop', 'mangaread'])
+  })
+})

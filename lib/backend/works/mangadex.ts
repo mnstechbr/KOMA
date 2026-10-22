@@ -34,7 +34,7 @@ export function mapCatalogWork(record: RecordValue): CatalogWork {
 const includes = 'includes[]=cover_art&includes[]=author&includes[]=artist'
 export async function searchCatalog(query: string, signal?: AbortSignal) {
   if (query.trim().length < 2 || query.length > 160) throw new SourceError('Digite de 2 a 160 caracteres para buscar a obra.')
-  const result = await sourceJson<{ data: RecordValue[] }>(`https://api.mangadex.org/manga?limit=30&title=${encodeURIComponent(query.trim())}&${includes}`, signal)
+  const result = await sourceJson<{ data: RecordValue[] }>(`https://api.mangadex.org/manga?limit=30&title=${encodeURIComponent(query.trim())}&hasAvailableChapters=true&${includes}`, signal)
   if (!Array.isArray(result.data)) throw new SourceError('A fonte não retornou resultados válidos.')
   return result.data.map(mapCatalogWork).sort((a, b) => titleScore(b, query) - titleScore(a, query))
 }

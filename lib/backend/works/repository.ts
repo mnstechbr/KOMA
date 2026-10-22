@@ -31,7 +31,7 @@ export class WorksRepository {
   }
   /** "choice": capítulos escolhidos ao adicionar (chave ou número); vazio = todos. */
   /** "startNumber": capítulo em que a pessoa parou de ler (os anteriores ficam lidos). */
-  add(userId: number, metadata: CatalogWork, choice: Array<{ key: string; number: string | null }> = [], startNumber: number | null = null): number {
+  add(userId: number, metadata: CatalogWork, choice: Array<{ key: string; number: string | null }> = [], startNumber: number | null = null, also: string[] = []): number {
     return this.database.transaction(() => {
       this.cache(metadata)
       // Obra de fonte personalizada já vinculada a outra obra da biblioteca: a mesma obra.
@@ -45,6 +45,12 @@ export class WorksRepository {
       if (choice.length && !(this.database.prepare('SELECT 1 FROM work_chapters WHERE work_id=? LIMIT 1').get(id))) this.database.prepare('UPDATE works SET chapter_choice=? WHERE id=?').run(JSON.stringify(choice), id)
       if (startNumber !== null && Number.isFinite(startNumber) && !(this.database.prepare('SELECT 1 FROM work_chapters WHERE work_id=? LIMIT 1').get(id))) this.database.prepare('UPDATE works SET start_number=? WHERE id=?').run(startNumber, id)
       if (custom) this.database.prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)').run(id,custom.provider,custom.url)
+      // Mesma obra em outras fontes, vinda do cartão da busca.
+      for (const other of also) {
+        const site = customWorkUrl(other)
+        if (site) this.database.prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)').run(id,site.provider,site.url)
+        else if (/^[0-9a-f-]{36}$/.test(other) && metadata.source !== 'mangadex') this.database.prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)').run(id,'mangadex',`https://mangadex.org/title/${other}`)
+      }
       return id
     })()
   }
