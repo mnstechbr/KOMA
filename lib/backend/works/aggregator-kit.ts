@@ -1,6 +1,6 @@
 import { parseDocument, DomUtils } from 'htmlparser2'
 import type { AnyNode, Element } from 'domhandler'
-import type { CatalogWork, SourceChapter } from '@/lib/works'
+import { seoTitles, type CatalogWork, type SourceChapter } from '@/lib/works'
 import { checkedSourceUrl, sourceBytes, SourceError } from './source-http'
 
 // Peças comuns aos conectores de sites (o modelo Madara e os conectores locais
@@ -123,14 +123,15 @@ export function madara(site: MadaraSite) {
     if (urls.length && urls.length <= 2 && urls.some((url) => /\/banner\./i.test(url))) throw new SourceError('Este capítulo contém apenas créditos ou aviso da fonte; as páginas da história ainda não estão disponíveis.', true, 'content_unavailable')
     return pageList(urls, name)
   }
+  const summaryText = (nodes: AnyNode[]) => { const summary = findClass(nodes, 'summary__content'); return summary ? DomUtils.textContent(summary).trim() : '' }
   function mapWork(nodes: AnyNode[], url: string): CatalogWork {
     const titleNode = findClass(nodes, 'post-title') || DomUtils.findOne((node) => node.name === 'h1', nodes)
     const heading = titleNode && (DomUtils.findOne((node) => ['h1', 'h3'].includes(node.name), titleNode.children) || titleNode)
     const directTitle = heading?.children.filter((node) => node.type === 'text').map((node) => DomUtils.textContent(node)).join(' ').trim()
     const title = (directTitle || (heading ? DomUtils.textContent(heading) : '')).replace(/\s+/g, ' ').trim().slice(0, 400)
     if (!title) throw new SourceError('A fonte não retornou o título da obra.')
-    const aliases = content(nodes, 'mg_alternative').split(/[,;\n]/).map((value) => value.trim()).filter(Boolean).map((value) => ({ language: 'und', title: value }))
-    const summary = findClass(nodes, 'summary__content')
+    const seo = seoTitles(summaryText(nodes))
+    const aliases = [...new Set([...content(nodes, 'mg_alternative').split(/[,;\n]/).map((value) => value.trim()).filter(Boolean), ...seo.titles])].map((value) => ({ language: 'und', title: value }))
     const thumbnail = findClass(nodes, 'tab-thumb') || findClass(nodes, 'summary_image')
     const image = thumbnail && DomUtils.findOne((node) => node.name === 'img', thumbnail.children)
     let coverSourceUrl: string | undefined
@@ -142,7 +143,7 @@ export function madara(site: MadaraSite) {
     const lower = genres.map((genre) => genre.toLowerCase())
     return {
       source: site.id, sourceName: name, sourceId: `${site.id}:${slugOf(url)}`, title, originalTitle: title, aliases,
-      description: summary ? DomUtils.textContent(summary).trim().slice(0, 12000) : '', descriptionLanguage: 'en',
+      description: seo.rest.slice(0, 12000), descriptionLanguage: 'en',
       originalLanguage: lower.includes('manhwa') ? 'ko' : lower.includes('manhua') ? 'zh' : lower.includes('manga') ? 'ja' : 'und',
       authors: [content(nodes, 'mg_author'), content(nodes, 'mg_artists')].filter(Boolean), genres,
       year: null, coverFile: coverSourceUrl ? 'cover.jpg' : null, coverSourceUrl,
@@ -177,7 +178,11 @@ export function madara(site: MadaraSite) {
     const url = workUrl(sourceId.slice(site.id.length + 1))
     const doc = await html(url, signal)
     const profile = findClass(doc.children, 'profile-manga') || findClass(doc.children, 'site-content') || doc
-    return { ...mapWork(profile.children, url), description: DomUtils.textContent(findClass(doc.children, 'summary__content') || profile).trim().slice(0, 12000) }
+    const work = mapWork(profile.children, url)
+    // Ficha sem os nomes alternativos: a frase de SEO da página inteira também vale.
+    const seo = seoTitles(DomUtils.textContent(findClass(doc.children, 'summary__content') || profile))
+    const known = new Set(work.aliases.map((alias) => alias.title))
+    return { ...work, aliases: [...work.aliases, ...seo.titles.filter((title) => !known.has(title) && title !== work.title).map((title) => ({ language: 'und', title }))], description: seo.rest.slice(0, 12000) }
   }
   return { connector, catalogSearch, catalogWork, workUrl, parseChapters, parsePages, parseSearch }
 }

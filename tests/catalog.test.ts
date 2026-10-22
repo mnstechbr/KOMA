@@ -17,3 +17,14 @@ describe('busca independente em mais de um catálogo',()=>{
     for(const value of ['site:../../secret','site:obra/extra','https://evil.invalid','site:'])expect(()=>validateCatalogId(value)).toThrow()
   })
 })
+
+describe('nomes escondidos na descrição dos sites Madara', () => {
+  it('lê os nomes da frase de SEO e tira a frase da sinopse', async () => {
+    const { seoTitles } = await import('../lib/works')
+    const { searchTitles } = await import('../lib/backend/works/aggregators')
+    const text = 'Read manhwa online Surviving as a Barbarian in a Fantasy World, Barbarian’s Adventure in a Fantasy World, 판타지 세계 속 바바리안으로 살아가기 at manhwa website\nThe man prayed every night.'
+    expect(seoTitles(text)).toEqual({ titles: ['Surviving as a Barbarian in a Fantasy World', 'Barbarian’s Adventure in a Fantasy World', '판타지 세계 속 바바리안으로 살아가기'], rest: 'The man prayed every night.' })
+    expect(searchTitles({ title: 'Barbarian’s Adventure in a Fantasy World', aliases: [], description: text })).toEqual(['Barbarian’s Adventure in a Fantasy World', 'Surviving as a Barbarian in a Fantasy World'])
+    expect(seoTitles('Sinopse comum, sem frase de site.')).toEqual({ titles: [], rest: 'Sinopse comum, sem frase de site.' })
+  })
+})

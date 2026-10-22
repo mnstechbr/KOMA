@@ -130,6 +130,10 @@ export class WorksRepository {
         for (const candidate of [chapter,...(chapter.alternatives || [])]) { const metadata = {...candidate}; delete metadata.alternatives; version.run(workId,chapter.key,candidate.sourceId,JSON.stringify(metadata)) }
       }
       if (choice.length && chapters.length) this.database.prepare('UPDATE works SET chapter_choice=NULL WHERE id=?').run(workId)
+      // Capítulo esperando a fonte voltar e que ganhou outra versão nesta busca: tenta já.
+      this.database.prepare(`UPDATE work_chapters SET retry_after=0 WHERE work_id=? AND state='queued' AND retry_after>?
+        AND EXISTS(SELECT 1 FROM work_source_versions v WHERE v.work_id=work_chapters.work_id AND v.chapter_key=work_chapters.chapter_key AND v.source_id<>work_chapters.source_id
+          AND v.source_id NOT IN (SELECT source_id FROM work_chapter_attempts WHERE chapter_id=work_chapters.id))`).run(workId, Date.now())
       this.database.prepare(`UPDATE works SET sync_requested=0,sync_attempts=0,sync_retry_after=0,last_synced_at=?,stage=CASE WHEN EXISTS(SELECT 1 FROM work_chapters WHERE work_id=? AND state NOT IN ('ready','partial','error','skipped')) THEN 'queued' WHEN EXISTS(SELECT 1 FROM work_chapters WHERE work_id=? AND state IN ('partial','error')) THEN 'partial' ELSE 'ready' END,message=?,updated_at=? WHERE id=?`).run(now(), workId, workId, chapters.length ? '' : 'A fonte não disponibiliza páginas para esta obra neste momento.', now(), workId)
       return added
     })()

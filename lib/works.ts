@@ -40,6 +40,15 @@ export const preparationLabels: Record<string, string> = {
   partial: 'Leitura com pendências', rendering: 'Desenhando páginas traduzidas',
   downloaded: 'Originais baixados · aguardando tradução', blocked: 'Tradução aguardando liberação', paused: 'Pausado', error: 'Precisa de atenção',
 }
+// Frase de SEO dos sites Madara com todos os nomes da obra ("Read manhwa online A, B, C at manhwa website").
+const SEO_SENTENCE = /\bread\s+(?:manhwa|manga|manhua|comics?|webtoons?)\s+online\s+(?:for\s+free\s+)?(.{3,600}?)\s+(?:at|on)\s+[\p{L}\s]{0,40}?(?:website|site)\b\.?/iu
+/** Nomes da obra que só aparecem na frase de SEO da descrição, e a descrição sem ela. */
+export function seoTitles(text: string) {
+  const match = SEO_SENTENCE.exec(text || '')
+  if (!match) return { titles: [] as string[], rest: text || '' }
+  const titles = match[1].split(/\s*,\s+/).map((title) => title.trim()).filter((title) => title.length >= 2 && title.length <= 200)
+  return { titles: [...new Set(titles)], rest: (text.slice(0, match.index) + text.slice(match.index + match[0].length)).trim() }
+}
 export function normalizeTitle(value: string) {
   return value.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
 }
