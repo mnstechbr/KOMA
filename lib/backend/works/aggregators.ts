@@ -1,6 +1,6 @@
 import { DomUtils } from 'htmlparser2'
 import { sameLanguage } from '@/lib/languages'
-import { normalizeTitle, type SourceChapter } from '@/lib/works'
+import { normalizeTitle, seoTitles, type SourceChapter } from '@/lib/works'
 import { SourceError } from './source-http'
 import { allowedImage, chapter, chapterNumber, hasClass, html, ordered, pageList, text, type AggregatorConnector } from './aggregator-kit'
 
@@ -90,9 +90,10 @@ export function versionRank(version: { sourceId: string; language: string }, tar
 export function aggregatorFor(chapterId: string) { return aggregators.find((connector) => connector.owns(chapterId)) }
 
 /** Títulos conhecidos da obra para pesquisa, do mais ao menos provável. */
-export function searchTitles(metadata: { title?: string; originalTitle?: string; aliases?: Array<{ language: string; title: string }> }) {
+export function searchTitles(metadata: { title?: string; originalTitle?: string; aliases?: Array<{ language: string; title: string }>; description?: string }) {
   const preferred = ['en', 'ja-ro', 'ko-ro', 'zh-ro', 'und']
-  const aliases = [...(metadata.aliases || [])].sort((a, b) => (preferred.indexOf(a.language) + 1 || 99) - (preferred.indexOf(b.language) + 1 || 99))
+  // Nomes que o site só mostra na frase de SEO da descrição também valem para a busca.
+  const aliases = [...(metadata.aliases || []), ...seoTitles(metadata.description || '').titles.map((title) => ({ language: 'und', title }))].sort((a, b) => (preferred.indexOf(a.language) + 1 || 99) - (preferred.indexOf(b.language) + 1 || 99))
   const titles = [metadata.title, ...aliases.filter((alias) => preferred.includes(alias.language)).map((alias) => alias.title), metadata.originalTitle]
   return [...new Map(titles.filter((title): title is string => Boolean(title && /[a-z]/i.test(title))).map((title) => [normalizeTitle(title), title.trim()])).values()]
 }

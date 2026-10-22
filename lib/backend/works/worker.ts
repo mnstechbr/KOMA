@@ -19,6 +19,7 @@ import { catalogMetadata } from './catalog'
 import { ensureSources } from './custom-sources'
 import { scheduledCheck } from './background'
 import { recordStageTimes } from './stage-times'
+import { aggregatorFor } from './aggregators'
 import { chapterPages, discoverWorkChapters } from './chapter-sources'
 import { chaptersDoneRendering, clearEmptyRenders, nextPagesToRender, nextPagesToUpgrade, renderWorkPage, upgradeWorkPage } from './render'
 import { localizeNextWork } from './synopsis'
@@ -415,6 +416,21 @@ export class WorkAutomation {
       // Endereço de imagem recusado por segurança também tenta outra versão: o
       // endereço recusado nunca é baixado, só se troca de fonte.
       if (error instanceof SourceError && (!error.retryable || chapter.attempts >= 2 || error.code === 'content_unavailable') && d.repository.alternate(d.repository.chapter(chapter.id)!)) { d.repository.stage(work.id,'queued','A versão falhou; tentando outra publicação disponível do capítulo.'); return }
+      // Nenhuma outra versão conhecida e a fonte não tem o capítulo agora (404, só
+      // créditos): procura a obra de novo em todas as fontes e tenta outra vez em 6 h
+      // e depois em 24 h, antes de marcar erro.
+      if (error instanceof SourceError && (!error.retryable || error.code === 'content_unavailable') && chapter.attempts < 2 && error.code !== 'destination_blocked') {
+        const name = aggregatorFor(chapter.source_id)?.name || (() => { try { return new URL(chapter.source_id).hostname.replace(/^www\./, '') } catch { return 'MangaDex' } })()
+        const hours = chapter.attempts === 0 ? 6 : 24
+        d.repository.database.transaction(() => {
+          d.repository.database.prepare("DELETE FROM work_source_checks WHERE work_id=? AND url LIKE 'search:%' AND status='not_found'").run(work.id)
+          d.repository.database.prepare('UPDATE works SET sync_requested=1,sync_attempts=0,sync_retry_after=0 WHERE id=?').run(work.id)
+          d.repository.database.prepare('UPDATE work_chapters SET attempts=attempts+1 WHERE id=?').run(chapter.id)
+        })()
+        d.repository.chapterStage(chapter.id, 'queued', `Só ${name} tem este capítulo e ele não está disponível agora. O KOMA procura em outras fontes e tenta de novo em ${hours} h.`, Date.now() + hours * 3600000)
+        d.repository.stage(work.id, 'queued', '')
+        return
+      }
       // Falha passageira do provedor/fila nunca vira erro definitivo: tenta de novo com espera crescente.
       const transient = error instanceof TranslationError && ['provider_unavailable','provider_failed','translation_busy'].includes(error.code)
       const automatic = transient || error instanceof SourceError && error.retryable && chapter.attempts < 2

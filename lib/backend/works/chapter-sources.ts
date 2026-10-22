@@ -1,5 +1,5 @@
-import type { SourceChapter } from '@/lib/works'
-import { sourcePages } from './mangadex'
+import { normalizeTitle, type CatalogWork, type SourceChapter } from '@/lib/works'
+import { catalogWork, listSourceChapters, searchCatalog, sourcePages } from './mangadex'
 import { catalogChapters, customWorkUrl } from './catalog'
 import { naverChapters, naverPages } from './naver'
 import { SourceError } from './source-http'
@@ -43,7 +43,10 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
   // Capítulos já conhecidos: índices do mais novo ao mais antigo param no primeiro deles.
   const known = new Set((repository.database.prepare('SELECT source_id FROM work_source_versions WHERE work_id=? UNION SELECT source_id FROM work_chapters WHERE work_id=?').all(work.id,work.id) as {source_id:string}[]).map(row=>row.source_id))
   // Pesquisa pelo título que não achou a obra fica guardada uns dias, sem repetir a cada procura.
+  // Nomes novos da obra (vindos de outra fonte) valem uma pesquisa nova em todos os sites.
+  let titlesChanged = false
   const recentSearch = (url:string) => {
+    if (titlesChanged) return false
     const row = repository.database.prepare('SELECT status,checked_at FROM work_source_checks WHERE work_id=? AND url=?').get(work.id,url) as {status:string;checked_at:string} | undefined
     if (!row) return false
     const age = Date.now() - new Date(row.checked_at).getTime()
@@ -54,7 +57,7 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
     try {const source=identifySource(link.url);originals.set(source.url,source)} catch {/* Vínculos sem conector permanecem visíveis nos detalhes. */}
   }
   // Vínculos de fontes do usuário que não estão mais cadastradas ficam de fora.
-  for(const source of boundSources) if(!aggregators.some(connector=>connector.id===source.provider) && sourceConnectors.some(item=>item.id===source.provider))originals.set(source.url,source)
+  for(const source of boundSources) if(source.provider!=='mangadex' && !aggregators.some(connector=>connector.id===source.provider) && sourceConnectors.some(item=>item.id===source.provider))originals.set(source.url,source)
   // Fonte primeiro: sem vínculo original conhecido, pesquisar a obra na
   // plataforma de origem pelo título no idioma original.
   if(metadata.originalLanguage==='ko' && ![...originals.values()].some(source=>source.provider==='naver') && !recentSearch('search:naver')) {
@@ -101,7 +104,38 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
   // Fontes alternativas: pesquisa automática pelo título quando ainda não há
   // vínculo e consulta independente de cada uma, em paralelo.
   const primary = custom?.url || ''
-  const titles = searchTitles(metadata)
+  let titles = searchTitles(metadata)
+  // MangaDex também para obras vindas de outras fontes. Os nomes de lá (inclusive
+  // os alternativos) ajudam a achar a mesma obra nos outros sites.
+  if (work.source !== 'mangadex') {
+    const bound = boundSources.find((source) => source.provider === 'mangadex')
+    let found: CatalogWork | null = null
+    try {
+      if (bound) found = await catalogWork(bound.url.split('/').pop() || '', signal)
+      else if (!recentSearch('search:mangadex')) {
+        found = await findOnMangaDex(titles, signal)
+        if (found) repository.database.prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)').run(work.id, 'mangadex', `https://mangadex.org/title/${found.sourceId}`)
+        else record('alternative', 'search:mangadex', 'not_found', 'MangaDex: obra não encontrada pelo título.')
+      }
+      if (found) {
+        const chapters = await listSourceChapters(found.sourceId, signal)
+        groups.push(chapters)
+        record('alternative', `https://mangadex.org/title/${found.sourceId}`, 'available', `MangaDex: ${chapters.length} capítulos consolidados.`)
+        titles = searchTitles({ ...metadata, aliases: [...(metadata.aliases || []), { language: 'en', title: found.title }, ...found.aliases] })
+      }
+    } catch (error) {
+      if (signal.aborted) throw error
+      record('alternative', bound?.url || 'search:mangadex', 'unavailable', error instanceof SourceError ? `MangaDex: ${error.message}` : 'MangaDex: falha na consulta.')
+    }
+  }
+  {
+    // Nomes usados na última pesquisa: quando aparecem nomes novos, a pesquisa é refeita.
+    const key = `koma:work-titles:v1:${work.id}`
+    const signature = titles.map((title) => normalizeTitle(title)).sort().join('|')
+    const previous = (repository.database.prepare('SELECT value FROM kv_store WHERE key=?').get(key) as { value: string } | undefined)?.value
+    titlesChanged = previous !== signature
+    repository.database.prepare('INSERT INTO kv_store (key, value, expires_at) VALUES (?, ?, NULL) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, signature)
+  }
   // WEBTOON e as fontes que o próprio usuário adicionou.
   const results = await Promise.allSettled(aggregators.map(async (connector) => {
     let links = boundSources.filter(source=>source.provider===connector.id && source.url!==primary).map(source=>source.url)
@@ -139,6 +173,16 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
   if(!groups.length)throw errors[0] || new SourceError('Nenhuma fonte de capítulos respondeu.',true)
   const existing = repository.detail(work.id,work.user_id)!.chapters
   return mergeChapterSources(groups,existing,work.target_language)
+}
+/** A mesma obra no MangaDex: algum nome (principal ou alternativo) idêntico a um dos conhecidos. */
+export async function findOnMangaDex(titles: string[], signal?: AbortSignal) {
+  const known = new Set(titles.map((title) => normalizeTitle(title).replace(/^the /, '')))
+  for (const title of titles.slice(0, 3)) {
+    const results = await searchCatalog(title, signal)
+    const match = results.find((work) => [work.title, work.originalTitle, ...work.aliases.map((alias) => alias.title)].some((name) => name && known.has(normalizeTitle(name).replace(/^the /, ''))))
+    if (match) return match
+  }
+  return null
 }
 export async function chapterPages(id: string, signal?: AbortSignal) {
   const aggregator = aggregatorFor(id)

@@ -84,6 +84,17 @@ describe('fila automática com checkpoints reais no SQLite e disco', () => {
     const order = memory.prepare('SELECT i.order_index, p.page_index FROM work_pages p JOIN section_images i ON i.id=p.image_id WHERE p.chapter_id=?').all(first.id) as Array<{ order_index: number; page_index: number }>
     expect(order.every((row) => row.order_index === row.page_index)).toBe(true)
   })
+  it('sem outra versão, capítulo fora do ar na fonte volta a ser procurado e espera 6 h', async () => {
+    const d = dependencies()
+    d.pages.mockRejectedValue(new SourceError('A fonte não disponibilizou este conteúdo (HTTP 404).'))
+    const first = chapter()
+    await new WorkAutomation(d).prepare(first, new AbortController().signal, true)
+    const row = memory.prepare('SELECT state, message, retry_after FROM work_chapters WHERE id=?').get(first.id) as { state: string; message: string; retry_after: number }
+    expect(row.state).toBe('queued')
+    expect(row.message).toMatch(/tenta de novo em 6 h/)
+    expect(row.retry_after).toBeGreaterThan(Date.now() + 5 * 3600000)
+    expect((memory.prepare('SELECT sync_requested FROM works WHERE id=?').get(workId) as { sync_requested: number }).sync_requested).toBe(1)
+  })
   it('lista e conserva a fila enquanto aguarda a autorização geral', async () => {
     const d = dependencies(); d.authorized=() => false
     await new WorkAutomation(d).prepare(chapter(),new AbortController().signal)
