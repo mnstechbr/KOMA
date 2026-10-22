@@ -68,6 +68,10 @@ Não há conta, servidor nem telemetria do KOMA. A biblioteca, o OCR e o progres
 - os textos dos balões enviados aos provedores de tradução que você autorizar;
 - os capítulos enviados à nuvem que você conectar.
 
+## Reportar problemas
+
+No leitor, o botão de bandeira reporta um erro de tradução numa página. **Reportar e enviar para o GitHub** abre no navegador uma [issue](https://github.com/mnstechbr/KOMA/issues/new/choose) já preenchida, só com texto (sem imagem, sem o nome da obra e sem links); você revisa e envia com a sua conta. Bugs do app vão pelo formulário **Bug do app**.
+
 ## Aviso legal
 
 O KOMA não hospeda nem distribui obras. Ele acessa páginas públicas pela sua conexão, para uso pessoal, como um navegador faria. Respeite os direitos autorais e os termos de uso de cada site. Sempre que possível, apoie os autores lendo e comprando nas plataformas oficiais.

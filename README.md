@@ -68,6 +68,10 @@ KOMA has no account, server or telemetry. The library, OCR and reading progress 
 - balloon text sent to the translation providers you authorize;
 - chapters uploaded to the cloud you connect.
 
+## Reporting problems
+
+In the reader, the flag button reports a translation error on a page. **Report and send to GitHub** opens a pre-filled [issue](https://github.com/mnstechbr/KOMA/issues/new/choose) in your browser with text only (no image, no title name, no links); you review it and submit it with your own account. App bugs go through the **App bug** form.
+
 ## Legal notice
 
 KOMA does not host or distribute any series. It reads public pages over your own connection, for personal use, the way a browser would. Respect copyright and each site's terms of use. Whenever you can, support the creators by reading and buying on official platforms.

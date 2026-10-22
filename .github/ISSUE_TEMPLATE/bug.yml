@@ -1,0 +1,43 @@
+name: Bug do app / App bug
+description: Algo no KOMA não funciona como deveria. / Something in KOMA does not work as it should.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Não inclua chaves, senhas, links de sites nem dados da sua biblioteca. Trechos do log de diagnóstico ajudam (Menu KOMA → Abrir pasta de diagnóstico); confira antes de colar.
+        Do not include keys, passwords, site links or library data. Snippets of the diagnostics log help (KOMA menu → Open diagnostics folder); check them before pasting.
+  - type: input
+    id: versao
+    attributes:
+      label: Versão do KOMA / KOMA version
+      placeholder: "0.4.58"
+    validations:
+      required: true
+  - type: input
+    id: sistema
+    attributes:
+      label: Sistema / System
+      placeholder: "Fedora 44, Windows 11"
+  - type: textarea
+    id: passos
+    attributes:
+      label: Como acontece / Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: O que era esperado / Expected
+  - type: textarea
+    id: aconteceu
+    attributes:
+      label: O que aconteceu / What happened
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Trecho do log (opcional) / Log snippet (optional)
+      render: text

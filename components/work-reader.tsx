@@ -84,13 +84,16 @@ export function WorkReader({ workId, chapterId }: { workId: number; chapterId: n
     } catch (error) { setMessage(error instanceof Error ? error.message : t('Não foi possível salvar o balão.')) }
     finally { setSaving(false) }
   }
-  async function sendReport() {
+  async function sendReport(github = false) {
     if (!report || saving) return
     setSaving(true); setMessage('')
     try {
-      const response = await fetch(`/api/local/works/${workId}/chapters/${chapterId}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId: report.pageId, kind: report.kind, note: report.note }) })
+      const response = await fetch(`/api/local/works/${workId}/chapters/${chapterId}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId: report.pageId, kind: report.kind, note: report.note, github }) })
       if (!response.ok) throw new Error()
-      setReport(null); setMessage(t('Erro reportado na página {n}. Ela passa a ser conferida em toda versão nova.', { n: report.index + 1 }))
+      const result = await response.json()
+      // Abre no navegador a issue preenchida (só texto); a pessoa revisa e envia com a conta dela.
+      if (github && result.issueUrl) window.open(result.issueUrl, '_blank', 'noopener')
+      setReport(null); setMessage(github ? t('Erro reportado na página {n}. A issue foi aberta no navegador: revise e envie pelo GitHub.', { n: report.index + 1 }) : t('Erro reportado na página {n}. Ela passa a ser conferida em toda versão nova.', { n: report.index + 1 }))
     } catch { setMessage(t('Não foi possível reportar o erro.')) }
     finally { setSaving(false) }
   }
@@ -133,7 +136,8 @@ export function WorkReader({ workId, chapterId }: { workId: number; chapterId: n
           <p className="koma-eyebrow">{t('Erro na página {n}', { n: report.index + 1 })}</p>
           <div className="flex flex-col gap-1" role="radiogroup">{[['english', t('Ficou texto em inglês')], ['outside', t('Frase fora do balão')], ['too-big', t('Letra grande demais')], ['name', t('Nome ou termo errado')], ['other', t('Outro')]].map(([value, label]) => <label key={value} className="koma-switch"><input type="radio" name="report-kind" value={value} checked={report.kind === value} onChange={() => setReport({ ...report, kind: value })} />{label}</label>)}</div>
           <textarea className="koma-input" rows={2} maxLength={500} value={report.note} placeholder={t('O que está errado? (opcional)')} aria-label={t('Detalhe do erro')} onChange={(event) => setReport({ ...report, note: event.target.value })} onKeyDown={(event) => { if (event.key === 'Escape') setReport(null) }} />
-          <div className="koma-actions"><button className="koma-button" disabled={saving}>{saving ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : null}{t('Reportar')}</button><button type="button" className="koma-outline-button" disabled={saving} onClick={() => setReport(null)}>{t('Cancelar')}</button></div>
+          <p className="koma-note">{t('No GitHub vão só o tipo de erro, o texto lido e a tradução desta página, sem imagem, sem o nome da obra e sem links. Você revisa antes de enviar.')}</p>
+          <div className="koma-actions"><button className="koma-button" disabled={saving}>{saving ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : null}{t('Reportar')}</button><button type="button" className="koma-outline-button" disabled={saving} onClick={() => void sendReport(true)}>{t('Reportar e enviar para o GitHub')}</button><button type="button" className="koma-outline-button" disabled={saving} onClick={() => setReport(null)}>{t('Cancelar')}</button></div>
         </form> : null}
         {balloon ? <form className="koma-balloon-editor" aria-label={t('Editar balão')} onSubmit={(event) => { event.preventDefault(); void saveBalloon() }}>
           <label htmlFor="balloon-text" className="koma-eyebrow">{t('Texto do balão')}</label>
