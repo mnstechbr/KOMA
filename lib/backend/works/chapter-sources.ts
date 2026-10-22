@@ -40,6 +40,15 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
   const record = (kind:string,url:string,status:string,message:string) => repository.database.prepare('INSERT INTO work_source_checks VALUES(?,?,?,?,?,?) ON CONFLICT(work_id,kind,url) DO UPDATE SET status=excluded.status,message=excluded.message,checked_at=excluded.checked_at').run(work.id,kind,url,status,message,new Date().toISOString())
   const metadata = JSON.parse(repository.row(work.id)!.metadata_json)
   const boundSources = repository.database.prepare('SELECT provider,url FROM work_catalog_sources WHERE work_id=?').all(work.id) as {provider:string;url:string}[]
+  // Capítulos já conhecidos: índices do mais novo ao mais antigo param no primeiro deles.
+  const known = new Set((repository.database.prepare('SELECT source_id FROM work_source_versions WHERE work_id=? UNION SELECT source_id FROM work_chapters WHERE work_id=?').all(work.id,work.id) as {source_id:string}[]).map(row=>row.source_id))
+  // Pesquisa pelo título que não achou a obra fica guardada uns dias, sem repetir a cada procura.
+  const recentSearch = (url:string) => {
+    const row = repository.database.prepare('SELECT status,checked_at FROM work_source_checks WHERE work_id=? AND url=?').get(work.id,url) as {status:string;checked_at:string} | undefined
+    if (!row) return false
+    const age = Date.now() - new Date(row.checked_at).getTime()
+    return row.status === 'not_found' && age < 5*86400000 || row.status === 'unavailable' && age < 86400000
+  }
   const originals=new Map<string,{provider:string;url:string}>()
   for(const link of metadata.publicationLinks || []) if(link.kind==='original') {
     try {const source=identifySource(link.url);originals.set(source.url,source)} catch {/* Vínculos sem conector permanecem visíveis nos detalhes. */}
@@ -48,7 +57,7 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
   for(const source of boundSources) if(!aggregators.some(connector=>connector.id===source.provider) && sourceConnectors.some(item=>item.id===source.provider))originals.set(source.url,source)
   // Fonte primeiro: sem vínculo original conhecido, pesquisar a obra na
   // plataforma de origem pelo título no idioma original.
-  if(metadata.originalLanguage==='ko' && ![...originals.values()].some(source=>source.provider==='naver')) {
+  if(metadata.originalLanguage==='ko' && ![...originals.values()].some(source=>source.provider==='naver') && !recentSearch('search:naver')) {
     try {
       const found=await findNaverOriginal(metadata,signal)
       if(found){originals.set(found,{provider:'naver',url:found});repository.database.prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)').run(work.id,'naver',found)}
@@ -61,8 +70,8 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
     try {
       let chapters:SourceChapter[]=[];let count=0;let message='';let status='available'
       if(original.provider==='naver') {
-        const data=await naverChapters(original.url,signal);chapters=data.chapters;count=data.total
-        message=`Naver: ${data.total} episódios listados; ${chapters.length} públicos e ${data.paid} pagos. Coleta apenas das páginas públicas.`
+        const data=await naverChapters(original.url,signal,known);chapters=data.chapters;count=data.total
+        message=chapters.length+data.paid>=data.total?`Naver: ${data.total} episódios listados; ${chapters.length} públicos e ${data.paid} pagos. Coleta apenas das páginas públicas.`:`Naver: ${data.total} episódios listados; índice consultado até o último episódio já conhecido.`
       } else if(original.provider==='jump') {
         chapters=await jumpChapters(original.url,signal);count=chapters.length;message=`Jump+: ${count} episódios consultados. Somente páginas públicas são obtidas.`
       } else if(original.provider==='kuaikan') {
@@ -97,6 +106,7 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
   const results = await Promise.allSettled(aggregators.map(async (connector) => {
     let links = boundSources.filter(source=>source.provider===connector.id && source.url!==primary).map(source=>source.url)
     if (!links.length && !boundSources.some(source=>source.provider===connector.id)) {
+      if (recentSearch(`search:${connector.id}`)) return []
       try {
         const match = await findOnAggregator(connector,titles,signal)
         if (!match) { record('alternative',`search:${connector.id}`,'not_found',`${connector.name}: obra não encontrada pelo título.`); return [] }
@@ -111,9 +121,9 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
     const found: SourceChapter[][] = []
     for (const url of links) {
       try {
-        const chapters = await connector.chapters(url,signal); found.push(chapters)
-        repository.database.prepare("UPDATE work_catalog_sources SET status='available',chapter_count=?,message='',checked_at=? WHERE work_id=? AND url=?").run(chapters.length,new Date().toISOString(),work.id,url)
-        record('alternative',url,'available',`${connector.name}: ${chapters.length} entradas no índice. A disponibilidade das páginas é conferida na coleta.`)
+        const chapters = await connector.chapters(url,signal,known); found.push(chapters)
+        repository.database.prepare("UPDATE work_catalog_sources SET status='available',chapter_count=MAX(chapter_count,?),message='',checked_at=? WHERE work_id=? AND url=?").run(chapters.length,new Date().toISOString(),work.id,url)
+        record('alternative',url,'available',`${connector.name}: ${chapters.length} entradas lidas no índice${chapters.some(item=>!known.has(item.sourceId))?'':' (nenhuma nova)'}. A disponibilidade das páginas é conferida na coleta.`)
       } catch (error) {
         if (signal.aborted) throw error
         errors.push(error)

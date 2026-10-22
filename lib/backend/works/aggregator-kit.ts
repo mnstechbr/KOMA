@@ -17,7 +17,8 @@ export interface AggregatorConnector {
   /** O identificador de capítulo pertence a esta fonte. */
   owns: (chapterId: string) => boolean
   search: (query: string, signal?: AbortSignal) => Promise<Array<{ title: string; url: string }>>
-  chapters: (url: string, signal?: AbortSignal) => Promise<SourceChapter[]>
+  /** "known": capítulos já conhecidos; índices do mais novo ao mais antigo param neles. */
+  chapters: (url: string, signal?: AbortSignal, known?: Set<string>) => Promise<SourceChapter[]>
   pages: (chapterId: string, signal?: AbortSignal) => Promise<PageRef[]>
 }
 

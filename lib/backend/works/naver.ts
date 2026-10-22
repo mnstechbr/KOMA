@@ -9,7 +9,7 @@ export function naverTitleId(value: string) {
   return id
 }
 type Article = {no:number;subtitle:string;charge:boolean}
-export async function naverChapters(url: string, signal?: AbortSignal) {
+export async function naverChapters(url: string, signal?: AbortSignal, known?: Set<string>) {
   const id = naverTitleId(url)
   const chapters = new Map<number,SourceChapter>(); let total = 0; let paid = 0
   for (let page=1;page<=1000;page++) {
@@ -17,11 +17,16 @@ export async function naverChapters(url: string, signal?: AbortSignal) {
     if (!Array.isArray(data.articleList) || !Number.isInteger(data.totalCount)) throw new SourceError('A Naver retornou um índice inválido.')
     total = data.totalCount
     paid = Math.max(paid,data.chargeFolderArticleList?.length || 0)
+    let fresh = 0
     for (const entry of data.articleList) {
       if (!Number.isSafeInteger(entry.no) || entry.no<1 || entry.charge !== false) continue
-      chapters.set(entry.no,{sourceId:`https://comic.naver.com/webtoon/detail?titleId=${id}&no=${entry.no}`,key:`chapter:${entry.no}`,number:String(entry.no),volume:null,title:'',language:'ko',position:entry.no,pageCount:0})
+      const sourceId = `https://comic.naver.com/webtoon/detail?titleId=${id}&no=${entry.no}`
+      if (!known?.has(sourceId)) fresh++
+      chapters.set(entry.no,{sourceId,key:`chapter:${entry.no}`,number:String(entry.no),volume:null,title:'',language:'ko',position:entry.no,pageCount:0})
     }
     if (chapters.size+paid >= total || !data.articleList.length) break
+    // Do mais novo ao mais antigo: página sem episódio novo encerra a procura.
+    if (known?.size && !fresh) break
     if (page === 1000) throw new SourceError('O índice da Naver ultrapassou o limite de paginação.')
   }
   return {chapters:[...chapters.values()].sort((a,b)=>a.position-b.position),total,paid}
