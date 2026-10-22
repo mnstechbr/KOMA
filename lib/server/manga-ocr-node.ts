@@ -2,7 +2,7 @@ import 'server-only'
 
 import fs from 'node:fs'
 import os from 'node:os'
-import { detectTextLines, groupLines, readingRows, sameRow, type TextBox } from './text-detect'
+import { detectTextLines, groupLines, openPixels, readingRows, sameRow, type RawPixels, type TextBox } from './text-detect'
 import { isPromoText } from '@/lib/promo-text'
 import path from 'node:path'
 import * as ort from 'onnxruntime-node'
@@ -62,6 +62,8 @@ const OCR_LINE_HEIGHT = Number(process.env.NODE_OCR_LINE_HEIGHT || 48)
 // ser traço de desenho ou letra coreana lida como latina ("OF / oF", "MOK").
 const MIN_LINE_SCORE = Number(process.env.NODE_OCR_MIN_LINE_SCORE || 0.5)
 const OCR_MAX_LINE_WIDTH = Number(process.env.NODE_OCR_MAX_LINE_WIDTH || 960)
+// Janelas de uma página alta lidas ao mesmo tempo.
+const TILE_TASKS = Number(process.env.NODE_OCR_TILE_TASKS || 2)
 
 let runtimePromise: Promise<NodeOcrRuntime> | null = null
 
@@ -101,17 +103,27 @@ export async function extractTextBoxesNode(imageBytes: Buffer, language = 'auto'
   // Janelas sobrepostas mantêm escala e coordenadas no arquivo original.
   const started = performance.now(); const found: Array<Detection & { tile: number }> = []
   const tileHeight = Math.min(height,Math.round(width*1.8)); const overlap = Math.round(width*0.3)
-  for(let top=0, tile=0;top<height;tile++) {
-    const cropHeight = Math.min(tileHeight,height-top)
-    const crop = await sharp(imageBytes).extract({left:0,top,width,height:cropHeight}).png().toBuffer()
-    const result = await runtime.extractTextBoxes(crop,language)
+  // A página é decodificada uma vez só; cada janela é um trecho das mesmas linhas
+  // de pixels (sem copiar nem gerar PNG), e as janelas são lidas TILE_TASKS por vez.
+  const raw = await decodeRgb(imageBytes)
+  const tops: number[] = []
+  for (let top = 0; ; top += tileHeight - overlap) { tops.push(top); if (top + Math.min(tileHeight, height - top) >= height) break }
+  const results: Array<Awaited<ReturnType<NodeOcrRuntime['extractTextBoxes']>>> = new Array(tops.length)
+  let next = 0
+  await Promise.all(Array.from({ length: Math.min(TILE_TASKS, tops.length) }, async () => {
+    for (let index = next++; index < tops.length; index = next++) {
+      const top = tops[index]; const cropHeight = Math.min(tileHeight, height - top)
+      const row = raw.width * raw.channels
+      results[index] = await runtime.extractTextBoxes({ data: raw.data.subarray(top * row, (top + cropHeight) * row), width: raw.width, height: cropHeight, channels: raw.channels }, language)
+    }
+  }))
+  for (const [tile, result] of results.entries()) {
+    const top = tops[tile]
     for (const detection of result.detections) {
       const box:Detection['box'] = [detection.box[0],detection.box[1]+top,detection.box[2],detection.box[3]+top]
       const lines = detection.lines?.map(([x1,y1,x2,y2]):[number,number,number,number]=>[x1,y1+top,x2,y2+top])
       found.push({...detection,box,lines,tile})
     }
-    if(top+cropHeight>=height)break
-    top+=tileHeight-overlap
   }
   // Um balão na emenda entre duas janelas aparece cortado nas duas: juntar as
   // metades (linhas de ambas) e ler o balão inteiro na imagem original.
@@ -120,7 +132,7 @@ export async function extractTextBoxesNode(imageBytes: Buffer, language = 'auto'
     if (group.length === 1) { const single: Detection = { ...group[0] }; delete (single as Partial<TileDetection>).tile; detections.push({ ...single, det_id: detections.length }); continue }
     const merged = mergeLines(group.flatMap((item) => item.lines || [])).map(([x1, y1, x2, y2]) => ({ x1, y1, x2, y2, score: 1 }))
     const box: Detection['box'] = [Math.min(...group.map((d) => d.box[0])), Math.min(...group.map((d) => d.box[1])), Math.max(...group.map((d) => d.box[2])), Math.max(...group.map((d) => d.box[3]))]
-    const read = merged.length ? await runtime.readLines(imageBytes, width, height, merged, language) : null
+    const read = merged.length ? await runtime.readLines(raw, width, height, merged, language) : null
     const text = read ? keptText(read.kept) : ''
     const lines = merged.filter((line) => !read?.promo.has(line)).map((line): [number, number, number, number] => [line.x1, line.y1, line.x2, line.y2])
     const longest = [...group].sort((x, y) => y.ocr_text.length - x.ocr_text.length)[0]
@@ -201,7 +213,7 @@ class NodeOcrRuntime {
   }
 
   /** Lê as linhas indicadas (coordenadas da própria imagem) e junta o texto. */
-  async readLinesFrom(imageBytes: Buffer, width: number, height: number, group: TextBox[], language = 'auto') {
+  async readLinesFrom(imageBytes: Buffer | RawPixels, width: number, height: number, group: TextBox[], language = 'auto') {
     return keptText((await this.readLines(imageBytes, width, height, group, language)).kept)
   }
 
@@ -210,7 +222,7 @@ class NodeOcrRuntime {
    * site, traços soltos e leituras de baixa confiança (efeito sonoro coreano
    * lido como letras latinas). Só as linhas mantidas são apagadas no desenho.
    */
-  async readLines(imageBytes: Buffer, width: number, height: number, group: TextBox[], language = 'auto') {
+  async readLines(imageBytes: Buffer | RawPixels, width: number, height: number, group: TextBox[], language = 'auto') {
     const latin = /^(en|pt|id|vi|es|fr|de|it|tr)(-|$)/i.test(language)
     const kept: Array<{ line: TextBox; text: string; score: number; row: number }> = []
     const weak: typeof kept = []
@@ -218,7 +230,7 @@ class NodeOcrRuntime {
     const order = readingRows(group).flatMap((row, index) => row.map((line) => ({ line, row: index })))
     for (const { line, row } of order) {
       try {
-        const crop = await sharp(imageBytes, { limitInputPixels: 50000000 }).rotate().extract({ left: Math.floor(line.x1), top: Math.floor(line.y1), width: Math.max(1, Math.min(width - Math.floor(line.x1), Math.ceil(line.x2 - line.x1))), height: Math.max(1, Math.min(height - Math.floor(line.y1), Math.ceil(line.y2 - line.y1))) }).png().toBuffer()
+        const crop = await openPixels(imageBytes).extract({ left: Math.floor(line.x1), top: Math.floor(line.y1), width: Math.max(1, Math.min(width - Math.floor(line.x1), Math.ceil(line.x2 - line.x1))), height: Math.max(1, Math.min(height - Math.floor(line.y1), Math.ceil(line.y2 - line.y1))) }).png().toBuffer()
         let { text: raw, score } = await this.recognizeLineScored(crop, language)
         // Letra estilizada (pincel, branca em balão escuro) costuma sair como uma
         // letra só numa linha larga. Nesse caso, lê de novo a linha binarizada e
@@ -275,12 +287,12 @@ class NodeOcrRuntime {
     return best
   }
 
-  async extractTextBoxes(imageBytes: Buffer, language = 'auto') {
+  async extractTextBoxes(imageBytes: Buffer | RawPixels, language = 'auto') {
     const started = performance.now()
     const timings: Record<string, number> = {}
 
     const tDecode = performance.now()
-    const raw = await decodeRgb(imageBytes)
+    const raw = Buffer.isBuffer(imageBytes) ? await decodeRgb(imageBytes) : imageBytes
     timings.decode = elapsedMs(tDecode)
 
     const tDetect = performance.now()
@@ -303,7 +315,8 @@ class NodeOcrRuntime {
       const merged = [...rowOf.get(a)!, ...rowOf.get(b)!]
       for (const line of merged) rowOf.set(line, merged)
     }
-    const readLines = (group: TextBox[]) => this.readLines(imageBytes, raw.width, raw.height, group, language)
+    // Recortes das linhas saem dos pixels já decodificados.
+    const readLines = (group: TextBox[]) => this.readLines(raw, raw.width, raw.height, group, language)
     const joined = keptText
 
     const tOcr = performance.now()
@@ -462,9 +475,8 @@ class NodeOcrRuntime {
     }
   }
 
-  private async detectBalloons(imageBytes: Buffer, originalWidth: number, originalHeight: number) {
-    const input = await sharp(imageBytes)
-      .rotate()
+  private async detectBalloons(imageBytes: Buffer | RawPixels, originalWidth: number, originalHeight: number) {
+    const input = await openPixels(imageBytes)
       .resize(DETECT_IMAGE_SIZE, DETECT_IMAGE_SIZE, { fit: 'fill' })
       .removeAlpha()
       .toColourspace('srgb')
@@ -491,9 +503,8 @@ class NodeOcrRuntime {
     return mergeSplitBalloons(nonMaxSuppression(boxes, DETECT_IOU)).slice(0, DETECT_MAX_BOXES)
   }
 
-  private async extractTextFromCrop(imageBytes: Buffer, box: Box, language: string) {
-    const crop = await sharp(imageBytes)
-      .rotate()
+  private async extractTextFromCrop(imageBytes: Buffer | RawPixels, box: Box, language: string) {
+    const crop = await openPixels(imageBytes)
       .extract({
         left: Math.max(0, Math.floor(box.x1)),
         top: Math.max(0, Math.floor(box.y1)),
