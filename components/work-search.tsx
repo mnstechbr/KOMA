@@ -20,11 +20,13 @@ export function WorkSearch() {
   // Capítulos escolhidos para baixar; nenhum marcado = todos.
   const [chapterList, setChapterList] = useState<SourceChapter[]>([])
   const [picked, setPicked] = useState<Set<string>>(new Set())
+  // "Já está lendo?": capítulo em que parou; a fila começa nele e volta ao início depois.
+  const [startFrom, setStartFrom] = useState('')
   const request = useRef<AbortController | null>(null)
   useEffect(() => () => request.current?.abort(), [])
   const selectedId = selected?.sourceId
   useEffect(() => {
-    setAvailableChapters(null); setChapterList([]); setPicked(new Set())
+    setAvailableChapters(null); setChapterList([]); setPicked(new Set()); setStartFrom('')
     if (!selectedId) return
     const controller = new AbortController()
     // Fonte personalizada ("site:obra"): a busca traz só o resumo; os detalhes vêm da página da obra.
@@ -58,7 +60,7 @@ export function WorkSearch() {
     if (!selected || adding) return
     setAdding(true); setMessage('')
     try {
-      const response = await fetch('/api/local/works', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceId: selected.sourceId, chapters: chapterList.filter((chapter) => picked.has(chapter.key)).map((chapter) => ({ key: chapter.key, number: chapter.number })) }) })
+      const response = await fetch('/api/local/works', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceId: selected.sourceId, startFrom: startFrom || undefined, chapters: chapterList.filter((chapter) => picked.has(chapter.key)).map((chapter) => ({ key: chapter.key, number: chapter.number })) }) })
       const data = await response.json()
       if (!response.ok) throw new Error(data.message || t('Não foi possível adicionar a obra.'))
       router.push(`/inicio/obras/${data.id}`)
@@ -77,6 +79,14 @@ export function WorkSearch() {
         <div><h2 className="font-bold">{selected.descriptionLanguage && !selected.descriptionLanguage.startsWith('pt') ? t('Sinopse da fonte ({language})', { language: selected.descriptionLanguage === 'en' ? t('inglês') : selected.descriptionLanguage }) : t('Sinopse')}</h2><p className="koma-synopsis is-open mt-2 max-h-64 overflow-auto">{selected.description || t('Esta fonte ainda não tem uma sinopse para a obra.')}</p></div>
         <p className="koma-note">{t('Fonte: {source}. Ao adicionar, o KOMA procura os capítulos disponíveis, consolida versões repetidas e prepara a leitura em PT-BR. A tradução usa os provedores autorizados nas preferências e consome sua cota.', { source: sourceName(selected) })}</p>
         <p className="font-semibold">{availableChapters === null ? t('Conferindo os capítulos disponíveis…') : availableChapters === 1 ? t('1 capítulo disponível nesta fonte, sem repetir versões.') : t('{n} capítulos disponíveis nesta fonte, sem repetir versões.', { n: availableChapters })}</p>
+        {chapterList.some((chapter) => chapter.number) ? <div className="space-y-1" data-reading-from>
+          <label htmlFor="reading-from" className="text-sm font-medium">{t('Já está lendo esta obra?')}</label>
+          <select id="reading-from" className="h-10 w-full max-w-sm rounded-[4px] border-2 border-input bg-background px-3 text-sm" value={startFrom} onChange={(event) => setStartFrom(event.target.value)}>
+            <option value="">{t('Não, começar do primeiro capítulo')}</option>
+            {[...new Set(chapterList.flatMap((chapter) => chapter.number ? [chapter.number] : []))].map((number) => <option key={number} value={number}>{t('Parei no capítulo {n}', { n: number })}</option>)}
+          </select>
+          {startFrom ? <p className="koma-note">{t('O KOMA prepara primeiro do capítulo {n} até o último e depois volta ao começo. Os capítulos antes do {n} ficam marcados como lidos.', { n: startFrom })}</p> : null}
+        </div> : null}
         {chapterList.length > 1 ? <details className="koma-details" data-chapter-choice>
           <summary>{t('Escolher capítulos')} · {picked.size ? t('{n} capítulo(s) escolhido(s).', { n: picked.size }) : t('Nenhum marcado: todos serão baixados.')}</summary>
           <div>

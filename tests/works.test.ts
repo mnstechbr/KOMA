@@ -42,6 +42,17 @@ describe('obra e atualização incremental', () => {
     database.prepare("DELETE FROM kv_store WHERE key='koma:custom-sources:v1'").run()
     await ensureSources(database, true)
   })
+  it('já está lendo: prepara de onde parou até o fim, novos na frente, e depois o começo', () => {
+    const id = repository.add(1, work, [], 3)
+    repository.syncChapters(id, ['1', '2', '3', '4', '5'].map((n) => ({ ...chapter(n), position: Number(n) })))
+    const order: string[] = []
+    const drain = (count: number) => { for (let i = 0; i < count; i++) { const next = repository.nextChapter()!; order.push(next.number!); repository.chapterStage(next.id, 'ready') } }
+    drain(2)
+    repository.syncChapters(id, ['1', '2', '3', '4', '5', '6'].map((n) => ({ ...chapter(n), position: Number(n) })))
+    drain(4)
+    expect(order).toEqual(['3', '4', '5', '6', '1', '2'])
+    expect(repository.detail(id, 1)!.chapters.map((c) => [c.number, c.read])).toEqual([['1', true], ['2', true], ['3', false], ['4', false], ['5', false], ['6', false]])
+  })
   it('refresh só acrescenta capítulos novos e preserva traduções/progresso', () => {
     const id = repository.add(1, work)
     repository.syncChapters(id, [chapter('1'), chapter('2')])
