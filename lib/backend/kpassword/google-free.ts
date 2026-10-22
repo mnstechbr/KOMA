@@ -41,7 +41,7 @@ export async function translateLineWithGoogle(text: string, source: string, targ
 }
 
 // As falas chegam com uma quebra por linha do balão: juntas, a frase faz sentido.
-const prepare = (text: string) => sentenceCase(text.replace(/\s*\n\s*/g, ' ').trim())
+export const prepare = (text: string) => sentenceCase(text.replace(/\s*\n\s*/g, ' ').trim())
 
 /** Várias falas num pedido; a resposta vem na mesma ordem, uma por fala. */
 async function requestGoogle(texts: string[], source: string, target: string, fetcher: typeof fetch): Promise<string[]> {

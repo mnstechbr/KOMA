@@ -2,6 +2,7 @@ import { requestThroughBridge } from './bridge'
 import { runClaudeCode } from './claude-code'
 import { runCodex } from './codex'
 import { runGoogleFree } from './google-free'
+import { runDeeplFree } from './deepl-free'
 import { runOpenRouter } from './openrouter'
 import { createHash } from 'node:crypto'
 import { db } from '../shared/database.module'
@@ -160,7 +161,7 @@ export class ContextualTranslation {
   private approved = false
   constructor(private readonly dependencies: Dependencies = {
     settings: getTranslationSettings,
-    call: (profile, body, languages) => profile.provider === 'google-free' ? runGoogleFree(body, languages?.source || 'auto', languages?.target || 'pt-br') : profile.provider === 'openrouter' ? runOpenRouter(body) : profile.provider === 'claude-code' ? runClaudeCode(profile, body) : profile.provider === 'chatgpt-codex' ? runCodex(profile, body) : requestThroughBridge(profile, body),
+    call: (profile, body, languages) => profile.provider === 'google-free' ? runGoogleFree(body, languages?.source || 'auto', languages?.target || 'pt-br') : profile.provider === 'deepl-free' ? runDeeplFree(body, languages?.source || 'auto', languages?.target || 'pt-br') : profile.provider === 'openrouter' ? runOpenRouter(body) : profile.provider === 'claude-code' ? runClaudeCode(profile, body) : profile.provider === 'chatgpt-codex' ? runCodex(profile, body) : requestThroughBridge(profile, body),
     checkpoints: {
       get: key => (db.prepare('SELECT result_json FROM translation_checkpoints WHERE cache_key=?').get(key) as {result_json:string} | undefined)?.result_json,
       set: (key,value) => { db.prepare('INSERT OR REPLACE INTO translation_checkpoints VALUES(?,?)').run(key,value) },

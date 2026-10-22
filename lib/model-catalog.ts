@@ -1,7 +1,7 @@
 // Provedores que o KPassword sabe chamar e modelos sugeridos para tradução e
 // revisão. O ID do modelo continua livre: a lista só sugere; qualquer ID
 // disponível na conta pode ser digitado. Preços mudam: confira no provedor.
-export type ApiProvider = 'deepseek' | 'mimo' | 'openai' | 'anthropic' | 'zai' | 'claude-code' | 'chatgpt-codex' | 'google-free' | 'openrouter'
+export type ApiProvider = 'deepseek' | 'mimo' | 'openai' | 'anthropic' | 'zai' | 'claude-code' | 'chatgpt-codex' | 'google-free' | 'deepl-free' | 'openrouter'
 export type ModelTier = 'econômico' | 'equilíbrio' | 'qualidade'
 export interface CatalogModel { id: string; label: string; tier: ModelTier; vision?: boolean; note?: string }
 export interface CatalogProvider {
@@ -22,6 +22,14 @@ export const API_PROVIDERS: CatalogProvider[] = [
     id: 'google-free', name: 'Google Tradutor (grátis)', identifiers: [], wire: 'free', operation: 'free',
     models: [
       { id: 'google-translate', label: 'Google Tradutor', tier: 'econômico', note: 'Grátis e rápido; tradução literal, sem contexto entre as falas.' },
+    ],
+  },
+  {
+    // DeepL API Free: conta gratuita do DeepL com franquia mensal, chave guardada no
+    // KOMA. Também traduz fala por fala, sem contexto da cena.
+    id: 'deepl-free', name: 'DeepL API Free (chave guardada no KOMA)', identifiers: [], wire: 'free', operation: 'free',
+    models: [
+      { id: 'deepl-free', label: 'DeepL', tier: 'econômico', note: 'Grátis dentro da franquia mensal da conta; tradução fala por fala, sem contexto entre as falas.' },
     ],
   },
   {

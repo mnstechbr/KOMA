@@ -11,6 +11,7 @@ import { BackgroundSettings } from './background-settings'
 import { PerformanceSettings } from './performance-settings'
 import { SubscriptionConnections } from './subscription-connections'
 import { OpenRouterKey } from './openrouter-key'
+import { DeeplKey } from './deepl-key'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import type { KomaTranslationSettings, ModelProfile } from '@/lib/backend/kpassword/settings'
@@ -54,6 +55,7 @@ function ProviderPicker({ id, label, value, onChange, disabled, exclude = [] }: 
 function Connection({ provider, bridge, onCheck, busy }: { provider: ApiProvider; bridge: { available: boolean; message: string } | null; onCheck: () => void; busy: boolean }) {
   const { t } = useT()
   const wire = catalogProvider(provider).wire
+  if (provider === 'deepl-free') return <DeeplKey />
   if (wire === 'free') return <p className="koma-note">{t('Grátis e sem conta. O Google traduz fala por fala, sem o contexto do capítulo, e pode bloquear por um tempo se receber pedidos demais.')}</p>
   if (wire === 'cli') return <SubscriptionConnections only={provider as 'claude-code' | 'chatgpt-codex'} />
   if (wire === 'koma-key') return <OpenRouterKey />
@@ -125,9 +127,10 @@ function TranslationSettings() {
 
   return <div className="flex flex-col gap-4">
     <label className="koma-switch"><input id="kpassword-enabled" type="checkbox" checked={current.enabled} disabled={busy} onChange={(event) => change({ enabled: event.target.checked })} />{t('Traduzir as obras automaticamente')}</label>
-    <ProviderPicker id="adaptation" label="Quem traduz" value={current.translation} disabled={busy} onChange={(translation) => change({ translation })} />
-    <label className="koma-switch"><input id="review-enabled" type="checkbox" checked={current.review.enabled} disabled={busy} onChange={(event) => change({ review: { ...current.review, enabled: event.target.checked } })} /><span>{t('Revisar com um segundo modelo')}<br /><span className="koma-note">{t('Confere a tradução contra o original. Fica melhor, mas cada capítulo leva o dobro do tempo.')}</span></span></label>
-    {current.review.enabled ? <ProviderPicker id="review" label="Quem revisa" value={current.review} disabled={busy} exclude={['google-free']} onChange={(review) => change({ review: { ...review, enabled: true } })} /> : null}
+    <ProviderPicker id="adaptation" label="Quem traduz" value={current.translation} disabled={busy} onChange={(translation) => change({ translation, ...(catalogProvider(translation.provider).wire === 'free' ? { review: { ...current.review, enabled: false } } : {}) })} />
+    {/* Tradutor grátis trabalha sozinho: sem revisor nem IA paga junto. */}
+    {catalogProvider(current.translation.provider).wire === 'free' ? null : <label className="koma-switch"><input id="review-enabled" type="checkbox" checked={current.review.enabled} disabled={busy} onChange={(event) => change({ review: { ...current.review, enabled: event.target.checked } })} /><span>{t('Revisar com um segundo modelo')}<br /><span className="koma-note">{t('Confere a tradução contra o original. Fica melhor, mas cada capítulo leva o dobro do tempo.')}</span></span></label>}
+    {current.review.enabled ? <ProviderPicker id="review" label="Quem revisa" value={current.review} disabled={busy} exclude={['google-free', 'deepl-free']} onChange={(review) => change({ review: { ...review, enabled: true } })} /> : null}
     {used.map((id) => <Connection key={id} provider={id} bridge={bridge} busy={busy} onCheck={() => void checkConnection()} />)}
     <fieldset className="space-y-2"><legend className="text-sm font-medium">{t('Envio das falas')}</legend>
       {used.map((id) => <label key={id} className="koma-switch"><input id={`consent-${id}`} type="checkbox" disabled={busy} checked={current.consent[id]} onChange={(event) => change({ consent: { ...current.consent, [id]: event.target.checked }, ...(!event.target.checked ? { enabled: false } : {}) })} />{t('Autorizo enviar as falas para {name}.', { name: t(catalogProvider(id).name) })}</label>)}
