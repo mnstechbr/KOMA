@@ -14,6 +14,7 @@ import { OpenRouterKey } from './openrouter-key'
 import { DeeplKey } from './deepl-key'
 import { StageTimes } from './stage-times'
 import { MobileSettings } from './mobile-settings'
+import { AniListSettings } from './anilist-settings'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import type { KomaTranslationSettings, ModelProfile } from '@/lib/backend/kpassword/settings'
@@ -171,6 +172,7 @@ export function PreferencesPage() {
       <PrefSection id="sources" title={t('Fontes')} hint={t('Onde o KOMA procura os capítulos')}><SourceSettings /></PrefSection>
       <PrefSection id="background" title={t('Segundo plano')} hint={t('Bandeja, iniciar com o computador, procura diária e avisos')}><BackgroundSettings /></PrefSection>
       <PrefSection id="mobile" title={t('Ler no celular')} hint={t('Abrir a biblioteca no celular pelo Wi-Fi de casa')}><MobileSettings /></PrefSection>
+      <PrefSection id="anilist" title={t('AniList')} hint={t('Atualizar o seu progresso de leitura no AniList')}><AniListSettings /></PrefSection>
       <PrefSection id="storage" title={t('Armazenamento na nuvem')} hint={t('Guardar os capítulos no Google Drive, OneDrive ou outra nuvem')}><StorageSettings /></PrefSection>
       <PrefSection id="performance" title={t('Desempenho')} hint={t('Quanto do computador o KOMA usa para preparar capítulos')}><PerformanceSettings /><StageTimes /></PrefSection>
       <PrefSection id="language" title={t('Idioma e aparência')} hint={t('Idioma das telas e das traduções, fundo animado')}><LanguageSettings /><AppearanceSettings /></PrefSection>

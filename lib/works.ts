@@ -4,6 +4,8 @@ export interface CatalogWork {
   aliases: Array<{ language: string; title: string }>
   description: string; descriptionLanguage: string; originalLanguage: string
   publicationLinks?: Array<{ kind: 'original' | 'licensed'; url: string }>
+  /** IDs da obra no AniList e no MyAnimeList, quando a fonte informa. */
+  trackers?: { al?: string; mal?: string }
   authors: string[]; genres: string[]; year: number | null; coverFile: string | null; coverSourceUrl?: string
   /** Sinopses da fonte por idioma (quando a fonte oferece várias). */
   descriptions?: Record<string, string>

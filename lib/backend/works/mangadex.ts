@@ -27,6 +27,7 @@ export function mapCatalogWork(record: RecordValue): CatalogWork {
     publicationLinks: ['raw','engtl'].flatMap((key) => {
       try { const url = new URL(a.links?.[key]); return url.protocol === 'https:' && !url.username && !url.password && !url.port && !url.hash ? [{ kind: key === 'raw' ? 'original' as const : 'licensed' as const, url: url.href }] : [] } catch { return [] }
     }),
+    trackers: Object.fromEntries(['al', 'mal'].flatMap((key) => typeof a.links?.[key] === 'string' && /^\d{1,10}$/.test(a.links[key]) ? [[key, a.links[key]]] : [])),
     year: Number.isInteger(a.year) ? a.year : null, coverFile: typeof coverFile === 'string' && /^[a-zA-Z0-9._-]{1,200}$/.test(coverFile) ? coverFile : null,
   }
 }
