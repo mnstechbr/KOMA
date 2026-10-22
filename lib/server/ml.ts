@@ -79,6 +79,11 @@ export async function textMaskOf(image: Buffer): Promise<Uint8Array | null> {
   if (worker()) return call('mask', [new Uint8Array(image)])
   return (await import('./inpaint')).textMask(image)
 }
+/** Desenha a página traduzida (no worker, quando existe; senão com os modelos daqui). */
+export async function renderPage(original: Buffer, items: import('./render-translation').RenderItem[], models?: import('./render-translation').EraseModels): Promise<Buffer> {
+  if (worker()) return Buffer.from(await call<Uint8Array>('render', [new Uint8Array(original), items]))
+  return (await import('./render-translation')).renderTranslatedPage(original, items, undefined, models)
+}
 /** Reconstrói os pixels marcados; altera "data" no lugar, como o lamaInpaint. */
 export async function inpaintRegion(data: Float32Array, width: number, height: number, mask: Uint8Array) {
   if (!worker()) return (await import('./inpaint')).lamaInpaint(data, width, height, mask)

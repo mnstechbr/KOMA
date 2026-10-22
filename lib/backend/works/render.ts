@@ -2,9 +2,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type Database from 'better-sqlite3'
 import type { OcrDetection } from '../sections/sections.types'
-import { renderTranslatedPage, type EraseModels, type RenderItem } from '@/lib/server/render-translation'
+import { type EraseModels, type RenderItem } from '@/lib/server/render-translation'
 import { inpaintAvailable } from '@/lib/server/inpaint'
-import { inpaintRegion, textMaskOf } from '@/lib/server/ml'
+import { inpaintRegion, renderPage, textMaskOf } from '@/lib/server/ml'
 import { SAME_LANGUAGE_SQL } from '@/lib/languages'
 import { splitBalloons } from './split-balloons'
 import { repeatedMarks } from './watermark'
@@ -97,7 +97,7 @@ export async function renderWorkPage(database: Database.Database, imageId: numbe
   // pela IA, junção de fala cortada), a página continua marcada para desenhar de novo.
   const snapshot = () => JSON.stringify([workPageItems(database, imageId), (database.prepare('SELECT ocr_json FROM work_pages WHERE image_id=?').get(imageId) as { ocr_json: string | null } | undefined)?.ocr_json])
   const drawn = snapshot()
-  const output = await renderTranslatedPage(original, workPageItems(database, imageId), undefined, eraseModels(original))
+  const output = await renderPage(original, workPageItems(database, imageId), eraseModels(original))
   const directory = path.join(path.dirname(path.dirname(image.original_path)), 'translated')
   fs.mkdirSync(directory, { recursive: true })
   // Nome com versão: o leitor guarda imagens em cache pelo endereço.

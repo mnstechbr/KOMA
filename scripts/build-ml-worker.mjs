@@ -12,9 +12,10 @@ const FILES = {
   inpaint: 'lib/server/inpaint.ts',
   'text-detect': 'lib/server/text-detect.ts',
   'promo-text': 'lib/promo-text.ts',
+  'render-translation': 'lib/server/render-translation.ts',
 }
 // Importações entre esses arquivos viram "./nome.mjs"; "server-only" sai (vale só no Next).
-const LOCAL = { './manga-ocr-node': 'manga-ocr-node', './inpaint': 'inpaint', './text-detect': 'text-detect', '@/lib/promo-text': 'promo-text' }
+const LOCAL = { './manga-ocr-node': 'manga-ocr-node', './inpaint': 'inpaint', './text-detect': 'text-detect', '@/lib/promo-text': 'promo-text', './render-translation': 'render-translation' }
 
 export async function buildMlWorker(out = path.join(root, 'build/koma-ml')) {
   await fs.rm(out, { recursive: true, force: true })
