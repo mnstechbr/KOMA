@@ -2,7 +2,7 @@ import {checkedSourceUrl,SourceError} from './source-http'
 import {aggregators} from './aggregators'
 
 export const sourceConnectors = [
-  {id:'jump',name:'Shonen Jump+',country:'Japão',index:true,pages:true,note:'Índice e páginas públicas. Episódios pagos não são obtidos.'},
+  {id:'jump',name:'Shonen Jump+',country:'Japão',index:true,pages:false,note:'Só o índice de capítulos: as páginas vêm protegidas (embaralhadas) e o KOMA não as desembaralha.'},
   {id:'mangaplus',name:'MANGA Plus',country:'Japão',index:false,pages:false,note:'Conector de catálogo e páginas ainda não implementado.'},
   {id:'naver',name:'Naver Webtoon',country:'Coreia',index:true,pages:true,note:'Fonte original de muitos manhwas. Pesquisa pelo título coreano, índice público e páginas gratuitas, com OCR coreano local.'},
   {id:'kakao',name:'KakaoPage',country:'Coreia',index:false,pages:false,note:'Vínculo original identificado; catálogo dinâmico e páginas ainda sem conector.'},

@@ -36,5 +36,7 @@ describe('consolidação entre publicações e alternativas',()=>{
     const html=(value:unknown)=>`<script id="episode-json" data-value='${JSON.stringify({readableProduct:value})}'></script>`
     expect(parseJumpPages(html(episode),url)).toHaveLength(1)
     expect(()=>parseJumpPages(html({...episode,isPublic:false}),url)).toThrow('públicas')
+    // Páginas embaralhadas: o Jump+ fica só como índice, sem desembaralhar.
+    expect(()=>parseJumpPages(html({...episode,pageStructure:{...episode.pageStructure,choJuGiga:'baku'}}),url)).toThrow('índice')
   })
 })

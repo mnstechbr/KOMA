@@ -48,14 +48,14 @@ describe('fontes alternativas por título', () => {
     expect(sourceRank('https://www.webtoons.com/en/action/x/episode-1/viewer?title_no=1&episode_no=1')).toBeLessThan(sourceRank('11111111-1111-4111-8111-111111111111'))
   })
 
-  it('usa a fonte original primeiro, inclusive coreana, antes de PT-BR e traduções', () => {
+  it('usa a fonte original primeiro, inclusive coreana, antes de PT-BR e traduções; Jump+ só como índice', () => {
     const jump = { sourceId: 'https://shonenjumpplus.com/episode/1', language: 'ja' }
     const naver = { sourceId: 'https://comic.naver.com/webtoon/detail?titleId=1&no=1', language: 'ko' }
     const ptbr = { sourceId: '11111111-1111-4111-8111-111111111111', language: 'pt-br' }
     const official = { sourceId: 'https://www.webtoons.com/en/action/x/episode-1/viewer?title_no=1&episode_no=1', language: 'en' }
     const scan = { sourceId: 'https://leitor.example.com/manga/x/chapter-1/', language: 'en' }
     const ranked = [scan, naver, official, ptbr, jump].sort((a, b) => versionRank(a) - versionRank(b))
-    expect(ranked).toEqual([naver, jump, ptbr, official, scan])
+    expect(ranked).toEqual([naver, ptbr, official, scan, jump])
   })
 
   it('escolhe a versão principal de cada capítulo pela prioridade de fontes', () => {
