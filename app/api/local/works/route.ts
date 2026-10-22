@@ -20,7 +20,9 @@ export async function POST(request: Request) {
     const metadata = await getCatalogWork(body.sourceId)
     // Capítulos escolhidos na tela de adicionar; sem escolha, todos.
     const choice = Array.isArray(body.chapters) ? (body.chapters as Array<{ key?: unknown; number?: unknown }>).filter((item) => typeof item?.key === 'string').slice(0, 5000).map((item) => ({ key: String(item.key), number: typeof item.number === 'string' ? item.number : null })) : []
-    const id = worksRepository.add(auth.user.id, metadata, choice)
+    // "Já está lendo?": número do capítulo em que a pessoa parou.
+    const startFrom = typeof body.startFrom === 'string' && /^\d{1,5}(\.\d{1,3})?$/.test(body.startFrom) ? Number(body.startFrom) : null
+    const id = worksRepository.add(auth.user.id, metadata, choice, startFrom)
     startWorkAutomation()
     return NextResponse.json({ id }, { status: 201 })
   } catch (error) { return sourceFailure(error) }

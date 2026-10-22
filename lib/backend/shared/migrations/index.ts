@@ -25,6 +25,7 @@ import { migration024SectionImagesIndex } from './024_section_images_index'
 import { migration025StaleWithoutText } from './025_stale_without_text'
 import { migration026UnreadableBalloons } from './026_unreadable_balloons'
 import { migration027ChapterChoice } from './027_chapter_choice'
+import { migration028ReadingFrom } from './028_reading_from'
 
 export interface SqliteMigration {
   version: number
@@ -60,4 +61,5 @@ export const SQLITE_MIGRATIONS: SqliteMigration[] = [
   migration025StaleWithoutText,
   migration026UnreadableBalloons,
   migration027ChapterChoice,
+  migration028ReadingFrom,
 ]

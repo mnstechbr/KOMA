@@ -12,6 +12,8 @@ import { SAME_LANGUAGE_SQL } from '@/lib/languages'
 
 // Fontes diferentes tentadas para o mesmo capítulo antes de marcar erro.
 const MAX_VERSION_ATTEMPTS = 6
+// "Já está lendo?": do capítulo em que a pessoa parou em diante primeiro; depois o começo.
+const READING_ORDER = 'CASE WHEN w.start_number IS NOT NULL AND (c.number IS NULL OR CAST(c.number AS REAL) < w.start_number) THEN 1 ELSE 0 END'
 
 export interface WorkRow { id: number; user_id: number; source: string; source_id: string; title: string; metadata_json: string; target_language: string; paused: number; sync_requested: number; sync_attempts: number; stage: string; message: string }
 export interface ChapterRow { id: number; work_id: number; source_id: string; title: string; number: string | null; language: string; section_id: number | null; page_count: number; attempts: number; state: string }
@@ -28,7 +30,8 @@ export class WorksRepository {
     return row ? JSON.parse(row.metadata_json) : null
   }
   /** "choice": capítulos escolhidos ao adicionar (chave ou número); vazio = todos. */
-  add(userId: number, metadata: CatalogWork, choice: Array<{ key: string; number: string | null }> = []): number {
+  /** "startNumber": capítulo em que a pessoa parou de ler (os anteriores ficam lidos). */
+  add(userId: number, metadata: CatalogWork, choice: Array<{ key: string; number: string | null }> = [], startNumber: number | null = null): number {
     return this.database.transaction(() => {
       this.cache(metadata)
       // Obra de fonte personalizada já vinculada a outra obra da biblioteca: a mesma obra.
@@ -40,6 +43,7 @@ export class WorksRepository {
       this.database.prepare(`INSERT OR IGNORE INTO works(user_id,source,source_id,title,metadata_json,target_language,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)`).run(userId, metadata.source, metadata.sourceId, metadata.title, JSON.stringify(metadata), getLanguageSettings(this.database).target, now(), now())
       const id = (this.database.prepare('SELECT id FROM works WHERE user_id=? AND source=? AND source_id=?').get(userId, metadata.source, metadata.sourceId) as { id: number }).id
       if (choice.length && !(this.database.prepare('SELECT 1 FROM work_chapters WHERE work_id=? LIMIT 1').get(id))) this.database.prepare('UPDATE works SET chapter_choice=? WHERE id=?').run(JSON.stringify(choice), id)
+      if (startNumber !== null && Number.isFinite(startNumber) && !(this.database.prepare('SELECT 1 FROM work_chapters WHERE work_id=? LIMIT 1').get(id))) this.database.prepare('UPDATE works SET start_number=? WHERE id=?').run(startNumber, id)
       if (custom) this.database.prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)').run(id,custom.provider,custom.url)
       return id
     })()
@@ -114,10 +118,13 @@ export class WorksRepository {
       let added = 0
       // Capítulos escolhidos ao adicionar: os demais ficam sem baixar até a pessoa pedir.
       const choice = JSON.parse((this.database.prepare('SELECT chapter_choice FROM works WHERE id=?').get(workId) as { chapter_choice: string | null } | undefined)?.chapter_choice || '[]') as Array<{ key: string; number: string | null }>
+      const start = (this.database.prepare('SELECT start_number FROM works WHERE id=?').get(workId) as { start_number: number | null } | undefined)?.start_number ?? null
       const chosen = (chapter: SourceChapter) => !choice.length || choice.some((item) => item.key === chapter.key || (item.number !== null && item.number === chapter.number))
       for (const chapter of chapters) {
         const inserted = insert.run(workId, chapter.key, chapter.sourceId, chapter.title, chapter.number, chapter.volume, chapter.language, chapter.position, chapter.pageCount, now(), now()).changes
         if (inserted && !chosen(chapter)) this.database.prepare("UPDATE work_chapters SET state='skipped' WHERE work_id=? AND chapter_key=?").run(workId, chapter.key)
+        // Capítulos antes de onde a pessoa parou já foram lidos fora do KOMA.
+        if (inserted && start !== null && chapter.number !== null && Number(chapter.number) < start) this.database.prepare('UPDATE work_chapters SET read_done=1 WHERE work_id=? AND chapter_key=?').run(workId, chapter.key)
         added += inserted
         reorder.run(chapter.position, workId, chapter.key)
         for (const candidate of [chapter,...(chapter.alternatives || [])]) { const metadata = {...candidate}; delete metadata.alternatives; version.run(workId,chapter.key,candidate.sourceId,JSON.stringify(metadata)) }
@@ -133,7 +140,7 @@ export class WorksRepository {
     this.database.prepare(`UPDATE works SET stage='error',message=?,sync_requested=?,sync_attempts=sync_attempts+1,sync_retry_after=? WHERE id=?`).run(message, again ? 1 : 0, Date.now() + 60000 * (work.sync_attempts + 1), work.id)
   }
   nextChapter(excluded:number[] = [], downloadedOnly = false, busyChapters: number[] = []) {
-    return this.database.prepare(`SELECT c.* FROM work_chapters c JOIN works w ON w.id=c.work_id WHERE w.paused=0 AND w.sync_requested=0 AND c.state NOT IN ('ready','partial','error','rendering','skipped') AND c.retry_after<=? ${downloadedOnly ? `AND c.page_count>0 AND (SELECT COUNT(*) FROM work_pages p WHERE p.chapter_id=c.id AND p.image_id IS NOT NULL)=c.page_count AND (${SAME_LANGUAGE_SQL} OR NOT EXISTS(SELECT 1 FROM work_pages p WHERE p.chapter_id=c.id AND p.ocr_json IS NULL AND p.state NOT IN ('ready','review')))` : ''} ${excluded.length?`AND w.id NOT IN (${excluded.map(()=>'?').join(',')})`:''} ${busyChapters.length?`AND c.id NOT IN (${busyChapters.map(()=>'?').join(',')})`:''} ORDER BY w.last_processed_at,c.position,c.id LIMIT 1`).get(Date.now(),...excluded,...busyChapters) as ChapterRow | undefined
+    return this.database.prepare(`SELECT c.* FROM work_chapters c JOIN works w ON w.id=c.work_id WHERE w.paused=0 AND w.sync_requested=0 AND c.state NOT IN ('ready','partial','error','rendering','skipped') AND c.retry_after<=? ${downloadedOnly ? `AND c.page_count>0 AND (SELECT COUNT(*) FROM work_pages p WHERE p.chapter_id=c.id AND p.image_id IS NOT NULL)=c.page_count AND (${SAME_LANGUAGE_SQL} OR NOT EXISTS(SELECT 1 FROM work_pages p WHERE p.chapter_id=c.id AND p.ocr_json IS NULL AND p.state NOT IN ('ready','review')))` : ''} ${excluded.length?`AND w.id NOT IN (${excluded.map(()=>'?').join(',')})`:''} ${busyChapters.length?`AND c.id NOT IN (${busyChapters.map(()=>'?').join(',')})`:''} ORDER BY w.last_processed_at,${READING_ORDER},c.position,c.id LIMIT 1`).get(Date.now(),...excluded,...busyChapters) as ChapterRow | undefined
   }
   nextDownload(excluded: number[] = [], busyChapters: number[] = []) {
     return this.database.prepare(`SELECT c.* FROM work_chapters c JOIN works w ON w.id=c.work_id
@@ -144,7 +151,7 @@ export class WorksRepository {
         OR (NOT ${SAME_LANGUAGE_SQL} AND EXISTS(SELECT 1 FROM work_pages p WHERE p.chapter_id=c.id AND p.ocr_json IS NULL AND p.state NOT IN ('ready','review'))))
       ${excluded.length ? `AND w.id NOT IN (${excluded.map(()=>'?').join(',')})` : ''}
       ${busyChapters.length ? `AND c.id NOT IN (${busyChapters.map(()=>'?').join(',')})` : ''}
-      ORDER BY w.last_processed_at,c.position,c.id LIMIT 1`).get(Date.now(),...excluded,...busyChapters) as ChapterRow | undefined
+      ORDER BY w.last_processed_at,${READING_ORDER},c.position,c.id LIMIT 1`).get(Date.now(),...excluded,...busyChapters) as ChapterRow | undefined
   }
   cooldown() {
     const row = this.database.prepare('SELECT retry_after AS retryAt,code,message FROM translation_cooldown WHERE id=1 AND retry_after>?').get(Date.now()) as { retryAt: number; code: string; message: string } | undefined

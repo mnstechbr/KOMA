@@ -38,6 +38,10 @@ export const pagesMessages: Catalog = {
     'Ver detalhes →': 'View details →',
     'Nenhuma correspondência nas fontes consultadas. Tente outro título ou uma romanização. A busca consulta os títulos alternativos cadastrados no catálogo.': 'No matches in the sources searched. Try another title or a romanization. The search also checks the alternative titles listed in the catalog.',
     'A busca consulta o MangaDex e as fontes que você adicionou nas Preferências, cada uma de forma independente. Uma fonte indisponível não impede resultados das outras. O KOMA não confunde um resultado sem capítulos com uma obra já preparada.': 'The search queries MangaDex and the sources you added in Preferences, each on its own. If one source is down, you still get results from the others. KOMA never mistakes a result without chapters for a title that is already prepared.',
+    'Já está lendo esta obra?': 'Already reading this title?',
+    'Não, começar do primeiro capítulo': 'No, start from the first chapter',
+    'Parei no capítulo {n}': 'I stopped at chapter {n}',
+    'O KOMA prepara primeiro do capítulo {n} até o último e depois volta ao começo. Os capítulos antes do {n} ficam marcados como lidos.': 'KOMA prepares chapter {n} through the latest first, then goes back to the start. Chapters before {n} are marked as read.',
     // Processamento
     'Não foi possível carregar o processamento.': 'Could not load processing.',
     'Não foi possível realizar esta ação.': 'Could not complete this action.',
@@ -212,6 +216,10 @@ export const pagesMessages: Catalog = {
     'Ver detalhes →': 'Ver detalles →',
     'Nenhuma correspondência nas fontes consultadas. Tente outro título ou uma romanização. A busca consulta os títulos alternativos cadastrados no catálogo.': 'No hay coincidencias en las fuentes consultadas. Prueba otro título o una romanización. La búsqueda también consulta los títulos alternativos del catálogo.',
     'A busca consulta o MangaDex e as fontes que você adicionou nas Preferências, cada uma de forma independente. Uma fonte indisponível não impede resultados das outras. O KOMA não confunde um resultado sem capítulos com uma obra já preparada.': 'La búsqueda consulta MangaDex y las fuentes que añadiste en Preferencias, cada una por separado. Si una fuente no está disponible, las demás siguen mostrando resultados. KOMA no confunde un resultado sin capítulos con una obra ya preparada.',
+    'Já está lendo esta obra?': '¿Ya estás leyendo esta obra?',
+    'Não, começar do primeiro capítulo': 'No, empezar por el primer capítulo',
+    'Parei no capítulo {n}': 'Me quedé en el capítulo {n}',
+    'O KOMA prepara primeiro do capítulo {n} até o último e depois volta ao começo. Os capítulos antes do {n} ficam marcados como lidos.': 'KOMA prepara primero del capítulo {n} al último y después vuelve al principio. Los capítulos antes del {n} quedan marcados como leídos.',
     // Processamento
     'Não foi possível carregar o processamento.': 'No se pudo cargar el procesamiento.',
     'Não foi possível realizar esta ação.': 'No se pudo realizar esta acción.',
