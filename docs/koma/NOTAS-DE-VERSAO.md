@@ -1,6 +1,22 @@
-# Notas de versão do KOMA (0.4.1 a 0.4.19)
+# Notas de versão do KOMA
 
 Histórico das entregas, mantido do antigo README. O README atual está em [README.pt-BR.md](../../README.pt-BR.md).
+
+
+## 1.0.0 — versão estável
+
+Primeira versão estável do repositório público.
+
+- Nenhuma fonte não oficial incluída; fontes personalizadas (tema Madara) em Preferências → Fontes.
+- Páginas baixadas em paralelo; procura diária de capítulos novos que para no primeiro já conhecido.
+- OCR de páginas muito altas cerca de 5 vezes mais rápido.
+- Editor de balões e "Reportar erro" no leitor, com envio opcional ao GitHub (só texto).
+- Segundo plano: bandeja, iniciar com o computador, procura diária e avisos de capítulo novo.
+- "Já está lendo?" ao adicionar uma obra.
+- DeepL API Free como mais uma opção grátis de tradução, ao lado do Google Tradutor.
+- Ler no celular pelo Wi-Fi de casa (QR code e código de acesso).
+- Progresso no AniList (opcional) e painel com o tempo de cada etapa.
+- Licença AGPL-3.0-or-later.
 
 ## Reproduzir o pacote
 
