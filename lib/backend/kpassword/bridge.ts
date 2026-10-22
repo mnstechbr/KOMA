@@ -69,7 +69,7 @@ class BridgeClient {
     this.ready = this.rpc('initialize', {
       protocolVersion: '2025-11-25',
       capabilities: {},
-      clientInfo: { name: 'KOMA', version: '1.0.3' },
+      clientInfo: { name: 'KOMA', version: '1.0.4' },
     })
       .then((reply) => {
         const result = reply.result as { serverInfo?: { name?: string } } | undefined
