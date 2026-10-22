@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
-import { ChevronDown, ChevronUp, Loader2, PencilLine } from 'lucide-react'
+import { ChevronDown, ChevronUp, Flag, Loader2, PencilLine } from 'lucide-react'
 import type { WorkChapter, WorkSummary } from '@/lib/works'
 import { ReaderScrollControls, useReaderScroll } from '@/components/reader-scroll'
 import { useT } from '@/components/i18n'
@@ -45,11 +45,14 @@ export function WorkReader({ workId, chapterId }: { workId: number; chapterId: n
   const [editing, setEditing] = useState(false)
   const [balloon, setBalloon] = useState<{ pageId: number; id: number; text: string; draft: string } | null>(null)
   const [saving, setSaving] = useState(false)
+  // "Reportar erro": clicar na página com o erro e dizer o tipo; a página entra no gate de qualidade.
+  const [reporting, setReporting] = useState(false)
+  const [report, setReport] = useState<{ pageId: number; index: number; kind: string; note: string } | null>(null)
   const router = useRouter()
   const scroll = useReaderScroll(Boolean(data))
   const progress = useScrollProgress(Boolean(data))
   useEffect(() => {
-    setData(null); setCompleted(false); setMessage(''); setOriginal(false); setBalloon(null)
+    setData(null); setCompleted(false); setMessage(''); setOriginal(false); setBalloon(null); setReport(null)
     const controller = new AbortController()
     void fetch(`/api/local/works/${workId}/chapters/${chapterId}`, { signal: controller.signal, cache: 'no-store' }).then(async (response) => {
       const result = await response.json()
@@ -81,6 +84,16 @@ export function WorkReader({ workId, chapterId }: { workId: number; chapterId: n
     } catch (error) { setMessage(error instanceof Error ? error.message : t('Não foi possível salvar o balão.')) }
     finally { setSaving(false) }
   }
+  async function sendReport() {
+    if (!report || saving) return
+    setSaving(true); setMessage('')
+    try {
+      const response = await fetch(`/api/local/works/${workId}/chapters/${chapterId}/report`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId: report.pageId, kind: report.kind, note: report.note }) })
+      if (!response.ok) throw new Error()
+      setReport(null); setMessage(t('Erro reportado na página {n}. Ela passa a ser conferida em toda versão nova.', { n: report.index + 1 }))
+    } catch { setMessage(t('Não foi possível reportar o erro.')) }
+    finally { setSaving(false) }
+  }
   async function done() {
     try {
       const response = await fetch(`/api/local/works/${workId}/chapters/${chapterId}`, { method: 'POST' })
@@ -99,7 +112,7 @@ export function WorkReader({ workId, chapterId }: { workId: number; chapterId: n
       {message ? <p role="status" className="koma-reader-note">{message}</p> : null}
       {data ? <>
         {data.pages.some((page) => page.note) ? <details className="koma-reader-note"><summary>{t('{n} página(s) com avisos. Trechos sem tradução permanecem no original.', { n: data.pages.filter((page) => page.note).length })}</summary><ul className="mt-2 space-y-2">{data.pages.map((page,index) => page.note ? <li key={page.id}>{t('Página {n}: {note}', { n: index + 1, note: page.note })}</li> : null)}</ul></details> : null}
-        <div className="koma-reader-pages">{data.pages.map((page, index) => <div key={page.id} className="relative" style={{ aspectRatio: `${page.width}/${page.height}` }}>
+        <div className="koma-reader-pages">{data.pages.map((page, index) => <div key={page.id} className={`relative${reporting ? ' koma-report-target' : ''}${report?.pageId === page.id ? ' is-on' : ''}`} style={{ aspectRatio: `${page.width}/${page.height}` }} onClick={reporting ? () => setReport({ pageId: page.id, index, kind: report?.kind || 'english', note: '' }) : undefined}>
           {/* Dimensões originais mantêm os balões alinhados e evitam saltos na rolagem. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={!original && page.translatedUrl ? page.translatedUrl : page.originalUrl} alt={t('Página {n}', { n: index + 1 })} width={page.width} height={page.height} loading={index < 2 ? 'eager' : 'lazy'} className="block h-full w-full" />
@@ -108,13 +121,20 @@ export function WorkReader({ workId, chapterId }: { workId: number; chapterId: n
           {editing && !original ? page.items.filter((item) => item.box?.length === 4 && item.box[2] > item.box[0]).map((item) => <button key={item.id} type="button" className={`koma-balloon-spot${balloon?.pageId === page.id && balloon.id === item.id ? ' is-on' : ''}`} style={{ left: `${item.box[0] / page.width * 100}%`, top: `${item.box[1] / page.height * 100}%`, width: `${(item.box[2] - item.box[0]) / page.width * 100}%`, height: `${(item.box[3] - item.box[1]) / page.height * 100}%` }} aria-label={t('Editar balão: {text}', { text: item.text || t('sem tradução') })} onClick={() => setBalloon({ pageId: page.id, id: item.id, text: item.text, draft: item.text })} />) : null}
         </div>)}</div>
         <ReaderScrollControls scroll={scroll} extra={<>
-          <button type="button" className="koma-icon-button" aria-pressed={editing} onClick={(event) => { setEditing(!editing); setBalloon(null); setOriginal(false); event.currentTarget.blur() }} aria-label={editing ? t('Sair do editor de balões') : t('Editar balões')} title={editing ? t('Sair do editor de balões') : t('Editar balões')}><PencilLine size={20} aria-hidden="true" /></button>
+          <button type="button" className="koma-icon-button" aria-pressed={reporting} onClick={(event) => { setReporting(!reporting); setReport(null); setEditing(false); setBalloon(null); event.currentTarget.blur() }} aria-label={reporting ? t('Sair de reportar erro') : t('Reportar erro')} title={reporting ? t('Sair de reportar erro') : t('Reportar erro: clique na página com o problema')}><Flag size={20} aria-hidden="true" /></button>
+          <button type="button" className="koma-icon-button" aria-pressed={editing} onClick={(event) => { setEditing(!editing); setReporting(false); setReport(null); setBalloon(null); setOriginal(false); event.currentTarget.blur() }} aria-label={editing ? t('Sair do editor de balões') : t('Editar balões')} title={editing ? t('Sair do editor de balões') : t('Editar balões')}><PencilLine size={20} aria-hidden="true" /></button>
           <button type="button" className="koma-original-toggle" aria-pressed={original} onClick={(event) => { setOriginal(!original); event.currentTarget.blur() }} title={original ? t('Voltar para a tradução') : t('Ver a página original')}>{original ? t('ORIGINAL') : targetInfo(data.work.targetLanguage).short}</button>
           <nav className="koma-reader-chapters" aria-label={t('Capítulos')}>
             {data.previousChapterId ? <Link className="koma-icon-button" href={`/inicio/obras/${workId}/ler/${data.previousChapterId}`} aria-label={t('Capítulo anterior')} title={t('Capítulo anterior')}><ChevronUp size={20} aria-hidden="true" /></Link> : <span className="koma-icon-button is-off" aria-hidden="true"><ChevronUp size={20} /></span>}
             {data.nextChapterId ? <Link className="koma-icon-button" href={`/inicio/obras/${workId}/ler/${data.nextChapterId}`} onClick={() => void done()} aria-label={t('Próximo capítulo')} title={t('Próximo capítulo')}><ChevronDown size={20} aria-hidden="true" /></Link> : <span className="koma-icon-button is-off" aria-hidden="true"><ChevronDown size={20} /></span>}
           </nav>
         </>} />
+        {report ? <form className="koma-balloon-editor" aria-label={t('Reportar erro')} onSubmit={(event) => { event.preventDefault(); void sendReport() }}>
+          <p className="koma-eyebrow">{t('Erro na página {n}', { n: report.index + 1 })}</p>
+          <div className="flex flex-col gap-1" role="radiogroup">{[['english', t('Ficou texto em inglês')], ['outside', t('Frase fora do balão')], ['too-big', t('Letra grande demais')], ['name', t('Nome ou termo errado')], ['other', t('Outro')]].map(([value, label]) => <label key={value} className="koma-switch"><input type="radio" name="report-kind" value={value} checked={report.kind === value} onChange={() => setReport({ ...report, kind: value })} />{label}</label>)}</div>
+          <textarea className="koma-input" rows={2} maxLength={500} value={report.note} placeholder={t('O que está errado? (opcional)')} aria-label={t('Detalhe do erro')} onChange={(event) => setReport({ ...report, note: event.target.value })} onKeyDown={(event) => { if (event.key === 'Escape') setReport(null) }} />
+          <div className="koma-actions"><button className="koma-button" disabled={saving}>{saving ? <Loader2 size={18} className="animate-spin" aria-hidden="true" /> : null}{t('Reportar')}</button><button type="button" className="koma-outline-button" disabled={saving} onClick={() => setReport(null)}>{t('Cancelar')}</button></div>
+        </form> : null}
         {balloon ? <form className="koma-balloon-editor" aria-label={t('Editar balão')} onSubmit={(event) => { event.preventDefault(); void saveBalloon() }}>
           <label htmlFor="balloon-text" className="koma-eyebrow">{t('Texto do balão')}</label>
           <textarea id="balloon-text" className="koma-input" rows={3} maxLength={600} autoFocus value={balloon.draft} onChange={(event) => setBalloon({ ...balloon, draft: event.target.value })} onKeyDown={(event) => { if (event.key === 'Escape') setBalloon(null); if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) { event.preventDefault(); void saveBalloon() } }} />

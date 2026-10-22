@@ -13,6 +13,7 @@ import { configureInpaint } from '../lib/server/inpaint'
 import { splitBalloons } from '../lib/backend/works/split-balloons'
 import { isPromoText } from '../lib/promo-text'
 import { ensureSources } from '../lib/backend/works/custom-sources'
+import { qualityReports } from '../lib/backend/works/quality-reports'
 import type { OcrDetection } from '../lib/backend/sections/sections.types'
 
 // Conferência de qualidade (só leitura, sem IA): redesenha as páginas com o
@@ -162,6 +163,12 @@ it.skipIf(process.env.KOMA_QUALITY !== '1' || !process.env.KOMA_QUALITY_SET)('n�
   fs.mkdirSync(out, { recursive: true })
   const set = JSON.parse(fs.readFileSync(process.env.KOMA_QUALITY_SET!, 'utf8')) as RegressionSet
   const failures: string[] = []
+  // Páginas reportadas no leitor ("Reportar erro"). Corrigidas: o mesmo tipo de erro
+  // não pode voltar. Abertas: medidas e listadas como pendentes, sem travar.
+  const REPORTED: Record<string, Problem[]> = { english: ['inglês', 'sem tradução'], outside: ['fora do balão', 'contorno'], 'too-big': [], name: [], other: [] }
+  const reports = qualityReports(db)
+  for (const report of reports.filter((item) => item.fixed)) set.pages.push({ image: report.image, why: `reportado: ${report.kind}${report.note ? ` (${report.note})` : ''}`, allow: PROBLEMS.filter((problem) => !REPORTED[report.kind]?.includes(problem)) })
+  const pending: string[] = []
   const read = async (image: number) => {
     const row = db.prepare('SELECT original_path FROM section_images WHERE id=?').get(image) as { original_path: string } | undefined
     if (!row || !fs.existsSync(row.original_path)) return null
@@ -190,6 +197,19 @@ it.skipIf(process.env.KOMA_QUALITY !== '1' || !process.env.KOMA_QUALITY_SET)('n�
     if (!upper || !lower) { failures.push(`${join.upper}/${join.lower}: imagem fora da biblioteca`); continue }
     if (!splitBalloons(upper.detections, upper.height, lower.detections).length) failures.push(`${join.upper}/${join.lower} (${join.why}): fala cortada entre as imagens não reconhecida`)
   }
-  fs.writeFileSync(path.join(out, 'regressao.json'), JSON.stringify({ checkedAt: new Date().toISOString(), failures }, null, 2))
+  for (const report of reports.filter((item) => !item.fixed)) {
+    const found = await read(report.image)
+    if (!found) continue
+    const saved = db.prepare('SELECT ocr_text, translated_text FROM section_image_ocr_items WHERE section_image_id=?').all(report.image) as Array<{ ocr_text: string; translated_text: string }>
+    const flat = (text: string) => text.replace(/\s+/g, ' ').toUpperCase()
+    const items: RenderItem[] = found.detections.filter((item) => !isPromoText(item.ocr_text)).flatMap((item) => {
+      const same = saved.find((row) => row.translated_text?.trim() && flat(row.ocr_text) === flat(item.ocr_text!))
+      return same ? [{ box: item.box, text: same.translated_text, source: item.ocr_text, kind: item.cls_name === 'text' ? 'text' as const : 'balloon' as const, lines: item.lines }] : []
+    })
+    const findings = await inspect(found.bytes, items, { image: report.image }, false)
+    pending.push(`${report.image} (${report.kind}${report.note ? `: ${report.note}` : ''}): ${findings.map((item) => item.problem).join(', ') || 'nenhum erro medido'}`)
+  }
+  if (pending.length) process.stderr.write(`[qualidade] reportados em aberto:\n${pending.join('\n')}\n`)
+  fs.writeFileSync(path.join(out, 'regressao.json'), JSON.stringify({ checkedAt: new Date().toISOString(), failures, pending }, null, 2))
   expect(failures).toEqual([])
 }, 60 * 60 * 1000)

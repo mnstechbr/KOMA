@@ -42,3 +42,19 @@ describe('coleta em segundo plano', () => {
     expect(takeNotices(database).map((notice) => notice.chapterId)).toEqual([4])
   })
 })
+
+describe('reportar erro no leitor', () => {
+  it('guarda a página reportada uma vez por tipo de erro', async () => {
+    const { addQualityReport, qualityReports } = await import('../lib/backend/works/quality-reports')
+    const database = library()
+    chapter(database, 1, '2026-10-01T10:01:00.000Z')
+    database.prepare(`INSERT INTO sections(id,user_id,name,created_at,updated_at) VALUES(1,1,'s','now','now')`).run()
+    database.prepare(`INSERT INTO section_images(id,section_id,order_index,original_name,mime,size_bytes,original_path,created_at,updated_at) VALUES(50,1,0,'a.jpg','image/jpeg',1,'/tmp/a.jpg','now','now')`).run()
+    database.prepare(`INSERT INTO work_pages(id,chapter_id,page_index,source_file,image_id,state) VALUES(9,1,0,'a.jpg',50,'ready')`).run()
+    expect(addQualityReport(database, 1, 9, 'english', 'sobrou WAIT')).toMatchObject({ image: 50, kind: 'english' })
+    addQualityReport(database, 1, 9, 'english', 'sobrou WAIT de novo')
+    addQualityReport(database, 1, 9, 'outside')
+    expect(qualityReports(database).map((item) => [item.kind, item.note])).toEqual([['english', 'sobrou WAIT de novo'], ['outside', '']])
+    expect(addQualityReport(database, 2, 9, 'english')).toBeNull()
+  })
+})
