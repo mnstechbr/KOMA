@@ -79,3 +79,17 @@ describe('enviar o erro para o GitHub', () => {
     expect(url.searchParams.get('idiomas')).toBe('en → pt-br')
   })
 })
+
+describe('painel de tempo das etapas', () => {
+  it('guarda os últimos capítulos e calcula a média por página', async () => {
+    const { recordStageTimes, stageReport } = await import('../lib/backend/works/stage-times')
+    const database = library()
+    chapter(database, 1, '2026-10-01T10:01:00.000Z'); chapter(database, 2, '2026-10-01T10:01:00.000Z')
+    recordStageTimes(database, { chapterId: 1, profile: 'maximo', pages: 10, downloadMs: 2000, ocrMs: 10000, translateMs: 3000 })
+    recordStageTimes(database, { chapterId: 2, profile: 'maximo', pages: 30, downloadMs: 6000, ocrMs: 30000, translateMs: 1000 })
+    const report = stageReport(database, 1)
+    expect(report.chapters.map((item) => [item.chapterId, item.work])).toEqual([[2, 'Obra'], [1, 'Obra']])
+    expect(report.average).toEqual({ pages: 40, downloadMs: 200, ocrMs: 1000, translateMs: 100 })
+    expect(stageReport(database, 99).chapters).toEqual([])
+  })
+})
