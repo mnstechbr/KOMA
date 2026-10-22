@@ -28,6 +28,17 @@ describe('consolidação entre publicações e alternativas', () => {
     const merged = mergeChapterSources([[{ ...chapter('chapter:128:volume:1', '128', '1'), sourceId: 'md-128', language: 'pl' }]], saved)
     expect(merged.map((c) => c.key)).toEqual(['chapter:1', 'chapter:128'])
     expect(merged[1].alternatives?.map((c) => c.sourceId)).toEqual(['md-128'])
+    // Mesmo número com e sem volume na mesma fonte (traduções diferentes): é o mesmo capítulo.
+    const mixed = mergeChapterSources(
+      [
+        [
+          { ...chapter('chapter:1:volume:1', '1', '1'), sourceId: 'md-ro' },
+          { ...chapter('chapter:1', '1'), sourceId: 'md-en' },
+        ],
+      ],
+      [chapter('chapter:1', '1')],
+    )
+    expect(mixed).toHaveLength(1)
     const restart = mergeChapterSources(
       [[chapter('chapter:1:volume:1', '1', '1'), chapter('chapter:1:volume:2', '1', '2')]],
       [chapter('chapter:1', '1')],
