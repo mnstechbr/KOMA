@@ -93,3 +93,29 @@ describe('painel de tempo das etapas', () => {
     expect(stageReport(database, 99).chapters).toEqual([])
   })
 })
+
+describe('progresso no AniList', () => {
+  it('envia o maior capítulo lido e nunca diminui o progresso', async () => {
+    const { connectAniList, syncAniListWork, anilistStatus } = await import('../lib/backend/works/anilist')
+    const database = library()
+    database.prepare("UPDATE works SET metadata_json=? WHERE id=1").run(JSON.stringify({ title: 'Obra', trackers: { al: '555' } }))
+    chapter(database, 1, '2026-10-01T10:01:00.000Z'); chapter(database, 2, '2026-10-01T10:01:00.000Z'); chapter(database, 3, '2026-10-01T10:01:00.000Z')
+    database.prepare('UPDATE work_chapters SET read_done=1 WHERE id IN (1,2)').run()
+    let remote = 1; const calls: string[] = []
+    const fetcher = (async (_url: string, init?: RequestInit) => {
+      const { query, variables } = JSON.parse(String(init?.body))
+      calls.push(query.split('{')[0].trim())
+      if (query.includes('Viewer')) return new Response(JSON.stringify({ data: { Viewer: { name: 'jean' } } }))
+      if (query.includes('mediaListEntry')) return new Response(JSON.stringify({ data: { Media: { mediaListEntry: { progress: remote, status: 'CURRENT' } } } }))
+      remote = variables.progress
+      return new Response(JSON.stringify({ data: { SaveMediaListEntry: { id: 1 } } }))
+    }) as unknown as typeof fetch
+    expect(await connectAniList(database, 'x'.repeat(40), fetcher)).toBe('jean')
+    expect(anilistStatus(database)).toMatchObject({ connected: true, viewer: 'jean' })
+    expect(await syncAniListWork(database, 1, fetcher)).toBe('updated')
+    expect(remote).toBe(2)
+    remote = 10
+    expect(await syncAniListWork(database, 1, fetcher)).toBe('up_to_date')
+    expect(remote).toBe(10)
+  })
+})

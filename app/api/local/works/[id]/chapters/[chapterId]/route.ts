@@ -3,6 +3,7 @@ import { personalAccess, numericId } from '../../../_shared'
 import { worksRepository } from '@/lib/backend/works/repository'
 import { ensureChapterLocal } from '@/lib/backend/storage/cloud'
 import { startWorkAutomation } from '@/lib/backend/works/worker'
+import { syncAniListWork } from '@/lib/backend/works/anilist'
 
 type Context = { params: Promise<{ id: string; chapterId: string }> }
 export async function GET(_request: Request, { params }: Context) {
@@ -37,6 +38,8 @@ export async function POST(request: Request, { params }: Context) {
   const detail = worksRepository.detail(numericId(id), auth.user.id)
   if (!detail?.chapters.some((chapter) => chapter.id === numericId(chapterId) && ['ready','partial'].includes(chapter.state))) return NextResponse.json({ message: 'Capítulo não disponível.' }, { status: 404 })
   worksRepository.markRead(numericId(id), numericId(chapterId), auth.user.id)
+  // AniList (se conectado): o maior capítulo lido, sem segurar a resposta.
+  void syncAniListWork(worksRepository.database, numericId(id)).catch(() => undefined)
   return NextResponse.json({ ok: true })
 }
 // "Refazer este capítulo" (leitura e tradução do zero) ou baixar um capítulo não escolhido ao adicionar a obra.
