@@ -14,6 +14,8 @@ on:
 jobs:
   installer:
     runs-on: windows-latest
+    permissions:
+      contents: write
     timeout-minutes: 60
 
     steps:
@@ -99,6 +101,18 @@ jobs:
           name: KOMA-Setup-windows
           path: artifacts/KOMA-Setup-*.exe
           if-no-files-found: error
+
+      # Versão publicada (tag v*): o instalador testado vai direto para a release,
+      # sem precisar baixar o arquivo em outro computador. As notas são editadas depois.
+      - name: Attach installer to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --verify-tag --title "KOMA ${tag#v}" --notes "KOMA ${tag#v}"
+          gh release upload "$tag" artifacts/KOMA-Setup-*.exe --clobber
 
       - name: Upload test logs
         if: always()
