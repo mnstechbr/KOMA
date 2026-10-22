@@ -27,6 +27,7 @@ let logFd
 // Segundo plano: com a bandeja ligada, fechar a janela só a esconde; "--hidden"
 // (início com o computador) abre direto na bandeja.
 let tray = null
+let backgroundTasks = null
 const startHidden = process.argv.includes('--hidden')
 const showWindow = () => { if (!window) return; if (window.isMinimized()) window.restore(); window.show(); window.focus() }
 async function startBackground(token, language) {
@@ -77,9 +78,12 @@ async function startBackground(token, language) {
   // A cada minuto (e logo depois de mudar a opção na tela): preferências e capítulos novos prontos.
   const poll = () => { void fetchSettings(true).then(apply).catch(() => { /* Serviço ocupado: tenta no próximo minuto. */ }); void syncMobile().catch(() => undefined) }
   setInterval(() => { if (!quitting) poll() }, 60000).unref()
-  setInterval(() => { if (!quitting) void syncMobile().catch(() => undefined) }, 5000).unref()
+  // Bandeja e início com o computador seguem a tela em poucos segundos (sem os avisos, que ficam no minuto).
+  setInterval(() => { if (!quitting) { void syncMobile().catch(() => undefined); void fetchSettings(false).then(apply).catch(() => undefined) } }, 5000).unref()
   app.on('before-quit', () => { if (mobile) void mobile.stop() })
-  return { poll }
+  // Ao sair: aplica a última escolha de início com o computador antes de desligar o serviço.
+  const finalSync = () => Promise.race([fetchSettings(false).then(apply), new Promise((resolve) => setTimeout(resolve, 3000))]).catch(() => undefined)
+  return { poll, finalSync }
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -94,6 +98,7 @@ if (!app.requestSingleInstanceLock()) {
     event.preventDefault()
     quitting = true
     void (async () => {
+      if (backgroundTasks) await backgroundTasks.finalSync()
       if (backend) await backend.stop()
       if (logFd !== undefined) fs.closeSync(logFd)
       app.quit()
@@ -153,6 +158,7 @@ if (!app.requestSingleInstanceLock()) {
     await window.loadURL(backend.url)
     if (quitting) return
     const background = process.env.KOMA_DESKTOP_TEST === '1' ? null : await startBackground(localSession.sessionToken, language)
+    backgroundTasks = background
     // Aberto escondido só quando a bandeja existe; sem ela a janela precisa aparecer.
     if (!startHidden || !tray) window.show()
     if (background) background.poll()

@@ -9,6 +9,7 @@ import * as kit from './aggregator-kit'
 import { madara, type AggregatorConnector } from './aggregator-kit'
 import { setUserConnectors } from './aggregators'
 import { setPromoNames } from '@/lib/promo-text'
+import { shareMlPromoNames } from '@/lib/server/ml'
 import { checkedSourceUrl, registerSourceHosts, sourceBytes, SourceError, type SourceHostRule } from './source-http'
 
 // Fontes que o próprio usuário adiciona. O KOMA não traz nenhum site não oficial:
@@ -171,7 +172,9 @@ export async function ensureSources(database: Database.Database, force = false) 
     const all = [...connectors, ...state.local.filter((item) => !ids.has(item.id))]
     setUserConnectors(all)
     // O nome do site carimbado nas páginas não é fala.
-    setPromoNames(all.flatMap((item) => [item.id, item.name, ...custom.filter((source) => source.id === item.id).map((source) => new URL(source.origin).hostname.replace(/^www\./, '').split('.')[0])]))
+    const promoNames = all.flatMap((item) => [item.id, item.name, ...custom.filter((source) => source.id === item.id).map((source) => new URL(source.origin).hostname.replace(/^www\./, '').split('.')[0])])
+    setPromoNames(promoNames)
+    shareMlPromoNames(promoNames)
     state.key = key; state.stamp = stamp
   })().finally(() => { state.loading = null })
   await state.loading

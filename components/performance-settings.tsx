@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useT } from './i18n'
+import { SettingsSkeleton } from './koma-skeletons'
 
 type Profile = 'leve' | 'equilibrado' | 'maximo'
 type Mode = 'auto' | Profile
@@ -26,7 +27,7 @@ export function PerformanceSettings() {
     } catch { setMessage(t('Não foi possível salvar.')) }
     finally { setBusy(false) }
   }
-  if (!data) return <p className="koma-note">{t('Consultando…')}</p>
+  if (!data) return message ? <p className="koma-note">{message}</p> : <SettingsSkeleton />
   const names: Record<Profile, string> = { leve: t('Leve'), equilibrado: t('Equilibrado'), maximo: t('Máximo') }
   const options: Array<{ mode: Mode; title: string; note: string; disabled?: boolean }> = [
     { mode: 'auto', title: t('Automático (recomendado)'), note: t('O KOMA escolhe pelo computador. Agora: {profile}.', { profile: names[data.profile] }) },

@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { verifyModels } from './desktop-models.mjs'
+import { buildMlWorker } from './build-ml-worker.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const target = path.resolve(root, 'artifacts', `koma-${Date.now()}`)
@@ -25,6 +26,8 @@ for (const entry of ['public', 'models']) {
   await fs.cp(path.join(root, entry), path.join(server, entry), { recursive: true, verbatimSymlinks: true })
 }
 await fs.cp(path.join(root, '.next/static'), path.join(server, '.next/static'), { recursive: true, verbatimSymlinks: true })
+// OCR e apagamento num processo separado (worker thread), fora da thread das telas.
+await fs.cp(await buildMlWorker(), path.join(server, 'koma-ml'), { recursive: true })
 for (const name of ['sharp', 'onnxruntime-node', 'better-sqlite3']) {
   await fs.cp(path.join(root, 'node_modules', name), path.join(server, 'node_modules', name), {
     recursive: true,

@@ -3,7 +3,7 @@ import { requireAdmin } from '@/app/api/_shared/proxy'
 import { isTrustedOrigin } from '@/lib/security/request-guards'
 import { db } from '@/lib/backend/shared/database.module'
 import { currentPerformance, detectGpu, savePerformanceMode } from '@/lib/backend/works/performance'
-import { probeGpu } from '@/lib/server/manga-ocr-node'
+import { probeGpuDevice as probeGpu } from '@/lib/server/ml'
 
 export async function GET() {
   const auth = await requireAdmin()

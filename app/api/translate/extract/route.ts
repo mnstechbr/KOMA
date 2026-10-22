@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { recoverOcr } from '@/lib/server/ocr-recovery'
-import { extractTextBoxesNode } from '@/lib/server/manga-ocr-node'
+import { extractText as extractTextBoxesNode } from '@/lib/server/ml'
 import { parseUploadedImageRequest } from '@/lib/server/uploaded-image-request'
 
 export async function POST(request: NextRequest) {

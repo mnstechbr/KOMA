@@ -1,5 +1,5 @@
 import sharp from 'sharp'
-import { recognizeImageTextNode } from './manga-ocr-node'
+import { recognizeText as recognizeImageTextNode } from './ml'
 import type { OcrDetection } from '@/lib/backend/sections/sections.types'
 
 // Uma tentativa local adicional, apenas nos balões incertos. Nunca usa LLM

@@ -4,6 +4,7 @@ import crypto from 'node:crypto'
 import zlib from 'node:zlib'
 import { execFileSync } from 'node:child_process'
 import { verifyModels } from './desktop-models.mjs'
+import { buildMlWorker } from './build-ml-worker.mjs'
 
 // Monta o pacote do KOMA para Windows 11 (x64) e o instalador .exe (NSIS).
 // Roda no Linux ou no Windows: usa o build do Next já feito (npm run build) e
@@ -81,6 +82,8 @@ for (const entry of ['.next', 'node_modules', 'package.json', 'server.js']) {
 await fs.copyFile(path.join(root, 'package.json'), path.join(server, 'package.json'))
 for (const entry of ['public', 'models']) await fs.cp(path.join(root, entry), path.join(server, entry), { recursive: true })
 await fs.cp(path.join(root, '.next/static'), path.join(server, '.next/static'), { recursive: true })
+// OCR e apagamento num processo separado (worker thread), fora da thread das telas.
+await fs.cp(await buildMlWorker(), path.join(server, 'koma-ml'), { recursive: true })
 await verifyModels(root, path.join(server, 'models'))
 
 // Módulos nativos: código JS do npm, binários win32-x64.

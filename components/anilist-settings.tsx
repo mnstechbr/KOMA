@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Input } from './ui/input'
 import { Label } from './ui/label'
 import { useT } from './i18n'
+import { SettingsSkeleton } from './koma-skeletons'
 
 interface Status { connected: boolean; viewer: string | null; clientId: string; authorizeUrl: string | null }
 
@@ -27,7 +28,7 @@ export function AniListSettings() {
     } catch (error) { setMessage(error instanceof Error && error.message ? t(error.message) : t('Não foi possível salvar.')) }
     finally { setBusy(false) }
   }
-  if (!status) return null
+  if (!status) return message ? <p className="koma-note">{message}</p> : <SettingsSkeleton />
   return <div className="flex flex-col gap-3">
     <p className="koma-note">{t('Opcional. Ao marcar um capítulo como lido, o KOMA atualiza o seu progresso no AniList (só aumenta). Você autoriza no site do AniList; o KOMA nunca vê a sua senha.')}</p>
     {status.connected ? <>

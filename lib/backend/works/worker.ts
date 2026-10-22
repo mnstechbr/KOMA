@@ -6,8 +6,7 @@ import crypto from 'node:crypto'
 import sharp from 'sharp'
 import { recoverOcr } from '@/lib/server/ocr-recovery'
 import { inspectPublicationSources } from './publication-sources'
-import { configureOcr, extractTextBoxesNode, probeGpu } from '@/lib/server/manga-ocr-node'
-import { configureInpaint } from '@/lib/server/inpaint'
+import { configureMl, extractText as extractTextBoxesNode, probeGpuDevice as probeGpu } from '@/lib/server/ml'
 import { contextualTranslation } from '../kpassword/translation'
 import { getTranslationSettings } from '../kpassword/repository'
 import { TranslationError } from '../kpassword/settings'
@@ -115,8 +114,7 @@ function applyPerformance(database: WorksRepository['database']) {
   const { profile, limits } = currentPerformance(database)
   DOWNLOAD_TASKS = limits.downloads; TRANSLATION_TASKS = limits.translation; RENDER_TASKS = limits.render; UPGRADE_TASKS = limits.upgrade
   ocrSlots = limits.ocrSlots
-  configureOcr({ device: limits.ocrDevice, threads: limits.ocrThreads })
-  configureInpaint(limits.ocrDevice)
+  void configureMl({ device: limits.ocrDevice, threads: limits.ocrThreads })
   sharp.concurrency(limits.imageThreads)
   const key = `${profile}:${JSON.stringify(limits)}`
   if (key !== appliedProfile) { appliedProfile = key; console.info('[KOMA] Perfil de desempenho', { profile, ...limits }) }
@@ -474,14 +472,20 @@ export function startWorkAutomation() {
   } catch { /* Pedido inválido: ignorado. */ }
   // O KOMA trabalha com prioridade baixa: o que o usuário estiver fazendo vem primeiro.
   try { os.setPriority(0, os.constants.priority.PRIORITY_BELOW_NORMAL) } catch { /* Sem permissão: segue na prioridade atual. */ }
-  void detectGpu(probeGpu).then(() => applyPerformance(repository.database))
+  // Ao abrir, as telas vêm primeiro: o trabalho pesado (procura diária, downloads,
+  // OCR, tradução e desenho) começa depois de WARMUP_MS e da detecção da placa de
+  // vídeo, para os modelos carregarem uma vez só, já no dispositivo certo.
+  const warmUntil = Date.now() + Number(process.env.KOMA_WARMUP_MS ?? 120000)
+  let gpuChecked = false
+  void detectGpu(probeGpu).then(() => applyPerformance(repository.database)).finally(() => { gpuChecked = true })
   const tick = async () => {
     try {
       if (!claimAutomationLock(repository, state.owner)) return
       applyPerformance(repository.database)
       await ensureSources(repository.database)
+      const heavy = gpuChecked && Date.now() >= warmUntil
       // Procura diária por capítulos novos, a partir do horário das Preferências.
-      scheduledCheck(repository.database, (userId) => repository.refreshAll(userId))
+      if (heavy) scheduledCheck(repository.database, (userId) => repository.refreshAll(userId))
       const launch = (workId: number, phase: ActiveTask['phase'], run: (signal: AbortSignal) => Promise<unknown>, chapterId?: number) => {
         const key = phase === 'sync' ? `sync:${workId}` : `${phase}:${chapterId}`
         const controller = new AbortController()
@@ -493,6 +497,7 @@ export function startWorkAutomation() {
       }
       const sync = repository.pendingSync([...state.active.values()].map(task=>task.workId))
       if (sync) launch(sync.id,'sync',signal=>engine.synchronize(sync,signal))
+      if (!heavy) return
       // Downloads independem do cofre e continuam durante a espera da tradução.
       while ([...state.active.values()].filter(task=>task.phase==='download').length < DOWNLOAD_TASKS) {
         const excluded = [...state.active.values()].filter(task=>task.phase==='sync').map(task=>task.workId)

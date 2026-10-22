@@ -3,7 +3,8 @@ import path from 'node:path'
 import type Database from 'better-sqlite3'
 import type { OcrDetection } from '../sections/sections.types'
 import { renderTranslatedPage, type EraseModels, type RenderItem } from '@/lib/server/render-translation'
-import { inpaintAvailable, lamaInpaint, textMask } from '@/lib/server/inpaint'
+import { inpaintAvailable } from '@/lib/server/inpaint'
+import { inpaintRegion, textMaskOf } from '@/lib/server/ml'
 import { SAME_LANGUAGE_SQL } from '@/lib/languages'
 import { splitBalloons } from './split-balloons'
 import { repeatedMarks } from './watermark'
@@ -42,7 +43,7 @@ export function chaptersDoneRendering(database: Database.Database, excluded: num
 export function eraseModels(original: Buffer): EraseModels | undefined {
   if (!inpaintAvailable()) return undefined
   let mask: Promise<Uint8Array | null> | null = null
-  return { mask: () => (mask ||= textMask(original).catch(() => null)), inpaint: (data, width, height, holes) => lamaInpaint(data, width, height, holes).catch(() => false) }
+  return { mask: () => (mask ||= textMaskOf(original).catch(() => null)), inpaint: (data, width, height, holes) => inpaintRegion(data, width, height, holes).catch(() => false) }
 }
 
 /** Falas de uma página como o desenho as recebe (inclusive balões cortados entre imagens). */

@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import { recognizeImageTextNode } from '@/lib/server/manga-ocr-node'
+import { recognizeText as recognizeImageTextNode } from '@/lib/server/ml'
 import type { OcrJobsRepository } from './ocr-jobs.repository'
 import type { EnqueueOcrJobResult, OcrJobLookup } from './ocr-jobs.types'
 
