@@ -14,11 +14,15 @@ const UNCLIP_RATIO = 1.6
 const MEAN = [0.485, 0.456, 0.406]
 const STD = [0.229, 0.224, 0.225]
 
-export async function detectTextLines(session: ort.InferenceSession, imageBytes: Buffer, width: number, height: number): Promise<TextBox[]> {
+/** Imagem já decodificada (RGB cru), para não decodificar o arquivo de novo a cada etapa. */
+export type RawPixels = { data: Buffer; width: number; height: number; channels: number }
+export const openPixels = (image: Buffer | RawPixels) => Buffer.isBuffer(image) ? sharp(image, { limitInputPixels: 50000000 }).rotate() : sharp(image.data, { raw: { width: image.width, height: image.height, channels: image.channels as 3 } })
+
+export async function detectTextLines(session: ort.InferenceSession, imageBytes: Buffer | RawPixels, width: number, height: number): Promise<TextBox[]> {
   const scale = Math.min(1, LIMIT_SIDE / Math.max(width, height))
   const w = Math.max(32, Math.round((width * scale) / 32) * 32)
   const h = Math.max(32, Math.round((height * scale) / 32) * 32)
-  const rgb = await sharp(imageBytes).rotate().resize(w, h, { fit: 'fill' }).removeAlpha().toColourspace('srgb').raw().toBuffer()
+  const rgb = await openPixels(imageBytes).resize(w, h, { fit: 'fill' }).removeAlpha().toColourspace('srgb').raw().toBuffer()
   const plane = w * h
   const input = new Float32Array(3 * plane)
   for (let i = 0; i < plane; i += 1) {
