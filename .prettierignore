@@ -11,3 +11,4 @@ paper/
 package-lock.json
 desktop/package-lock.json
 tests/quality-pages.json
+.impeccable/
