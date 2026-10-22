@@ -19,6 +19,7 @@ import { sourceBytes, SourceError } from './source-http'
 import { catalogMetadata } from './catalog'
 import { ensureSources } from './custom-sources'
 import { scheduledCheck } from './background'
+import { recordStageTimes } from './stage-times'
 import { chapterPages, discoverWorkChapters } from './chapter-sources'
 import { chaptersDoneRendering, clearEmptyRenders, nextPagesToRender, nextPagesToUpgrade, renderWorkPage, upgradeWorkPage } from './render'
 import { localizeNextWork } from './synopsis'
@@ -402,7 +403,11 @@ export class WorkAutomation {
       d.sections.setSectionStatus(sectionId, { status: hasReview ? 'partial' : 'completed', internalStatus: 'idle' })
       d.repository.completeChapter(chapter)
       const times = stageTimes.get(chapter.id)
-      if (times) { stageTimes.delete(chapter.id); console.info('[KOMA] Etapas do capítulo', { chapterId: chapter.id, profile: appliedProfile.split(':')[0], pagesOcr: times.pages, downloadMs: times.download, ocrMs: times.ocr, translateMs: times.translate }) }
+      if (times) {
+        stageTimes.delete(chapter.id)
+        console.info('[KOMA] Etapas do capítulo', { chapterId: chapter.id, profile: appliedProfile.split(':')[0], pagesOcr: times.pages, downloadMs: times.download, ocrMs: times.ocr, translateMs: times.translate })
+        try { recordStageTimes(d.repository.database, { chapterId: chapter.id, profile: appliedProfile.split(':')[0], pages: times.pages, downloadMs: times.download, ocrMs: times.ocr, translateMs: times.translate }) } catch { /* Painel é só informativo. */ }
+      }
     } catch (error) {
       if (sectionId) d.sections.setSectionStatus(sectionId, { status: 'partial', internalStatus: 'idle' })
       if (signal.aborted || (error instanceof SourceError && error.code === 'paused')) { d.repository.chapterStage(chapter.id, 'queued'); return }
