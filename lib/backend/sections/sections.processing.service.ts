@@ -1,4 +1,4 @@
-import { extractTextBoxesNode } from '@/lib/server/manga-ocr-node'
+import { extractText as extractTextBoxesNode } from '@/lib/server/ml'
 import { contextualTranslation } from '@/lib/backend/kpassword/translation'
 import type { SectionsRepository } from './sections.repository'
 import type { OcrDetection, PendingSectionImage, SectionLangs } from './sections.types'

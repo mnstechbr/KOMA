@@ -6,6 +6,7 @@ import { preparationLabels, type WorkChapter, type WorkSummary } from '@/lib/wor
 import { BrushProgress, WorkCover, chapterLabel, workKind, type Translate } from '@/components/koma-ui'
 import { useT } from '@/components/i18n'
 import { targetInfo } from '@/lib/languages'
+import { WorkSkeleton } from '@/components/koma-skeletons'
 
 type Source = { kind: string; url: string; message: string; status: string }
 const BLOCK = 30
@@ -86,6 +87,7 @@ export function WorkDetail({ id }: { id: number }) {
 
   return <div data-work-detail={work ? 'ready' : 'loading'}>
     <Link href="/inicio/secoes" className="koma-text-link koma-back"><ArrowLeft size={18} aria-hidden="true" />{t('Biblioteca')}</Link>
+    {!work && !message ? <WorkSkeleton /> : null}
     {work ? <>
       <section className="koma-work-hero">
         <div className="koma-work-cover"><WorkCover work={work} sizes="240px" t={t} /></div>

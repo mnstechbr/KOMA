@@ -6,6 +6,7 @@ import { ChevronDown, ChevronUp, Flag, Loader2, PencilLine } from 'lucide-react'
 import type { WorkChapter, WorkSummary } from '@/lib/works'
 import { ReaderScrollControls, useReaderScroll } from '@/components/reader-scroll'
 import { useT } from '@/components/i18n'
+import { ReaderSkeleton } from '@/components/koma-skeletons'
 import { targetInfo } from '@/lib/languages'
 
 interface ReadingData {
@@ -113,6 +114,7 @@ export function WorkReader({ workId, chapterId }: { workId: number; chapterId: n
     <div className="koma-reader-progress" aria-hidden="true"><span ref={progress} /></div>
     <div className="koma-reader-body">
       {message ? <p role="status" className="koma-reader-note">{message}</p> : null}
+      {!data && !message ? <ReaderSkeleton /> : null}
       {data ? <>
         {data.pages.some((page) => page.note) ? <details className="koma-reader-note"><summary>{t('{n} página(s) com avisos. Trechos sem tradução permanecem no original.', { n: data.pages.filter((page) => page.note).length })}</summary><ul className="mt-2 space-y-2">{data.pages.map((page,index) => page.note ? <li key={page.id}>{t('Página {n}: {note}', { n: index + 1, note: page.note })}</li> : null)}</ul></details> : null}
         <div className="koma-reader-pages">{data.pages.map((page, index) => <div key={page.id} className={`relative${reporting ? ' koma-report-target' : ''}${report?.pageId === page.id ? ' is-on' : ''}`} style={{ aspectRatio: `${page.width}/${page.height}` }} onClick={reporting ? () => setReport({ pageId: page.id, index, kind: report?.kind || 'english', note: '' }) : undefined}>

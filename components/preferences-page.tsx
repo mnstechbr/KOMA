@@ -13,6 +13,7 @@ import { SubscriptionConnections } from './subscription-connections'
 import { OpenRouterKey } from './openrouter-key'
 import { DeeplKey } from './deepl-key'
 import { StageTimes } from './stage-times'
+import { SettingsSkeleton } from './koma-skeletons'
 import { MobileSettings } from './mobile-settings'
 import { AniListSettings } from './anilist-settings'
 import { Input } from './ui/input'
@@ -89,7 +90,7 @@ function TranslationSettings() {
     return () => controller.abort()
   }, [t])
 
-  if (!settings) return <p className="koma-note">{message || t('Carregando…')}</p>
+  if (!settings) return message ? <p className="koma-note">{message}</p> : <SettingsSkeleton />
   const current = settings
   const used = [current.translation.provider, ...(current.review.enabled ? [current.review.provider] : [])].filter((id, index, list) => list.indexOf(id) === index)
   const viaVault = used.some((id) => ['openai', 'anthropic'].includes(catalogProvider(id).wire))
