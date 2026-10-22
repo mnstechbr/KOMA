@@ -1,4 +1,4 @@
-import { PROVIDER_IDS, providerName, type ApiProvider } from '@/lib/model-catalog'
+import { PROVIDER_IDS, catalogProvider, providerName, type ApiProvider } from '@/lib/model-catalog'
 export type { ApiProvider }
 export interface ModelProfile { provider: ApiProvider; model: string; credentialId: string }
 export interface KomaTranslationSettings {
@@ -58,6 +58,9 @@ export function parseTranslationSettings(value: unknown): KomaTranslationSetting
     glossary: root.glossary as string, voices: root.voices as string,
   }
   if (settings.enabled) {
+    // Tradutores grátis (Google, DeepL Free) trabalham sozinhos: sem revisor e sem misturar com IA paga.
+    if (catalogProvider(settings.translation.provider).wire === 'free' && settings.review.enabled) throw new TranslationError('invalid_settings', 'Os tradutores grátis trabalham sem revisão. Desligue a revisão ou escolha um modelo de IA para traduzir.')
+    if (catalogProvider(settings.review.provider).wire === 'free' && settings.review.enabled) throw new TranslationError('invalid_settings', 'Os tradutores grátis não servem como revisor.')
     for (const item of [settings.translation, ...(settings.review.enabled ? [settings.review] : [])]) {
       if (!item.model) throw new TranslationError('incomplete_settings', 'Preencha o modelo para cada etapa ativa.')
       if (!settings.consent[item.provider]) throw new TranslationError('consent_required', `Autorize o envio dos diálogos ao ${providerName(item.provider)}.`, 403)
