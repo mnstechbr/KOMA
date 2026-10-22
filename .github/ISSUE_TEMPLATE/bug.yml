@@ -1,7 +1,7 @@
 name: Bug do app / App bug
 description: Algo no KOMA não funciona como deveria. / Something in KOMA does not work as it should.
-title: "[Bug] "
-labels: ["bug"]
+title: '[Bug] '
+labels: ['bug']
 body:
   - type: markdown
     attributes:
@@ -12,14 +12,14 @@ body:
     id: versao
     attributes:
       label: Versão do KOMA / KOMA version
-      placeholder: "0.4.58"
+      placeholder: '0.4.58'
     validations:
       required: true
   - type: input
     id: sistema
     attributes:
       label: Sistema / System
-      placeholder: "Fedora 44, Windows 11"
+      placeholder: 'Fedora 44, Windows 11'
   - type: textarea
     id: passos
     attributes:

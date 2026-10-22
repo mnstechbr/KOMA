@@ -8,5 +8,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Inicialização exclusiva do aplicativo KOMA.' }, { status: 403 })
   }
   // O aplicativo usa o idioma salvo para o cookie da interface e o menu da janela.
-  return NextResponse.json({ ...createDesktopSession(), language: getLanguageSettings(db).ui }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json(
+    { ...createDesktopSession(), language: getLanguageSettings(db).ui },
+    { headers: { 'Cache-Control': 'no-store' } },
+  )
 }

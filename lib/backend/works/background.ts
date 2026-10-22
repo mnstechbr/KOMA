@@ -20,10 +20,19 @@ const NOTICES_KEY = 'koma:notices:v1'
 
 const read = <T>(database: Database.Database, key: string): T | null => {
   const row = database.prepare('SELECT value FROM kv_store WHERE key = ?').get(key) as { value: string } | undefined
-  try { return row ? JSON.parse(row.value) as T : null } catch { return null }
+  try {
+    return row ? (JSON.parse(row.value) as T) : null
+  } catch {
+    return null
+  }
 }
-const write = (database: Database.Database, key: string, value: unknown) => database.prepare(`INSERT INTO kv_store (key, value, expires_at) VALUES (?, ?, NULL)
-  ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = NULL`).run(key, JSON.stringify(value))
+const write = (database: Database.Database, key: string, value: unknown) =>
+  database
+    .prepare(
+      `INSERT INTO kv_store (key, value, expires_at) VALUES (?, ?, NULL)
+  ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = NULL`,
+    )
+    .run(key, JSON.stringify(value))
 
 export function backgroundSettings(database: Database.Database): BackgroundSettings {
   const stored = read<Partial<BackgroundSettings>>(database, KEY) || {}
@@ -41,7 +50,12 @@ export function saveBackgroundSettings(database: Database.Database, next: Partia
     tray: typeof next.tray === 'boolean' ? next.tray : current.tray,
     autostart: typeof next.autostart === 'boolean' ? next.autostart : current.autostart,
     notify: typeof next.notify === 'boolean' ? next.notify : current.notify,
-    checkHour: next.checkHour === null ? null : Number.isInteger(next.checkHour) && next.checkHour! >= 0 && next.checkHour! <= 23 ? next.checkHour! : current.checkHour,
+    checkHour:
+      next.checkHour === null
+        ? null
+        : Number.isInteger(next.checkHour) && next.checkHour! >= 0 && next.checkHour! <= 23
+          ? next.checkHour!
+          : current.checkHour,
   }
   write(database, KEY, merged)
   return merged
@@ -49,7 +63,8 @@ export function saveBackgroundSettings(database: Database.Database, next: Partia
 
 /** Momento da procura de hoje (hora configurada, horário local). */
 function todaysSlot(now: Date, hour: number) {
-  const slot = new Date(now); slot.setHours(hour, 0, 0, 0)
+  const slot = new Date(now)
+  slot.setHours(hour, 0, 0, 0)
   return slot
 }
 /**
@@ -71,7 +86,13 @@ export function scheduledCheck(database: Database.Database, refreshAll: (userId:
   return total
 }
 
-export interface ChapterNotice { workId: number; chapterId: number; title: string; number: string | null; count: number }
+export interface ChapterNotice {
+  workId: number
+  chapterId: number
+  title: string
+  number: string | null
+  count: number
+}
 /**
  * Capítulos novos que ficaram prontos desde o último aviso, um aviso por obra.
  * Só contam capítulos descobertos depois da obra adicionada (não os da primeira
@@ -84,8 +105,12 @@ export function takeNotices(database: Database.Database): ChapterNotice[] {
     write(database, NOTICES_KEY, { baseline: max, sent: [] })
     return []
   }
-  const rows = database.prepare(`SELECT c.id, c.work_id, c.number, w.title FROM work_chapters c JOIN works w ON w.id=c.work_id
-    WHERE c.id > ? AND c.state = 'ready' AND julianday(c.created_at) - julianday(w.created_at) > 1.0/48 ORDER BY c.work_id, c.position`).all(state.baseline) as Array<{ id: number; work_id: number; number: string | null; title: string }>
+  const rows = database
+    .prepare(
+      `SELECT c.id, c.work_id, c.number, w.title FROM work_chapters c JOIN works w ON w.id=c.work_id
+    WHERE c.id > ? AND c.state = 'ready' AND julianday(c.created_at) - julianday(w.created_at) > 1.0/48 ORDER BY c.work_id, c.position`,
+    )
+    .all(state.baseline) as Array<{ id: number; work_id: number; number: string | null; title: string }>
   const sent = new Set(state.sent)
   const fresh = rows.filter((row) => !sent.has(row.id))
   if (!fresh.length) return []

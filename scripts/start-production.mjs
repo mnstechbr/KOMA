@@ -8,5 +8,10 @@ if (!fs.existsSync(manifest)) throw new Error('Prepare o pacote com npm run desk
 const bundle = fs.readFileSync(manifest, 'utf8').trim()
 const child = spawn(path.join(bundle, 'koma'), [], { stdio: 'inherit', env: process.env })
 for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => child.kill(signal))
-child.once('error', (error) => { console.error(error.message); process.exitCode = 1 })
-child.once('exit', (code) => { process.exitCode = code ?? 1 })
+child.once('error', (error) => {
+  console.error(error.message)
+  process.exitCode = 1
+})
+child.once('exit', (code) => {
+  process.exitCode = code ?? 1
+})

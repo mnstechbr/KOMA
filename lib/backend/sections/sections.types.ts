@@ -6,7 +6,6 @@ export interface ResolvedImageFile {
 
 export type ImageKind = 'original' | 'translated'
 
-
 export interface SectionLangs {
   sourceLang: string
   targetLang: string
@@ -29,7 +28,6 @@ export interface PendingSectionImage {
   original_path: string
   mime: string
 }
-
 
 export interface OcrDetection {
   det_id?: number

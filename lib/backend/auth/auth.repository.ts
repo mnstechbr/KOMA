@@ -18,14 +18,18 @@ export class AuthRepository {
   getUserFromToken(token: string | null | undefined): LocalUser | null {
     if (!token) return null
 
-    const row = db.prepare(`
+    const row = db
+      .prepare(
+        `
       SELECT u.*
       FROM sessions s
       JOIN users u ON u.id = s.user_id
       WHERE s.token = ?
         AND s.expires_at > ?
       LIMIT 1
-    `).get(token, new Date().toISOString()) as any
+    `,
+      )
+      .get(token, new Date().toISOString()) as any
 
     if (!row) return null
     return mapUser(row)

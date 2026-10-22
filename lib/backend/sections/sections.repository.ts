@@ -16,7 +16,10 @@ const sectionsRoot = path.join(getDataDir(), 'sections')
 if (!fs.existsSync(sectionsRoot)) fs.mkdirSync(sectionsRoot, { recursive: true })
 
 function extFromName(name: string) {
-  const ext = path.extname(name || '').trim().toLowerCase()
+  const ext = path
+    .extname(name || '')
+    .trim()
+    .toLowerCase()
   if (!ext || ext.length > 10) return '.bin'
   return ext
 }
@@ -49,17 +52,18 @@ function writeSectionImages(sectionId: number, data: SectionLangs, files: Sectio
       data.sourceLang,
       data.targetLang,
       now,
-      now
+      now,
     )
   })
 
   db.prepare('UPDATE sections SET updated_at = ? WHERE id = ?').run(now, sectionId)
 }
 
-
 export class SectionsRepository {
   listSections(userId: number) {
-    const sectionRows = db.prepare(`
+    const sectionRows = db
+      .prepare(
+        `
       SELECT s.*,
         COUNT(i.id) as images_count,
         SUM(CASE WHEN i.selected_for_processing = 1 THEN 1 ELSE 0 END) as selected_images_count,
@@ -70,10 +74,14 @@ export class SectionsRepository {
       WHERE s.user_id = ?
       GROUP BY s.id
       ORDER BY s.id DESC
-    `).all(userId) as any[]
+    `,
+      )
+      .all(userId) as any[]
 
     const firstImageBySectionId = new Map<number, { imageId: number; mime: string }>()
-    const firstImageRows = db.prepare(`
+    const firstImageRows = db
+      .prepare(
+        `
       SELECT i.section_id, i.id, i.mime
       FROM section_images i
       JOIN (
@@ -82,7 +90,9 @@ export class SectionsRepository {
         GROUP BY section_id
       ) first_i
       ON first_i.section_id = i.section_id AND first_i.min_order_index = i.order_index
-    `).all() as Array<{ section_id: number; id: number; mime: string | null }>
+    `,
+      )
+      .all() as Array<{ section_id: number; id: number; mime: string | null }>
 
     for (const image of firstImageRows) {
       const sectionId = Number(image.section_id)
@@ -127,13 +137,16 @@ export class SectionsRepository {
     })
   }
 
-  
   createSectionWithImages(userId: number, data: CreateSectionData, files: SectionImageFileInput[]) {
     const now = new Date().toISOString()
-    const sectionInsert = db.prepare(`
+    const sectionInsert = db
+      .prepare(
+        `
       INSERT INTO sections (user_id, name, priority, status, internal_status, source_lang, target_lang, provider_lang, include_logs, created_at, updated_at)
       VALUES (?, ?, 10, 'processing', 'queued', ?, ?, ?, 0, ?, ?)
-    `).run(userId, data.name, data.sourceLang, data.targetLang, data.providerLang, now, now)
+    `,
+      )
+      .run(userId, data.name, data.sourceLang, data.targetLang, data.providerLang, now, now)
     const sectionId = Number(sectionInsert.lastInsertRowid)
 
     writeSectionImages(sectionId, data, files, 0)
@@ -142,13 +155,12 @@ export class SectionsRepository {
   }
 
   appendImagesToSection(userId: number, sectionId: number, files: SectionImageFileInput[]) {
-    const section = db.prepare(
-      'SELECT id, source_lang, target_lang, provider_lang FROM sections WHERE id = ? AND user_id = ?'
-    ).get(sectionId, userId) as any
+    const section = db
+      .prepare('SELECT id, source_lang, target_lang, provider_lang FROM sections WHERE id = ? AND user_id = ?')
+      .get(sectionId, userId) as any
     if (!section) return null
 
-    const countRow = db.prepare('SELECT COUNT(*) as count FROM section_images WHERE section_id = ?')
-      .get(sectionId) as any
+    const countRow = db.prepare('SELECT COUNT(*) as count FROM section_images WHERE section_id = ?').get(sectionId) as any
     const startIndex = Number(countRow?.count ?? 0)
     const langs = {
       sourceLang: String(section.source_lang || 'auto'),
@@ -166,9 +178,9 @@ export class SectionsRepository {
   }
 
   getSectionLangs(sectionId: number, userId: number): SectionLangs | null {
-    const section = db.prepare(
-      'SELECT id, source_lang, target_lang, provider_lang FROM sections WHERE id = ? AND user_id = ?'
-    ).get(sectionId, userId) as any
+    const section = db
+      .prepare('SELECT id, source_lang, target_lang, provider_lang FROM sections WHERE id = ? AND user_id = ?')
+      .get(sectionId, userId) as any
     if (!section) return null
     return {
       sourceLang: String(section.source_lang || 'auto'),
@@ -178,49 +190,65 @@ export class SectionsRepository {
   }
 
   getPendingImages(sectionId: number): PendingSectionImage[] {
-    return db.prepare(`
+    return db
+      .prepare(
+        `
       SELECT id, order_index, original_path, mime
       FROM section_images
       WHERE section_id = ? AND translation_status = 'pending'
       ORDER BY order_index ASC
-    `).all(sectionId) as PendingSectionImage[]
+    `,
+      )
+      .all(sectionId) as PendingSectionImage[]
   }
 
   setSectionStatus(sectionId: number, patch: { status?: string; internalStatus?: string }) {
     const now = new Date().toISOString()
     if (patch.status !== undefined && patch.internalStatus !== undefined) {
-      db.prepare('UPDATE sections SET status = ?, internal_status = ?, updated_at = ? WHERE id = ?')
-        .run(patch.status, patch.internalStatus, now, sectionId)
+      db.prepare('UPDATE sections SET status = ?, internal_status = ?, updated_at = ? WHERE id = ?').run(
+        patch.status,
+        patch.internalStatus,
+        now,
+        sectionId,
+      )
     } else if (patch.internalStatus !== undefined) {
-      db.prepare('UPDATE sections SET internal_status = ?, updated_at = ? WHERE id = ?')
-        .run(patch.internalStatus, now, sectionId)
+      db.prepare('UPDATE sections SET internal_status = ?, updated_at = ? WHERE id = ?').run(patch.internalStatus, now, sectionId)
     } else if (patch.status !== undefined) {
-      db.prepare('UPDATE sections SET status = ?, updated_at = ? WHERE id = ?')
-        .run(patch.status, now, sectionId)
+      db.prepare('UPDATE sections SET status = ?, updated_at = ? WHERE id = ?').run(patch.status, now, sectionId)
     }
   }
 
   countUnresolvedImages(sectionId: number) {
-    const remaining = db.prepare(`
+    const remaining = db
+      .prepare(
+        `
       SELECT COUNT(*) as count FROM section_images
       WHERE section_id = ? AND translation_status NOT IN ('translated','extracted','failed')
-    `).get(sectionId) as any
+    `,
+      )
+      .get(sectionId) as any
     return Number(remaining?.count ?? 0)
   }
 
   markImageTranslating(imageId: number) {
-    db.prepare(`UPDATE section_images SET status = 'processing', translation_status = 'translating', updated_at = ? WHERE id = ?`)
-      .run(new Date().toISOString(), imageId)
+    db.prepare(`UPDATE section_images SET status = 'processing', translation_status = 'translating', updated_at = ? WHERE id = ?`).run(
+      new Date().toISOString(),
+      imageId,
+    )
   }
 
   markImageCompleted(imageId: number) {
-    db.prepare(`UPDATE section_images SET status = 'completed', translation_status = 'extracted', updated_at = ? WHERE id = ?`)
-      .run(new Date().toISOString(), imageId)
+    db.prepare(`UPDATE section_images SET status = 'completed', translation_status = 'extracted', updated_at = ? WHERE id = ?`).run(
+      new Date().toISOString(),
+      imageId,
+    )
   }
 
   markImageFailed(imageId: number) {
-    db.prepare(`UPDATE section_images SET status = 'error', translation_status = 'failed', updated_at = ? WHERE id = ?`)
-      .run(new Date().toISOString(), imageId)
+    db.prepare(`UPDATE section_images SET status = 'error', translation_status = 'failed', updated_at = ? WHERE id = ?`).run(
+      new Date().toISOString(),
+      imageId,
+    )
   }
 
   readImageBuffer(originalPath: string): Buffer | null {
@@ -245,41 +273,55 @@ export class SectionsRepository {
           Number(det.det_id ?? idx + 1),
           typeof det.cls_name === 'string' ? det.cls_name : null,
           typeof det.conf === 'number' ? det.conf : null,
-          x1, y1, x2, y2,
+          x1,
+          y1,
+          x2,
+          y2,
           typeof det.ocr_text === 'string' ? det.ocr_text : '',
           translatedByIdx.get(idx) ?? '',
-          new Date().toISOString()
+          new Date().toISOString(),
         )
       })
     })
     insertTx(detections)
   }
 
-  
   resetSectionForReprocess(sectionId: number) {
     const now = new Date().toISOString()
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE section_images
       SET translation_status = 'pending', status = 'queued', translated_path = NULL, updated_at = ?
       WHERE section_id = ?
-    `).run(now, sectionId)
-    db.prepare('UPDATE sections SET status = ?, internal_status = ?, updated_at = ? WHERE id = ?')
-      .run('processing', 'queued', now, sectionId)
+    `,
+    ).run(now, sectionId)
+    db.prepare('UPDATE sections SET status = ?, internal_status = ?, updated_at = ? WHERE id = ?').run(
+      'processing',
+      'queued',
+      now,
+      sectionId,
+    )
   }
 
   findSectionProvider(sectionId: number, userId: number): string | null {
-    const section = db.prepare(`
+    const section = db
+      .prepare(
+        `
       SELECT id, provider_lang
       FROM sections
       WHERE id = ? AND user_id = ?
       LIMIT 1
-    `).get(sectionId, userId) as { id?: number; provider_lang?: string | null } | undefined
+    `,
+      )
+      .get(sectionId, userId) as { id?: number; provider_lang?: string | null } | undefined
     if (!section?.id) return null
     return String(section.provider_lang ?? 'google')
   }
 
   getSectionImageCounts(sectionId: number) {
-    return db.prepare(`
+    return db
+      .prepare(
+        `
       SELECT
         COUNT(*) AS total_pages,
         SUM(CASE WHEN selected_for_processing = 1 THEN 1 ELSE 0 END) AS selected_pages,
@@ -287,11 +329,15 @@ export class SectionsRepository {
         SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_pages
       FROM section_images
       WHERE section_id = ?
-    `).get(sectionId) as Record<string, unknown>
+    `,
+      )
+      .get(sectionId) as Record<string, unknown>
   }
 
   getSectionOcrAggregates(sectionId: number) {
-    return db.prepare(`
+    return db
+      .prepare(
+        `
       SELECT
         COUNT(DISTINCT section_image_id) AS ocr_completed_pages,
         COUNT(*) AS total_detections,
@@ -301,7 +347,9 @@ export class SectionsRepository {
       WHERE section_image_id IN (
         SELECT id FROM section_images WHERE section_id = ?
       )
-    `).get(sectionId) as Record<string, unknown>
+    `,
+      )
+      .get(sectionId) as Record<string, unknown>
   }
 
   getSectionDetail(sectionId: number, userId: number) {
@@ -324,12 +372,16 @@ export class SectionsRepository {
       created_at: String(section.created_at),
       updated_at: String(section.updated_at),
       images: images.map((img) => {
-        const items = db.prepare(`
+        const items = db
+          .prepare(
+            `
           SELECT id, det_id, cls_name, conf, x1, y1, x2, y2, ocr_text, translated_text
           FROM section_image_ocr_items
           WHERE section_image_id = ?
           ORDER BY id ASC
-        `).all(img.id) as any[]
+        `,
+          )
+          .all(img.id) as any[]
         const overlayItems = items.map((row) => ({
           id: Number(row.id),
           det_id: Number(row.det_id),
@@ -412,19 +464,21 @@ export class SectionsRepository {
   }
 
   resolveImageFile(sectionId: number, imageId: number, kind: ImageKind, userId: number): ResolvedImageFile | null {
-    const row = db.prepare(`
+    const row = db
+      .prepare(
+        `
       SELECT i.*, s.user_id
       FROM section_images i
       JOIN sections s ON s.id = i.section_id
       WHERE i.id = ? AND i.section_id = ?
       LIMIT 1
-    `).get(imageId, sectionId) as any
+    `,
+      )
+      .get(imageId, sectionId) as any
 
     if (!row || Number(row.user_id) !== userId) return null
 
-    const filePath = kind === 'translated'
-      ? (row.translated_path || row.original_path)
-      : row.original_path
+    const filePath = kind === 'translated' ? row.translated_path || row.original_path : row.original_path
 
     if (!filePath || !fs.existsSync(filePath)) return null
 

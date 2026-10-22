@@ -17,7 +17,10 @@ describe('união de balões cortados pelo detector', () => {
     ])
   })
   it('não une caixas que só encostam numa quina', () => {
-    const boxes = [{ x1: 0, y1: 0, x2: 100, y2: 100, conf: 0.9 }, { x1: 90, y1: 90, x2: 200, y2: 200, conf: 0.9 }]
+    const boxes = [
+      { x1: 0, y1: 0, x2: 100, y2: 100, conf: 0.9 },
+      { x1: 90, y1: 90, x2: 200, y2: 200, conf: 0.9 },
+    ]
     expect(mergeSplitBalloons(boxes)).toHaveLength(2)
   })
 })

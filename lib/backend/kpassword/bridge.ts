@@ -32,9 +32,13 @@ export async function inspectBridge() {
     if (!helper.isFile() || (helper.mode & 0o022) !== 0) return { available: false, message: 'Reinstale o conector oficial do KPassword.' }
     const root = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local/share')
     const socketPath = path.join(root, 'com.kpassword.app/secrets-bridge/request.sock')
-    for (const [file, socket] of [[path.dirname(socketPath), false], [socketPath, true]] as const) {
+    for (const [file, socket] of [
+      [path.dirname(socketPath), false],
+      [socketPath, true],
+    ] as const) {
       const stat = await lstat(file)
-      if (stat.uid !== process.getuid?.() || (stat.mode & 0o077) !== 0 || (socket ? !stat.isSocket() : !stat.isDirectory())) return { available: false, message: ERRORS.endpoint_unsafe }
+      if (stat.uid !== process.getuid?.() || (stat.mode & 0o077) !== 0 || (socket ? !stat.isSocket() : !stat.isDirectory()))
+        return { available: false, message: ERRORS.endpoint_unsafe }
     }
     return { available: true, message: 'Conector local encontrado. A autorização de cada etapa será solicitada pelo KPassword.' }
   } catch {
@@ -48,7 +52,10 @@ class BridgeClient {
   private child: ChildProcessWithoutNullStreams
   private nextId = 0
   private buffer = Buffer.alloc(0)
-  private pending = new Map<number, { resolve: (value: Record<string, unknown>) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>()
+  private pending = new Map<
+    number,
+    { resolve: (value: Record<string, unknown>) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }
+  >()
   private ready: Promise<unknown>
   private closed = false
 
@@ -60,12 +67,20 @@ class BridgeClient {
     this.child.on('close', () => this.close())
     this.child.stdin.on('error', () => this.close())
     this.ready = this.rpc('initialize', {
-      protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'KOMA', version: '1.0.2' },
-    }).then((reply) => {
-      const result = reply.result as { serverInfo?: { name?: string } } | undefined
-      if (result?.serverInfo?.name !== 'KPassword Secrets Bridge') throw new TranslationError('invalid_bridge', 'O conector não identificou o KPassword.', 503)
-      this.child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n')
-    }).catch((error) => { this.close(); throw error })
+      protocolVersion: '2025-11-25',
+      capabilities: {},
+      clientInfo: { name: 'KOMA', version: '1.0.2' },
+    })
+      .then((reply) => {
+        const result = reply.result as { serverInfo?: { name?: string } } | undefined
+        if (result?.serverInfo?.name !== 'KPassword Secrets Bridge')
+          throw new TranslationError('invalid_bridge', 'O conector não identificou o KPassword.', 503)
+        this.child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n')
+      })
+      .catch((error) => {
+        this.close()
+        throw error
+      })
   }
 
   private receive(chunk: Buffer) {
@@ -81,9 +96,15 @@ class BridgeClient {
         if (!request) continue
         clearTimeout(request.timer)
         this.pending.delete(reply.id)
-        if (reply.error) { request.reject(new TranslationError('bridge_unavailable', 'A sessão do KPassword foi interrompida. Reative a ponte e tente novamente.', 503)); this.close() }
-        else request.resolve(reply)
-      } catch { this.close() }
+        if (reply.error) {
+          request.reject(
+            new TranslationError('bridge_unavailable', 'A sessão do KPassword foi interrompida. Reative a ponte e tente novamente.', 503),
+          )
+          this.close()
+        } else request.resolve(reply)
+      } catch {
+        this.close()
+      }
     }
   }
 
@@ -91,16 +112,24 @@ class BridgeClient {
     if (this.closed) return Promise.reject(new TranslationError('bridge_unavailable', ERRORS.bridge_inactive, 503))
     const id = ++this.nextId
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => this.close(new TranslationError('bridge_timeout', 'O KPassword não respondeu a tempo. Confira a autorização no cofre.', 504)), 165000)
+      const timer = setTimeout(
+        () => this.close(new TranslationError('bridge_timeout', 'O KPassword não respondeu a tempo. Confira a autorização no cofre.', 504)),
+        165000,
+      )
       this.pending.set(id, { resolve, reject, timer })
       this.child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n')
     })
   }
 
-  close(error = new TranslationError('bridge_unavailable', 'A sessão do KPassword está indisponível. Ative a ponte e tente novamente.', 503)) {
+  close(
+    error = new TranslationError('bridge_unavailable', 'A sessão do KPassword está indisponível. Ative a ponte e tente novamente.', 503),
+  ) {
     if (this.closed) return
     this.closed = true
-    for (const item of this.pending.values()) { clearTimeout(item.timer); item.reject(error) }
+    for (const item of this.pending.values()) {
+      clearTimeout(item.timer)
+      item.reject(error)
+    }
     this.pending.clear()
     this.child.kill('SIGKILL')
     if (client === this) client = undefined
@@ -111,7 +140,10 @@ class BridgeClient {
     const { identifiers, operation } = catalogProvider(profile.provider)
     let result: { isError?: boolean; content?: Array<{ type?: string; text?: string }> } | undefined
     for (const provider of identifiers) {
-      const reply = await this.rpc('tools/call', { name: 'api_request', arguments: { provider, ...(profile.credentialId ? { credential_id: profile.credentialId } : {}), operation, body } })
+      const reply = await this.rpc('tools/call', {
+        name: 'api_request',
+        arguments: { provider, ...(profile.credentialId ? { credential_id: profile.credentialId } : {}), operation, body },
+      })
       result = reply.result as typeof result
       // Alias da mesma família: só tentar outro identificador se nenhuma chave
       // correspondeu. Não repetir chamadas recusadas ou enviadas ao provedor.
@@ -120,34 +152,51 @@ class BridgeClient {
     const text = result?.content?.find((part) => part.type === 'text')?.text
     if (result?.isError) {
       // Apenas códigos conhecidos saem do transporte; nunca respostas brutas.
-      throw new TranslationError(text && ERRORS[text] ? text : 'provider_http_error', (text && ERRORS[text]) || ERRORS.provider_http_error, 502)
+      throw new TranslationError(
+        text && ERRORS[text] ? text : 'provider_http_error',
+        (text && ERRORS[text]) || ERRORS.provider_http_error,
+        502,
+      )
     }
     try {
       const value = JSON.parse(text || '')
-      if (value.ok !== true || !Number.isInteger(value.status) || value.status < 200 || value.status >= 300 || !value.body) throw new Error()
+      if (value.ok !== true || !Number.isInteger(value.status) || value.status < 200 || value.status >= 300 || !value.body)
+        throw new Error()
       return value.body
-    } catch { throw new TranslationError('invalid_response', 'O KPassword retornou uma resposta inválida.', 502) }
+    } catch {
+      throw new TranslationError('invalid_response', 'O KPassword retornou uma resposta inválida.', 502)
+    }
   }
 
-  async ping() { await this.ready; await this.rpc('ping', {}) }
+  async ping() {
+    await this.ready
+    await this.rpc('ping', {})
+  }
 }
 
 let client: BridgeClient | undefined
 process.once('exit', () => client?.close())
-export function closeBridge() { client?.close() }
+export function closeBridge() {
+  client?.close()
+}
 
 export async function checkBridgeConnection() {
   const status = await inspectBridge()
   if (!status.available) throw new TranslationError('bridge_unavailable', status.message, 503)
   client ??= new BridgeClient()
   await client.ping()
-  return { available: true, message: 'Conexão com o KPassword verificada, sem enviar textos nem consumir cota. Credenciais e modelos serão conferidos na primeira tradução.' }
+  return {
+    available: true,
+    message:
+      'Conexão com o KPassword verificada, sem enviar textos nem consumir cota. Credenciais e modelos serão conferidos na primeira tradução.',
+  }
 }
 
 export async function requestThroughBridge(profile: ModelProfile, body: Record<string, unknown>): Promise<unknown> {
   const status = await inspectBridge()
   if (!status.available) throw new TranslationError('bridge_unavailable', status.message, 503)
-  if (Buffer.byteLength(JSON.stringify(body)) > 1024 * 1024 - 2048) throw new TranslationError('request_too_large', 'A cena ultrapassa o limite de envio do KPassword.')
+  if (Buffer.byteLength(JSON.stringify(body)) > 1024 * 1024 - 2048)
+    throw new TranslationError('request_too_large', 'A cena ultrapassa o limite de envio do KPassword.')
   client ??= new BridgeClient()
   return client.call(profile, body)
 }

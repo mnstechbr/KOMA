@@ -10,10 +10,7 @@ const sectionParamsSchema = z.object({
 })
 
 function unauthorized() {
-  return NextResponse.json(
-    { message: 'Token inválido ou expirado', error: 'Unauthorized', statusCode: 401 },
-    { status: 401 }
-  )
+  return NextResponse.json({ message: 'Token inválido ou expirado', error: 'Unauthorized', statusCode: 401 }, { status: 401 })
 }
 
 export async function GET(request: Request, { params }: RouteParams) {

@@ -13,11 +13,35 @@ export async function POST(request: Request, { params }: Context) {
   const detail = worksRepository.detail(numericId(id), auth.user.id)
   const chapter = detail?.chapters.find((item) => item.id === numericId(chapterId))
   if (!detail || !chapter) return NextResponse.json({ message: 'Capítulo não encontrado.' }, { status: 404 })
-  const body = await request.json().catch(() => ({})) as { pageId?: unknown; kind?: unknown; note?: unknown; balloonId?: unknown; github?: unknown }
-  if (!Number.isInteger(body.pageId) || !REPORT_KINDS.includes(body.kind as ReportKind) || (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > 500))) return NextResponse.json({ message: 'Informe a página e o tipo de erro.' }, { status: 400 })
-  const report = addQualityReport(worksRepository.database, chapter.id, body.pageId as number, body.kind as ReportKind, (body.note as string | undefined) || '', Number.isInteger(body.balloonId) ? body.balloonId as number : null)
+  const body = (await request.json().catch(() => ({}))) as {
+    pageId?: unknown
+    kind?: unknown
+    note?: unknown
+    balloonId?: unknown
+    github?: unknown
+  }
+  if (
+    !Number.isInteger(body.pageId) ||
+    !REPORT_KINDS.includes(body.kind as ReportKind) ||
+    (body.note !== undefined && (typeof body.note !== 'string' || body.note.length > 500))
+  )
+    return NextResponse.json({ message: 'Informe a página e o tipo de erro.' }, { status: 400 })
+  const report = addQualityReport(
+    worksRepository.database,
+    chapter.id,
+    body.pageId as number,
+    body.kind as ReportKind,
+    (body.note as string | undefined) || '',
+    Number.isInteger(body.balloonId) ? (body.balloonId as number) : null,
+  )
   if (!report) return NextResponse.json({ message: 'Página não encontrada.' }, { status: 404 })
   // "Enviar para o GitHub": só o link da issue preenchida; quem envia é a pessoa, no navegador.
-  const issueUrl = body.github === true ? issueLink(worksRepository.database, report.image, report.kind, report.note, { language: chapter.language, target: detail.work.targetLanguage }) : undefined
+  const issueUrl =
+    body.github === true
+      ? issueLink(worksRepository.database, report.image, report.kind, report.note, {
+          language: chapter.language,
+          target: detail.work.targetLanguage,
+        })
+      : undefined
   return NextResponse.json({ ok: true, issueUrl })
 }

@@ -9,15 +9,34 @@ test('só rede local e só as rotas de leitura', () => {
   assert.equal(allowed('GET', '/movel/ler/1/2'), true)
   assert.equal(allowed('GET', '/api/local/works/3/chapters/9'), true)
   assert.equal(allowed('POST', '/api/local/works/3/chapters/9'), true)
-  for (const [method, path] of [['GET', '/inicio/preferencias'], ['GET', '/api/openrouter'], ['PUT', '/api/local/mobile'], ['PATCH', '/api/local/works/3'], ['GET', '/api/deepl'], ['POST', '/api/local/works']]) assert.equal(allowed(method, path), false)
+  for (const [method, path] of [
+    ['GET', '/inicio/preferencias'],
+    ['GET', '/api/openrouter'],
+    ['PUT', '/api/local/mobile'],
+    ['PATCH', '/api/local/works/3'],
+    ['GET', '/api/deepl'],
+    ['POST', '/api/local/works'],
+  ])
+    assert.equal(allowed(method, path), false)
 })
 
 test('entra com o QR code ou o código e repassa só o permitido', async () => {
   const seen = []
-  const backend = http.createServer((request, response) => { seen.push({ url: request.url, host: request.headers.host, cookie: request.headers.cookie }); response.setHeader('Set-Cookie', 'koma-session=x'); response.end('ok') })
+  const backend = http.createServer((request, response) => {
+    seen.push({ url: request.url, host: request.headers.host, cookie: request.headers.cookie })
+    response.setHeader('Set-Cookie', 'koma-session=x')
+    response.end('ok')
+  })
   await new Promise((resolve) => backend.listen(0, '127.0.0.1', resolve))
   const backendUrl = `http://127.0.0.1:${backend.address().port}`
-  const server = await startMobileServer({ port: 0, token: 'a'.repeat(32), code: '123456', backendUrl, sessionToken: 'desktop-token', language: 'pt-BR' })
+  const server = await startMobileServer({
+    port: 0,
+    token: 'a'.repeat(32),
+    code: '123456',
+    backendUrl,
+    sessionToken: 'desktop-token',
+    language: 'pt-BR',
+  })
   const base = `http://127.0.0.1:${server.port}`
   try {
     assert.equal((await fetch(`${base}/movel`)).status, 401)
@@ -30,7 +49,29 @@ test('entra com o QR code ou o código e repassa só o permitido', async () => {
     assert.equal(page.headers.get('set-cookie'), null)
     assert.deepEqual(seen.at(-1), { url: '/movel', host: new URL(backendUrl).host, cookie: 'koma-session=desktop-token; koma-lang=pt-BR' })
     assert.equal((await fetch(`${base}/inicio/preferencias`, { headers: { cookie } })).status, 404)
-    for (let attempt = 0; attempt < 5; attempt++) assert.equal((await fetch(`${base}/entrar`, { method: 'POST', body: 'code=000000', headers: { 'content-type': 'application/x-www-form-urlencoded' } })).status, 403)
-    assert.equal((await fetch(`${base}/entrar`, { method: 'POST', body: 'code=123456', headers: { 'content-type': 'application/x-www-form-urlencoded' } })).status, 429)
-  } finally { await server.stop(); backend.close() }
+    for (let attempt = 0; attempt < 5; attempt++)
+      assert.equal(
+        (
+          await fetch(`${base}/entrar`, {
+            method: 'POST',
+            body: 'code=000000',
+            headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          })
+        ).status,
+        403,
+      )
+    assert.equal(
+      (
+        await fetch(`${base}/entrar`, {
+          method: 'POST',
+          body: 'code=123456',
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+        })
+      ).status,
+      429,
+    )
+  } finally {
+    await server.stop()
+    backend.close()
+  }
 })

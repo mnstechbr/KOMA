@@ -41,7 +41,6 @@ import {
   type ImageNaturalSize,
 } from './model'
 
-
 export function OcrTextOverlay({
   imageId,
   items,
@@ -87,11 +86,7 @@ export function OcrTextOverlay({
   onSelectItem?: (imageId: number, itemId: number) => void
   onClearSelection?: () => void
   onMoveItem?: (imageId: number, itemId: number, dx: number, dy: number) => void
-  onResizeItem?: (
-    imageId: number,
-    itemId: number,
-    payload: { dx: number; dy: number; widthScale: number; heightScale: number }
-  ) => void
+  onResizeItem?: (imageId: number, itemId: number, payload: { dx: number; dy: number; widthScale: number; heightScale: number }) => void
   onOpenQuickEditor?: (payload: { imageId: number; itemId: number; leftPercent: number; topPercent: number }) => void
   dragEnabledItemId?: number | null
   selectionModeEnabled?: boolean
@@ -180,10 +175,7 @@ export function OcrTextOverlay({
     }
   })()
 
-  const handleResizeSelectionPreview = (
-    corner: 'top-left' | 'bottom-right',
-    event: React.PointerEvent<HTMLDivElement>
-  ) => {
+  const handleResizeSelectionPreview = (corner: 'top-left' | 'bottom-right', event: React.PointerEvent<HTMLDivElement>) => {
     if (!selectionPreviewData || !onSelectionPreviewChange) return
     event.preventDefault()
     event.stopPropagation()
@@ -191,8 +183,7 @@ export function OcrTextOverlay({
     const pointerTarget = event.currentTarget
     try {
       pointerTarget.setPointerCapture(event.pointerId)
-    } catch {
-    }
+    } catch {}
 
     const pointerId = event.pointerId
     const minScreenPx = 18
@@ -254,8 +245,7 @@ export function OcrTextOverlay({
       window.removeEventListener('pointercancel', clearListeners)
       try {
         pointerTarget.releasePointerCapture(pointerId)
-      } catch {
-      }
+      } catch {}
     }
 
     window.addEventListener('pointermove', handlePointerMove)
@@ -275,8 +265,7 @@ export function OcrTextOverlay({
     const pointerTarget = event.currentTarget
     try {
       pointerTarget.setPointerCapture(event.pointerId)
-    } catch {
-    }
+    } catch {}
 
     const overlayElement = overlayRef.current
     const overlayRect = overlayElement?.getBoundingClientRect()
@@ -322,12 +311,7 @@ export function OcrTextOverlay({
 
       onSelectionDraftReady({
         imageId,
-        box: [
-          Math.round(x1),
-          Math.round(y1),
-          Math.round(x2),
-          Math.round(y2),
-        ],
+        box: [Math.round(x1), Math.round(y1), Math.round(x2), Math.round(y2)],
         leftPercent: clampPercent(((x1 + x2) / 2 / refWidth) * 100),
         topPercent: clampPercent((y1 / refHeight) * 100),
       })
@@ -351,8 +335,7 @@ export function OcrTextOverlay({
       window.removeEventListener('pointercancel', handlePointerCancel)
       try {
         pointerTarget.releasePointerCapture(pointerId)
-      } catch {
-      }
+      } catch {}
     }
 
     const handlePointerUp = (upEvent: PointerEvent) => {
@@ -377,15 +360,11 @@ export function OcrTextOverlay({
       onPointerDown={handleOverlayPointerDown}
       className={cn(
         'absolute inset-0 z-10',
-        (editable || Boolean(onOpenQuickEditor) || selectionModeEnabled)
-          ? 'pointer-events-auto'
-          : 'pointer-events-none',
-        selectionModeEnabled && 'cursor-crosshair touch-none'
+        editable || Boolean(onOpenQuickEditor) || selectionModeEnabled ? 'pointer-events-auto' : 'pointer-events-none',
+        selectionModeEnabled && 'cursor-crosshair touch-none',
       )}
     >
-      {selectionModeEnabled && (
-        <div className="pointer-events-none absolute inset-0 z-[5] bg-black/35" />
-      )}
+      {selectionModeEnabled && <div className="pointer-events-none absolute inset-0 z-[5] bg-black/35" />}
       {selectionPreviewData && (
         <>
           <div
@@ -470,27 +449,27 @@ export function OcrTextOverlay({
         const itemFontScale = clampRange(
           override?.fontScale ?? OCR_OVERLAY_ITEM_FONT_SCALE_DEFAULT,
           OCR_OVERLAY_ITEM_FONT_SCALE_MIN,
-          OCR_OVERLAY_ITEM_FONT_SCALE_MAX
+          OCR_OVERLAY_ITEM_FONT_SCALE_MAX,
         )
         const itemSizeScale = clampRange(
           override?.sizeScale ?? OCR_OVERLAY_ITEM_SIZE_DEFAULT,
           OCR_OVERLAY_ITEM_SIZE_MIN,
-          OCR_OVERLAY_ITEM_SIZE_MAX
+          OCR_OVERLAY_ITEM_SIZE_MAX,
         )
         const itemWidthScale = clampRange(
           override?.widthScale ?? OCR_OVERLAY_ITEM_AXIS_SCALE_DEFAULT,
           OCR_OVERLAY_ITEM_AXIS_SCALE_MIN,
-          OCR_OVERLAY_ITEM_AXIS_SCALE_MAX
+          OCR_OVERLAY_ITEM_AXIS_SCALE_MAX,
         )
         const itemHeightScale = clampRange(
           override?.heightScale ?? OCR_OVERLAY_ITEM_AXIS_SCALE_DEFAULT,
           OCR_OVERLAY_ITEM_AXIS_SCALE_MIN,
-          OCR_OVERLAY_ITEM_AXIS_SCALE_MAX
+          OCR_OVERLAY_ITEM_AXIS_SCALE_MAX,
         )
         const itemDensity = clampRange(
           override?.density ?? OCR_OVERLAY_ITEM_DENSITY_DEFAULT,
           OCR_OVERLAY_ITEM_DENSITY_MIN,
-          OCR_OVERLAY_ITEM_DENSITY_MAX
+          OCR_OVERLAY_ITEM_DENSITY_MAX,
         )
         const shape = override?.shape ?? globalShape
 
@@ -574,16 +553,9 @@ export function OcrTextOverlay({
         const hasTranslatedText = item.translatedText.trim().length > 0
         const hasOcrText = item.ocrText.trim().length > 0
         const originalTextValue = item.ocrText || item.translatedText
-        const translatedTextValue = (
-          showTranslatingPlaceholder
-          && hasOcrText
-          && !hasTranslatedText
-        )
-          ? 'Traduzindo...'
-          : (item.translatedText || item.ocrText)
-        const textValue = textMode === 'original'
-          ? originalTextValue
-          : translatedTextValue
+        const translatedTextValue =
+          showTranslatingPlaceholder && hasOcrText && !hasTranslatedText ? 'Traduzindo...' : item.translatedText || item.ocrText
+        const textValue = textMode === 'original' ? originalTextValue : translatedTextValue
         const displayedWidth = Math.max(1, movedWidth * ratioX)
         const displayedHeight = Math.max(1, movedHeight * ratioY)
         const baseFontPxUnscaled = movedHeight * 0.23 * Math.min(ratioX, ratioY) * OCR_OVERLAY_DEFAULT_FONT_SCALE
@@ -591,13 +563,8 @@ export function OcrTextOverlay({
         const compactText = textValue.replace(/\s+/g, ' ').trim()
         const explicitLineCount = Math.max(1, textValue.split('\n').length)
         const approxCharsPerLine = Math.max(1, Math.floor(displayedWidth / Math.max(1, baseFontPxUnscaled * 0.56)))
-        const longestWordLength = compactText
-          .split(/\s+/)
-          .reduce((max, token) => Math.max(max, token.length), 1)
-        const estimatedLineCount = Math.max(
-          explicitLineCount,
-          Math.ceil(Math.max(1, compactText.length) / approxCharsPerLine)
-        )
+        const longestWordLength = compactText.split(/\s+/).reduce((max, token) => Math.max(max, token.length), 1)
+        const estimatedLineCount = Math.max(explicitLineCount, Math.ceil(Math.max(1, compactText.length) / approxCharsPerLine))
         const maxFontByHeight = displayedHeight / Math.max(1, estimatedLineCount * 1.2)
         const maxFontByWidth = displayedWidth / Math.max(2, longestWordLength * 0.62)
         const fitFontSize = Math.min(baseFontPx, maxFontByHeight, maxFontByWidth)
@@ -606,7 +573,7 @@ export function OcrTextOverlay({
         const effectiveDensity = clampRange(
           safeOverlayDensity * itemDensity,
           OCR_OVERLAY_DENSITY_MIN,
-          OCR_OVERLAY_DENSITY_MAX * OCR_OVERLAY_ITEM_DENSITY_MAX
+          OCR_OVERLAY_DENSITY_MAX * OCR_OVERLAY_ITEM_DENSITY_MAX,
         )
         const baseAlpha = sampledColors?.baseAlpha ?? 0.88
         const backgroundAlpha = clampRange(baseAlpha * effectiveDensity * safeOverlayOpacity, 0.08, 0.98)
@@ -616,18 +583,9 @@ export function OcrTextOverlay({
         const textColor = sampledColors?.textColor ?? 'rgba(15,23,42,0.96)'
         const isSelected = editable && selectedItemId === item.id
         const isDragEnabledForItem = editable && dragEnabledItemId === item.id
-        const showResizeHandles = Boolean(
-          editable
-          && isSelected
-          && onResizeItem
-          && !selectionModeEnabled
-          && !selectionPreviewData
-        )
+        const showResizeHandles = Boolean(editable && isSelected && onResizeItem && !selectionModeEnabled && !selectionPreviewData)
 
-        const handleResizePointerDown = (
-          corner: 'top-left' | 'bottom-right',
-          event: React.PointerEvent<HTMLDivElement>
-        ) => {
+        const handleResizePointerDown = (corner: 'top-left' | 'bottom-right', event: React.PointerEvent<HTMLDivElement>) => {
           if (!onResizeItem) return
           event.preventDefault()
           event.stopPropagation()
@@ -635,8 +593,7 @@ export function OcrTextOverlay({
           const pointerTarget = event.currentTarget
           try {
             pointerTarget.setPointerCapture(event.pointerId)
-          } catch {
-          }
+          } catch {}
 
           const pointerId = event.pointerId
           const minScreenPx = 18
@@ -677,12 +634,12 @@ export function OcrTextOverlay({
             const nextWidthScale = clampRange(
               targetWidth / Math.max(1, baseWidth * itemSizeScale),
               OCR_OVERLAY_ITEM_AXIS_SCALE_MIN,
-              OCR_OVERLAY_ITEM_AXIS_SCALE_MAX
+              OCR_OVERLAY_ITEM_AXIS_SCALE_MAX,
             )
             const nextHeightScale = clampRange(
               targetHeight / Math.max(1, baseHeight * itemSizeScale),
               OCR_OVERLAY_ITEM_AXIS_SCALE_MIN,
-              OCR_OVERLAY_ITEM_AXIS_SCALE_MAX
+              OCR_OVERLAY_ITEM_AXIS_SCALE_MAX,
             )
             const nextWidth = baseWidth * itemSizeScale * nextWidthScale
             const nextHeight = baseHeight * itemSizeScale * nextHeightScale
@@ -737,8 +694,7 @@ export function OcrTextOverlay({
             window.removeEventListener('pointercancel', clearListeners)
             try {
               pointerTarget.releasePointerCapture(pointerId)
-            } catch {
-            }
+            } catch {}
           }
 
           window.addEventListener('pointermove', handlePointerMove)
@@ -755,11 +711,11 @@ export function OcrTextOverlay({
             const previousTap = lastTapRef.current
             const isSameItem = previousTap?.itemId === item.id
             const isQuickDoubleTap = Boolean(
-              previousTap
-                && isSameItem
-                && (now - previousTap.at) <= OCR_OVERLAY_QUICK_EDITOR_DOUBLE_TAP_MS
-                && Math.abs(event.clientX - previousTap.x) <= OCR_OVERLAY_QUICK_EDITOR_TAP_MOVE_PX
-                && Math.abs(event.clientY - previousTap.y) <= OCR_OVERLAY_QUICK_EDITOR_TAP_MOVE_PX
+              previousTap &&
+              isSameItem &&
+              now - previousTap.at <= OCR_OVERLAY_QUICK_EDITOR_DOUBLE_TAP_MS &&
+              Math.abs(event.clientX - previousTap.x) <= OCR_OVERLAY_QUICK_EDITOR_TAP_MOVE_PX &&
+              Math.abs(event.clientY - previousTap.y) <= OCR_OVERLAY_QUICK_EDITOR_TAP_MOVE_PX,
             )
 
             if (isQuickDoubleTap) {
@@ -793,8 +749,7 @@ export function OcrTextOverlay({
           const pointerId = event.pointerId
           try {
             pointerTarget.setPointerCapture(pointerId)
-          } catch {
-          }
+          } catch {}
 
           onSelectItem?.(imageId, item.id)
 
@@ -821,8 +776,7 @@ export function OcrTextOverlay({
             window.removeEventListener('pointercancel', clearListeners)
             try {
               pointerTarget.releasePointerCapture(pointerId)
-            } catch {
-            }
+            } catch {}
           }
 
           window.addEventListener('pointermove', handlePointerMove)
@@ -839,7 +793,7 @@ export function OcrTextOverlay({
               className={cn(
                 'absolute z-20 flex items-center justify-center overflow-hidden px-1 text-center font-semibold select-none',
                 shape === 'oval' ? 'rounded-[999px]' : 'rounded-[4px]',
-                (selectionModeEnabled || Boolean(selectionPreviewData))
+                selectionModeEnabled || Boolean(selectionPreviewData)
                   ? 'pointer-events-none'
                   : editable
                     ? isDragEnabledForItem
@@ -848,7 +802,7 @@ export function OcrTextOverlay({
                     : onOpenQuickEditor
                       ? 'cursor-pointer pointer-events-auto'
                       : 'pointer-events-none',
-                isSelected && 'ring-2 ring-primary/60'
+                isSelected && 'ring-2 ring-primary/60',
               )}
               style={{
                 left: `${left}%`,

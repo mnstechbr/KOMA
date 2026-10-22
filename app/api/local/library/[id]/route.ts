@@ -10,8 +10,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const { id } = await params
   const sectionId = Number(id)
   const body = await request.json().catch(() => null)
-  if (!Number.isInteger(sectionId) || sectionId < 1 || !body ||
-    (typeof body.favorite !== 'boolean' && body.opened !== true)) {
+  if (!Number.isInteger(sectionId) || sectionId < 1 || !body || (typeof body.favorite !== 'boolean' && body.opened !== true)) {
     return NextResponse.json({ message: 'Preferência inválida.' }, { status: 400 })
   }
   const result = updateLibraryPreference(user.id, sectionId, {

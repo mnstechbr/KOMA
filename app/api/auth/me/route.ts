@@ -5,10 +5,7 @@ export async function GET(request: Request) {
   const user = await requireUser(request)
 
   if (!user) {
-    return NextResponse.json(
-      { message: 'Token inválido ou expirado', error: 'Unauthorized', statusCode: 401 },
-      { status: 401 }
-    )
+    return NextResponse.json({ message: 'Token inválido ou expirado', error: 'Unauthorized', statusCode: 401 }, { status: 401 })
   }
 
   return NextResponse.json({

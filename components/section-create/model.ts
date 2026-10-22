@@ -40,7 +40,6 @@ export interface SectionCategoryResponse {
   error?: string
 }
 
-
 export type UploadMode = 'pdf' | 'pdf-batch' | 'images'
 
 export const STATIC_LANGUAGES: LanguageOption[] = [
@@ -73,7 +72,6 @@ export const MAX_BATCH_PDFS = 3
 export const MAX_BATCH_PDFS_ROLE4 = 10
 export const SECTION_CATEGORY_MAX_LENGTH = 64
 
-
 export function isPdfFile(file: File) {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
 }
@@ -87,10 +85,7 @@ export function getPdfBaseName(fileName: string) {
 }
 
 export function buildSectionNameSuggestionFromPdf(fileName: string) {
-  return getPdfBaseName(fileName)
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+  return getPdfBaseName(fileName).replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 export function buildSectionNameSuggestionFromImage(fileName: string) {
@@ -162,9 +157,7 @@ export function getPreparingOverallProgress(state: PreparingState | null) {
   if (!state || state.totalFiles <= 0) return 0
 
   const filesDoneBeforeCurrent = Math.max(0, state.currentFileIndex - 1)
-  const currentFileProgress = state.totalPages > 0
-    ? Math.min(1, state.processedPages / state.totalPages)
-    : 0
+  const currentFileProgress = state.totalPages > 0 ? Math.min(1, state.processedPages / state.totalPages) : 0
 
   const overall = ((filesDoneBeforeCurrent + currentFileProgress) / state.totalFiles) * 100
   return Math.min(100, Math.max(0, overall))
@@ -209,8 +202,7 @@ export function toSectionCategoryKey(value: string) {
 
 export function isMobileDevice() {
   if (typeof navigator === 'undefined') return false
-  return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) ||
-    (typeof window !== 'undefined' && window.innerWidth < 768)
+  return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) || (typeof window !== 'undefined' && window.innerWidth < 768)
 }
 
 export function getHardwareConcurrency() {
@@ -237,11 +229,7 @@ export function getPdfParallelChunksDefault() {
 
 export function canvasToBlob(canvas: HTMLCanvasElement, mimeType: string, quality: number) {
   return new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob(
-      (b) => (b ? resolve(b) : reject(new Error('Falha ao converter página para imagem.'))),
-      mimeType,
-      quality
-    )
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Falha ao converter página para imagem.'))), mimeType, quality),
   )
 }
 
@@ -272,10 +260,7 @@ export let _pdfjsLib: typeof import('pdfjs-dist') | null = null
 export async function getPdfjsLib() {
   if (!_pdfjsLib) {
     const lib = await import('pdfjs-dist')
-    lib.GlobalWorkerOptions.workerSrc = new URL(
-      'pdfjs-dist/build/pdf.worker.min.mjs',
-      import.meta.url
-    ).toString()
+    lib.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
     _pdfjsLib = lib
   }
   return _pdfjsLib
@@ -284,7 +269,7 @@ export async function getPdfjsLib() {
 export async function extractPdfToImages(
   pdfFile: File,
   onProgress: (processedPages: number, totalPages: number) => void,
-  options?: { maxPages?: number | null; parallelChunks?: number | null }
+  options?: { maxPages?: number | null; parallelChunks?: number | null },
 ): Promise<File[]> {
   const pdfjsLib = await getPdfjsLib()
 
@@ -320,12 +305,8 @@ export async function extractPdfToImages(
   const isHugePdf = totalPages >= 120 || fileSizeMb >= 120
   const isLargePdf = totalPages >= 60 || fileSizeMb >= 60
 
-  const targetMegaPixels = mobile
-    ? (isHugePdf ? 0.75 : isLargePdf ? 0.95 : 1.2)
-    : (isHugePdf ? 1.2 : isLargePdf ? 1.6 : 2.0)
-  const tunedMegaPixels = lowMemoryDevice
-    ? Math.max(0.7, targetMegaPixels - (mobile ? 0.1 : 0.3))
-    : targetMegaPixels
+  const targetMegaPixels = mobile ? (isHugePdf ? 0.75 : isLargePdf ? 0.95 : 1.2) : isHugePdf ? 1.2 : isLargePdf ? 1.6 : 2.0
+  const tunedMegaPixels = lowMemoryDevice ? Math.max(0.7, targetMegaPixels - (mobile ? 0.1 : 0.3)) : targetMegaPixels
 
   const maxScale = mobile ? 1.45 : 1.7
   const minScale = mobile ? 0.85 : 1.0
@@ -333,25 +314,30 @@ export async function extractPdfToImages(
   const scale = Math.min(maxScale, Math.max(minScale, dynamicScale))
 
   const imageQuality = useWebp
-    ? (
-      mobile
-        ? (isLargePdf ? 0.64 : 0.68)
-        : (isHugePdf ? 0.68 : isLargePdf ? 0.72 : 0.76)
-    )
-    : (
-      mobile
-        ? (isLargePdf ? 0.68 : 0.72)
-        : (isHugePdf ? 0.72 : isLargePdf ? 0.76 : 0.8)
-    )
+    ? mobile
+      ? isLargePdf
+        ? 0.64
+        : 0.68
+      : isHugePdf
+        ? 0.68
+        : isLargePdf
+          ? 0.72
+          : 0.76
+    : mobile
+      ? isLargePdf
+        ? 0.68
+        : 0.72
+      : isHugePdf
+        ? 0.72
+        : isLargePdf
+          ? 0.76
+          : 0.8
 
   const highEndDesktop = !mobile && !lowMemoryDevice && hardwareConcurrency >= 8
-  const concurrencyCap = mobile ? 4 : (highEndDesktop ? 12 : (lowMemoryDevice ? 6 : 9))
+  const concurrencyCap = mobile ? 4 : highEndDesktop ? 12 : lowMemoryDevice ? 6 : 9
   const baseConcurrency = Math.max(2, Math.floor(hardwareConcurrency / (mobile ? 2 : 1.5)))
   const hugePdfPenalty = isHugePdf ? 2 : 0
-  const concurrency = Math.max(
-    1,
-    Math.min(concurrencyCap, totalPages, baseConcurrency - hugePdfPenalty)
-  )
+  const concurrency = Math.max(1, Math.min(concurrencyCap, totalPages, baseConcurrency - hugePdfPenalty))
   onProgress(0, totalPages)
 
   let completedCount = 0
@@ -383,11 +369,7 @@ export async function extractPdfToImages(
       let pendingBlob: Promise<Blob> | null = null
       let pendingPageNum = -1
 
-      for (
-        let pageNum = range.start + slotIndex;
-        pageNum <= range.end;
-        pageNum += chunkConcurrency
-      ) {
+      for (let pageNum = range.start + slotIndex; pageNum <= range.end; pageNum += chunkConcurrency) {
         if (((pageNum - range.start) / chunkConcurrency) % 8 === 0) {
           await yieldToUI()
         }
@@ -424,9 +406,7 @@ export async function extractPdfToImages(
       slot.canvas.height = 0
     }
 
-    await Promise.all(
-      Array.from({ length: chunkConcurrency }, (_, i) => runSlot(i))
-    )
+    await Promise.all(Array.from({ length: chunkConcurrency }, (_, i) => runSlot(i)))
   }
 
   await Promise.all(ranges.map((range) => runChunk(range)))

@@ -60,7 +60,9 @@ let runtimePromise: Promise<NodeOcrRuntime> | null = null
 export type OcrDevice = 'cpu' | 'webgpu'
 const ocrConfig: { device: OcrDevice; threads: number } = { device: 'cpu', threads: 0 }
 /** Dispositivo em uso pelo OCR (os modelos de apagamento seguem o mesmo). */
-export function ocrDevice() { return ocrConfig.device }
+export function ocrDevice() {
+  return ocrConfig.device
+}
 
 export function configureOcr(next: { device: OcrDevice; threads: number }) {
   if (next.device === ocrConfig.device && next.threads === ocrConfig.threads) return
@@ -74,60 +76,107 @@ export async function probeGpu(): Promise<{ available: boolean; ms: number | nul
   try {
     const started = performance.now()
     const session = await ort.InferenceSession.create(YOLO_MODEL_PATH, { executionProviders: ['webgpu'], logSeverityLevel: 4 })
-    const input = new ort.Tensor('float32', new Float32Array(3 * DETECT_IMAGE_SIZE * DETECT_IMAGE_SIZE).fill(0.5), [1, 3, DETECT_IMAGE_SIZE, DETECT_IMAGE_SIZE])
+    const input = new ort.Tensor('float32', new Float32Array(3 * DETECT_IMAGE_SIZE * DETECT_IMAGE_SIZE).fill(0.5), [
+      1,
+      3,
+      DETECT_IMAGE_SIZE,
+      DETECT_IMAGE_SIZE,
+    ])
     await session.run({ [session.inputNames[0]]: input })
     const ms = Math.round(performance.now() - started)
     await session.release().catch(() => undefined)
     return { available: true, ms }
-  } catch { return { available: false, ms: null } }
+  } catch {
+    return { available: false, ms: null }
+  }
 }
 
 export async function extractTextBoxesNode(imageBytes: Buffer, language = 'auto') {
   const runtime = await getRuntime()
-  const metadata = await sharp(imageBytes, {limitInputPixels:50000000}).metadata()
-  const width = metadata.width!; const height = metadata.height!
-  if (height <= width*2.5) return runtime.extractTextBoxes(imageBytes, language)
+  const metadata = await sharp(imageBytes, { limitInputPixels: 50000000 }).metadata()
+  const width = metadata.width!
+  const height = metadata.height!
+  if (height <= width * 2.5) return runtime.extractTextBoxes(imageBytes, language)
   // Uma tira vertical inteira reduzida a 640 px torna os balões invisíveis.
   // Janelas sobrepostas mantêm escala e coordenadas no arquivo original.
-  const started = performance.now(); const found: Array<Detection & { tile: number }> = []
-  const tileHeight = Math.min(height,Math.round(width*1.8)); const overlap = Math.round(width*0.3)
+  const started = performance.now()
+  const found: Array<Detection & { tile: number }> = []
+  const tileHeight = Math.min(height, Math.round(width * 1.8))
+  const overlap = Math.round(width * 0.3)
   // A página é decodificada uma vez só; cada janela é um trecho das mesmas linhas
   // de pixels (sem copiar nem gerar PNG), e as janelas são lidas TILE_TASKS por vez.
   const raw = await decodeRgb(imageBytes)
   const tops: number[] = []
-  for (let top = 0; ; top += tileHeight - overlap) { tops.push(top); if (top + Math.min(tileHeight, height - top) >= height) break }
+  for (let top = 0; ; top += tileHeight - overlap) {
+    tops.push(top)
+    if (top + Math.min(tileHeight, height - top) >= height) break
+  }
   const results: Array<Awaited<ReturnType<NodeOcrRuntime['extractTextBoxes']>>> = new Array(tops.length)
   let next = 0
-  await Promise.all(Array.from({ length: Math.min(TILE_TASKS, tops.length) }, async () => {
-    for (let index = next++; index < tops.length; index = next++) {
-      const top = tops[index]; const cropHeight = Math.min(tileHeight, height - top)
-      const row = raw.width * raw.channels
-      results[index] = await runtime.extractTextBoxes({ data: raw.data.subarray(top * row, (top + cropHeight) * row), width: raw.width, height: cropHeight, channels: raw.channels }, language)
-    }
-  }))
+  await Promise.all(
+    Array.from({ length: Math.min(TILE_TASKS, tops.length) }, async () => {
+      for (let index = next++; index < tops.length; index = next++) {
+        const top = tops[index]
+        const cropHeight = Math.min(tileHeight, height - top)
+        const row = raw.width * raw.channels
+        results[index] = await runtime.extractTextBoxes(
+          { data: raw.data.subarray(top * row, (top + cropHeight) * row), width: raw.width, height: cropHeight, channels: raw.channels },
+          language,
+        )
+      }
+    }),
+  )
   for (const [tile, result] of results.entries()) {
     const top = tops[tile]
     for (const detection of result.detections) {
-      const box:Detection['box'] = [detection.box[0],detection.box[1]+top,detection.box[2],detection.box[3]+top]
-      const lines = detection.lines?.map(([x1,y1,x2,y2]):[number,number,number,number]=>[x1,y1+top,x2,y2+top])
-      found.push({...detection,box,lines,tile})
+      const box: Detection['box'] = [detection.box[0], detection.box[1] + top, detection.box[2], detection.box[3] + top]
+      const lines = detection.lines?.map(([x1, y1, x2, y2]): [number, number, number, number] => [x1, y1 + top, x2, y2 + top])
+      found.push({ ...detection, box, lines, tile })
     }
   }
   // Um balão na emenda entre duas janelas aparece cortado nas duas: juntar as
   // metades (linhas de ambas) e ler o balão inteiro na imagem original.
   const detections: Detection[] = []
   for (const group of mergeTileGroups(found)) {
-    if (group.length === 1) { const single: Detection = { ...group[0] }; delete (single as Partial<TileDetection>).tile; detections.push({ ...single, det_id: detections.length }); continue }
+    if (group.length === 1) {
+      const single: Detection = { ...group[0] }
+      delete (single as Partial<TileDetection>).tile
+      detections.push({ ...single, det_id: detections.length })
+      continue
+    }
     const merged = mergeLines(group.flatMap((item) => item.lines || [])).map(([x1, y1, x2, y2]) => ({ x1, y1, x2, y2, score: 1 }))
-    const box: Detection['box'] = [Math.min(...group.map((d) => d.box[0])), Math.min(...group.map((d) => d.box[1])), Math.max(...group.map((d) => d.box[2])), Math.max(...group.map((d) => d.box[3]))]
+    const box: Detection['box'] = [
+      Math.min(...group.map((d) => d.box[0])),
+      Math.min(...group.map((d) => d.box[1])),
+      Math.max(...group.map((d) => d.box[2])),
+      Math.max(...group.map((d) => d.box[3])),
+    ]
     const read = merged.length ? await runtime.readLines(raw, width, height, merged, language) : null
     const text = read ? keptText(read.kept) : ''
-    const lines = merged.filter((line) => !read?.promo.has(line)).map((line): [number, number, number, number] => [line.x1, line.y1, line.x2, line.y2])
+    const lines = merged
+      .filter((line) => !read?.promo.has(line))
+      .map((line): [number, number, number, number] => [line.x1, line.y1, line.x2, line.y2])
     const longest = [...group].sort((x, y) => y.ocr_text.length - x.ocr_text.length)[0]
-    detections.push({ det_id: detections.length, cls_name: group.some((d) => d.cls_name === 'class_0') ? 'class_0' : longest.cls_name, conf: Math.max(...group.map((d) => d.conf)), box, ocr_text: text || longest.ocr_text, ocr_error: '', lines })
+    detections.push({
+      det_id: detections.length,
+      cls_name: group.some((d) => d.cls_name === 'class_0') ? 'class_0' : longest.cls_name,
+      conf: Math.max(...group.map((d) => d.conf)),
+      box,
+      ocr_text: text || longest.ocr_text,
+      ocr_error: '',
+      lines,
+    })
   }
   const unique = dedupeDetections(detections)
-  return {width,height,detections_count:unique.length,elapsed_ms:elapsedMs(started),timings_ms:{},slowest_stage:'ocr',detections:unique}
+  return {
+    width,
+    height,
+    detections_count: unique.length,
+    elapsed_ms: elapsedMs(started),
+    timings_ms: {},
+    slowest_stage: 'ocr',
+    detections: unique,
+  }
 }
 
 export async function recognizeImageTextNode(imageBytes: Buffer, timeoutSec = 10, language = 'auto') {
@@ -159,7 +208,7 @@ class NodeOcrRuntime {
     private readonly latinRecDict: string[],
     private readonly koreanRecSession: ort.InferenceSession | null,
     private readonly koreanRecDict: string[],
-    private readonly detSession: ort.InferenceSession | null
+    private readonly detSession: ort.InferenceSession | null,
   ) {}
 
   static async create() {
@@ -218,15 +267,26 @@ class NodeOcrRuntime {
     const order = readingRows(group).flatMap((row, index) => row.map((line) => ({ line, row: index })))
     for (const { line, row } of order) {
       try {
-        const crop = await openPixels(imageBytes).extract({ left: Math.floor(line.x1), top: Math.floor(line.y1), width: Math.max(1, Math.min(width - Math.floor(line.x1), Math.ceil(line.x2 - line.x1))), height: Math.max(1, Math.min(height - Math.floor(line.y1), Math.ceil(line.y2 - line.y1))) }).png().toBuffer()
+        const crop = await openPixels(imageBytes)
+          .extract({
+            left: Math.floor(line.x1),
+            top: Math.floor(line.y1),
+            width: Math.max(1, Math.min(width - Math.floor(line.x1), Math.ceil(line.x2 - line.x1))),
+            height: Math.max(1, Math.min(height - Math.floor(line.y1), Math.ceil(line.y2 - line.y1))),
+          })
+          .png()
+          .toBuffer()
         let { text: raw, score } = await this.recognizeLineScored(crop, language)
         // Letra estilizada (pincel, branca em balão escuro) costuma sair como uma
         // letra só numa linha larga. Nesse caso, lê de novo a linha binarizada e
         // separada em sublinhas, e fica com a leitura mais completa.
         const letters = (raw.match(/[\p{L}\p{N}]/gu) || []).length
-        if (latin && line.y2 - line.y1 >= 40 && letters < Math.max(3, (line.x2 - line.x1) / Math.max(1, line.y2 - line.y1) * 1.2)) {
+        if (latin && line.y2 - line.y1 >= 40 && letters < Math.max(3, ((line.x2 - line.x1) / Math.max(1, line.y2 - line.y1)) * 1.2)) {
           const retry = await this.readStylizedLine(crop, language)
-          if ((retry.match(/[\p{L}]/gu) || []).length > Math.max(letters, 2)) { raw = retry; score = 1 }
+          if ((retry.match(/[\p{L}]/gu) || []).length > Math.max(letters, 2)) {
+            raw = retry
+            score = 1
+          }
         }
         const text = raw.trim()
         // Traços, marcas e caracteres soltos de outro alfabeto não são fala.
@@ -235,10 +295,18 @@ class NodeOcrRuntime {
         // Em capítulo latino, linha com letras coreanas, japonesas ou chinesas é
         // crédito ou efeito da edição original, não fala.
         if (latin && (text.match(/[\u1100-\u11ff\u3040-\u30ff\u3130-\u318f\u3400-\u9fff\uac00-\ud7af]/g) || []).length >= 2) continue
-        if (isPromoText(text)) { promo.add(line); continue }
-        if (latin && score < MIN_LINE_SCORE) { if (score >= 0.35 && (text.match(/[\p{L}]/gu) || []).length >= 3) weak.push({ line, text, score, row }); continue }
+        if (isPromoText(text)) {
+          promo.add(line)
+          continue
+        }
+        if (latin && score < MIN_LINE_SCORE) {
+          if (score >= 0.35 && (text.match(/[\p{L}]/gu) || []).length >= 3) weak.push({ line, text, score, row })
+          continue
+        }
         kept.push({ line, text, score, row })
-      } catch { /* Linha ilegível não invalida o bloco. */ }
+      } catch {
+        /* Linha ilegível não invalida o bloco. */
+      }
     }
     // Linha de leitura incerta no meio de uma fala lida com segurança ("H OLD!" no
     // fim de "...FOR THE CIRCLE TO"): do mesmo tamanho e colada nas outras, é parte
@@ -246,10 +314,12 @@ class NodeOcrRuntime {
     if (kept.some((item) => item.score >= 0.8)) {
       const heights = kept.map((item) => item.line.y2 - item.line.y1).sort((a, b) => a - b)
       const median = heights[Math.floor(heights.length / 2)]
-      const top = Math.min(...kept.map((item) => item.line.y1)); const bottom = Math.max(...kept.map((item) => item.line.y2))
+      const top = Math.min(...kept.map((item) => item.line.y1))
+      const bottom = Math.max(...kept.map((item) => item.line.y2))
       for (const item of weak) {
         const height = item.line.y2 - item.line.y1
-        if (height >= median * 0.6 && height <= median * 1.6 && item.line.y1 <= bottom + median * 0.5 && item.line.y2 >= top - median * 0.5) kept.push(item)
+        if (height >= median * 0.6 && height <= median * 1.6 && item.line.y1 <= bottom + median * 0.5 && item.line.y2 >= top - median * 0.5)
+          kept.push(item)
       }
       kept.sort((a, b) => order.findIndex((entry) => entry.line === a.line) - order.findIndex((entry) => entry.line === b.line))
     }
@@ -269,7 +339,12 @@ class NodeOcrRuntime {
       const text = normalizeOcrText(parts.map((part) => part.text).join(' '))
       const letters = (text.match(/[\p{L}]/gu) || []).length
       // Só leitura confiável e com cara de palavra: efeitos e traços viram lixo aqui.
-      const score = parts.reduce((sum, part) => sum + part.score * part.text.length, 0) / Math.max(1, parts.reduce((sum, part) => sum + part.text.length, 0))
+      const score =
+        parts.reduce((sum, part) => sum + part.score * part.text.length, 0) /
+        Math.max(
+          1,
+          parts.reduce((sum, part) => sum + part.text.length, 0),
+        )
       if (letters >= 4 && score >= 0.5 && /[A-Za-zÀ-ÿ]{3,}/.test(text) && letters > (best.match(/[\p{L}]/gu) || []).length) best = text
     }
     return best
@@ -298,11 +373,12 @@ class NodeOcrRuntime {
     // letra pequena lado a lado é de balões encostados (mangá), cada um com sua fala.
     const apart = (a: TextBox, b: TextBox) => Math.min(a.y2 - a.y1, b.y2 - b.y1) < raw.width * 0.07
     const rowOf = new Map(lines.map((line) => [line, [line]]))
-    for (const a of lines) for (const b of lines) {
-      if (a === b || rowOf.get(a) === rowOf.get(b) || !sameRow(a, b, apart)) continue
-      const merged = [...rowOf.get(a)!, ...rowOf.get(b)!]
-      for (const line of merged) rowOf.set(line, merged)
-    }
+    for (const a of lines)
+      for (const b of lines) {
+        if (a === b || rowOf.get(a) === rowOf.get(b) || !sameRow(a, b, apart)) continue
+        const merged = [...rowOf.get(a)!, ...rowOf.get(b)!]
+        for (const line of merged) rowOf.set(line, merged)
+      }
     // Recortes das linhas saem dos pixels já decodificados.
     const readLines = (group: TextBox[]) => this.readLines(raw, raw.width, raw.height, group, language)
     const joined = keptText
@@ -315,7 +391,9 @@ class NodeOcrRuntime {
       const cropBox = expandBox(box, raw.width, raw.height, CROP_MARGIN)
       // Linha pertence ao balão quando a maior parte dela está dentro da caixa,
       // mesmo que o detector tenha cortado a borda do balão.
-      const within = (line: TextBox, crop: Box) => Math.max(0, Math.min(line.x2, crop.x2) - Math.max(line.x1, crop.x1)) * Math.max(0, Math.min(line.y2, crop.y2) - Math.max(line.y1, crop.y1))
+      const within = (line: TextBox, crop: Box) =>
+        Math.max(0, Math.min(line.x2, crop.x2) - Math.max(line.x1, crop.x1)) *
+        Math.max(0, Math.min(line.y2, crop.y2) - Math.max(line.y1, crop.y1))
       const area = (line: TextBox) => Math.max(1, (line.x2 - line.x1) * (line.y2 - line.y1))
       const holds = (crop: Box, line: TextBox) => within(line, crop) / area(line) > 0.5
       // Linha solta: fora de todas as caixas do detector.
@@ -324,12 +402,15 @@ class NodeOcrRuntime {
       // lado de "TRAP...") entra; fileira quase toda solta (narração que só encosta
       // na caixa) não é deste balão. Palavras de outro balão na mesma altura não contam.
       const candidates = lines.filter((line) => !used.has(line) && holds(cropBox, line))
-      const inside = [...new Set(candidates.map((line) => rowOf.get(line)!))].flatMap((row) => {
-        const loose = row.filter((line) => !holds(cropBox, line) && free(line))
-        const mine = row.filter((line) => holds(cropBox, line))
-        const share = mine.reduce((sum, line) => sum + within(line, cropBox), 0) / [...mine, ...loose].reduce((sum, line) => sum + area(line), 0)
-        return share >= 0.5 ? [...mine, ...loose] : []
-      }).filter((line) => !used.has(line))
+      const inside = [...new Set(candidates.map((line) => rowOf.get(line)!))]
+        .flatMap((row) => {
+          const loose = row.filter((line) => !holds(cropBox, line) && free(line))
+          const mine = row.filter((line) => holds(cropBox, line))
+          const share =
+            mine.reduce((sum, line) => sum + within(line, cropBox), 0) / [...mine, ...loose].reduce((sum, line) => sum + area(line), 0)
+          return share >= 0.5 ? [...mine, ...loose] : []
+        })
+        .filter((line) => !used.has(line))
       // Linha logo acima ou abaixo das linhas do balão, que saiu da caixa do
       // detector ("ENERGY!" embaixo de "...WITH MERE DEMONIC"), é da mesma fala.
       for (let grew = inside.length > 0; grew;) {
@@ -340,9 +421,16 @@ class NodeOcrRuntime {
             const height = Math.min(other.y2 - other.y1, line.y2 - line.y1)
             const gap = Math.max(other.y1, line.y1) - Math.min(other.y2, line.y2)
             const overlapX = Math.min(other.x2, line.x2) - Math.max(other.x1, line.x1)
-            return gap <= height * 0.5 && overlapX >= Math.min(other.x2 - other.x1, line.x2 - line.x1) * 0.5 && Math.max(other.y2 - other.y1, line.y2 - line.y1) <= height * 1.6
+            return (
+              gap <= height * 0.5 &&
+              overlapX >= Math.min(other.x2 - other.x1, line.x2 - line.x1) * 0.5 &&
+              Math.max(other.y2 - other.y1, line.y2 - line.y1) <= height * 1.6
+            )
           })
-          if (near) { inside.push(line); grew = true }
+          if (near) {
+            inside.push(line)
+            grew = true
+          }
         }
       }
       inside.forEach((line) => used.add(line))
@@ -354,9 +442,19 @@ class NodeOcrRuntime {
           const text = joined(read.kept)
           if (!text) continue
           const own = group.lines.filter((line) => !read.promo.has(line))
-          const gx1 = Math.min(...own.map((l) => l.x1)); const gy1 = Math.min(...own.map((l) => l.y1))
-          const gx2 = Math.max(...own.map((l) => l.x2)); const gy2 = Math.max(...own.map((l) => l.y2))
-          detections.push({ det_id: detections.length, cls_name: 'class_0', conf: box.conf, box: [Math.round(gx1), Math.round(gy1), Math.round(gx2), Math.round(gy2)], ocr_text: text, ocr_error: '', lines: own.map(roundLine) })
+          const gx1 = Math.min(...own.map((l) => l.x1))
+          const gy1 = Math.min(...own.map((l) => l.y1))
+          const gx2 = Math.max(...own.map((l) => l.x2))
+          const gy2 = Math.max(...own.map((l) => l.y2))
+          detections.push({
+            det_id: detections.length,
+            cls_name: 'class_0',
+            conf: box.conf,
+            box: [Math.round(gx1), Math.round(gy1), Math.round(gx2), Math.round(gy2)],
+            ocr_text: text,
+            ocr_error: '',
+            lines: own.map(roundLine),
+          })
         }
         continue
       }
@@ -374,7 +472,14 @@ class NodeOcrRuntime {
         // Sem linhas próprias: se o texto da área já pertence a outro balão, é a
         // outra metade do mesmo balão (caixa duplicada) e não vira fala nova.
         // Linhas na caixa que pertencem a uma fileira de fora também contam como texto de outra fala.
-        const taken = !inside.length && candidates.length > 0 || !inside.length && lines.some((line) => used.has(line) && overlapRatio([line.x1, line.y1, line.x2, line.y2], [cropBox.x1, cropBox.y1, cropBox.x2, cropBox.y2]) > 0.3)
+        const taken =
+          (!inside.length && candidates.length > 0) ||
+          (!inside.length &&
+            lines.some(
+              (line) =>
+                used.has(line) &&
+                overlapRatio([line.x1, line.y1, line.x2, line.y2], [cropBox.x1, cropBox.y1, cropBox.x2, cropBox.y2]) > 0.3,
+            ))
         if (taken) continue
         if (!text) text = await this.extractTextFromCrop(imageBytes, cropBox, language)
       } catch (err) {
@@ -389,12 +494,25 @@ class NodeOcrRuntime {
         ocr_text: text,
         ocr_error: error,
         // Sem linhas detectadas: a área central do balão serve de referência para apagar.
-        lines: own.length ? own.map(roundLine) : [roundLine({ x1: box.x1 + (box.x2 - box.x1) * 0.15, y1: box.y1 + (box.y2 - box.y1) * 0.15, x2: box.x2 - (box.x2 - box.x1) * 0.15, y2: box.y2 - (box.y2 - box.y1) * 0.15, score: 0 })],
+        lines: own.length
+          ? own.map(roundLine)
+          : [
+              roundLine({
+                x1: box.x1 + (box.x2 - box.x1) * 0.15,
+                y1: box.y1 + (box.y2 - box.y1) * 0.15,
+                x2: box.x2 - (box.x2 - box.x1) * 0.15,
+                y2: box.y2 - (box.y2 - box.y1) * 0.15,
+                score: 0,
+              }),
+            ],
       })
     }
 
     // Texto fora de balões (narração, legendas sobre a arte).
-    for (const group of groupLines(lines.filter((line) => !used.has(line)), apart)) {
+    for (const group of groupLines(
+      lines.filter((line) => !used.has(line)),
+      apart,
+    )) {
       // Só as linhas lidas como fala entram no bloco: traços, efeitos sonoros
       // e marcas d'água ao redor não ampliam a área apagada.
       const read = await readLines(group.lines)
@@ -403,7 +521,13 @@ class NodeOcrRuntime {
       if (isPromoText(joined(read.kept)) || (read.promo.size && read.promo.size >= read.kept.length)) continue
       // O bloco foi juntado por uma linha que não era fala (efeito sonoro coreano
       // entre dois balões): sem ela, as falas voltam a ser separadas.
-      const parts = read.kept.length > 1 ? groupLines(read.kept.map((item) => item.line), apart) : [{ lines: read.kept.map((item) => item.line) }]
+      const parts =
+        read.kept.length > 1
+          ? groupLines(
+              read.kept.map((item) => item.line),
+              apart,
+            )
+          : [{ lines: read.kept.map((item) => item.line) }]
       for (const part of parts) {
         const kept = read.kept.filter((item) => part.lines.includes(item.line))
         const text = joined(kept)
@@ -412,11 +536,26 @@ class NodeOcrRuntime {
         if (letters < 3 && !(letters >= 2 && /[!?.]/.test(text) && kept.every((item) => item.score >= 0.8))) continue
         if (isPromoText(text)) continue
         const keptLines = kept.map((item) => item.line)
-        const block = { lines: keptLines, score: group.score, x1: Math.min(...keptLines.map((l) => l.x1)), y1: Math.min(...keptLines.map((l) => l.y1)), x2: Math.max(...keptLines.map((l) => l.x2)), y2: Math.max(...keptLines.map((l) => l.y2)) }
+        const block = {
+          lines: keptLines,
+          score: group.score,
+          x1: Math.min(...keptLines.map((l) => l.x1)),
+          y1: Math.min(...keptLines.map((l) => l.y1)),
+          x2: Math.max(...keptLines.map((l) => l.x2)),
+          y2: Math.max(...keptLines.map((l) => l.y2)),
+        }
         // Letra miúda solta sobre o desenho (marca d'água, assinatura) não é fala.
         const blockLineHeight = [...block.lines.map((l) => l.y2 - l.y1)].sort((a, b) => a - b)[Math.floor(block.lines.length / 2)]
         if (blockLineHeight < raw.width * 0.026) continue
-        detections.push({ det_id: detections.length, cls_name: 'text', conf: block.score, box: [Math.round(block.x1), Math.round(block.y1), Math.round(block.x2), Math.round(block.y2)], ocr_text: text, ocr_error: '', lines: block.lines.map(roundLine) })
+        detections.push({
+          det_id: detections.length,
+          cls_name: 'text',
+          conf: block.score,
+          box: [Math.round(block.x1), Math.round(block.y1), Math.round(block.x2), Math.round(block.y2)],
+          ocr_text: text,
+          ocr_error: '',
+          lines: block.lines.map(roundLine),
+        })
       }
     }
     timings.ocr = elapsedMs(tOcr)
@@ -436,7 +575,7 @@ class NodeOcrRuntime {
 
   async recognizeImageText(imageBytes: Buffer, timeoutSec: number, language = 'auto') {
     const started = performance.now()
-    const deadline = started + (Math.max(1, timeoutSec) * 1000)
+    const deadline = started + Math.max(1, timeoutSec) * 1000
     const lines = await segmentTextLines(imageBytes)
     const recognized: string[] = []
     const errors: string[] = []
@@ -455,7 +594,7 @@ class NodeOcrRuntime {
     }
 
     return {
-      extracted_text: normalizeOcrText(recognized.join('\n')) || await this.recognizeLine(imageBytes,language),
+      extracted_text: normalizeOcrText(recognized.join('\n')) || (await this.recognizeLine(imageBytes, language)),
       elapsed_ms: elapsedMs(started),
       timeout_sec: Math.round(timeoutSec),
       ocr_variant_best: 'node-onnx-recognition',
@@ -479,7 +618,7 @@ class NodeOcrRuntime {
         const dst = y * DETECT_IMAGE_SIZE + x
         floatData[dst] = input[src] / 255
         floatData[plane + dst] = input[src + 1] / 255
-        floatData[(plane * 2) + dst] = input[src + 2] / 255
+        floatData[plane * 2 + dst] = input[src + 2] / 255
       }
     }
 
@@ -516,7 +655,9 @@ class NodeOcrRuntime {
     return isSpeechLine(whole.text, whole.score, language) ? whole.text.trim() : ''
   }
 
-  private async recognizeLine(lineBuffer: Buffer, language = 'auto') { return (await this.recognizeLineScored(lineBuffer, language)).text }
+  private async recognizeLine(lineBuffer: Buffer, language = 'auto') {
+    return (await this.recognizeLineScored(lineBuffer, language)).text
+  }
 
   private async recognizeLineScored(lineBuffer: Buffer, language = 'auto') {
     if (/^ko(-|$)/i.test(language)) {
@@ -534,7 +675,9 @@ class NodeOcrRuntime {
     return scoreText(latin.text) > scoreText(main.text) ? latin : main
   }
 
-  supportsKorean() { return Boolean(this.koreanRecSession) }
+  supportsKorean() {
+    return Boolean(this.koreanRecSession)
+  }
 
   private async recognizeLineWith(session: ort.InferenceSession, dict: string[], lineBuffer: Buffer) {
     const { data, width } = await prepareRecognitionInput(lineBuffer)

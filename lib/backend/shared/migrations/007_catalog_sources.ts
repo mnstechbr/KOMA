@@ -1,5 +1,7 @@
 export const migration007CatalogSources = {
-  version: 7, name: '007_catalog_sources', up: `
+  version: 7,
+  name: '007_catalog_sources',
+  up: `
     ALTER TABLE work_chapters ADD COLUMN version_attempts INTEGER NOT NULL DEFAULT 0;
     CREATE TABLE work_catalog_sources (
       work_id INTEGER NOT NULL REFERENCES works(id), provider TEXT NOT NULL,

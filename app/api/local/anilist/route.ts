@@ -8,7 +8,8 @@ import { anilistStatus, connectAniList, disconnectAniList, saveClientId, syncAni
 async function guard(request?: Request) {
   const auth = await requireAdmin()
   if ('response' in auth) return { response: auth.response }
-  if (request && (process.env.KOMA_DESKTOP !== '1' || !isTrustedOrigin(request))) return { response: NextResponse.json({ message: 'Ação não autorizada.' }, { status: 403 }) }
+  if (request && (process.env.KOMA_DESKTOP !== '1' || !isTrustedOrigin(request)))
+    return { response: NextResponse.json({ message: 'Ação não autorizada.' }, { status: 403 }) }
   return { userId: auth.user.id }
 }
 
@@ -22,7 +23,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const auth = await guard(request)
   if ('response' in auth) return auth.response
-  const body = await request.json().catch(() => ({})) as { clientId?: unknown; token?: unknown; sync?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { clientId?: unknown; token?: unknown; sync?: unknown }
   try {
     if (typeof body.clientId === 'string') saveClientId(db, body.clientId.trim())
     if (typeof body.token === 'string') await connectAniList(db, body.token)

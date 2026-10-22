@@ -8,4 +8,12 @@ import { shellMessages } from './messages/shell'
 import { sourcesMessages } from './messages/sources'
 
 // Novos arquivos de mensagens entram nesta lista.
-export const catalog = mergeCatalogs(shellMessages, languageMessages, libraryMessages, pagesMessages, preferencesMessages, sourcesMessages, performanceMessages)
+export const catalog = mergeCatalogs(
+  shellMessages,
+  languageMessages,
+  libraryMessages,
+  pagesMessages,
+  preferencesMessages,
+  sourcesMessages,
+  performanceMessages,
+)

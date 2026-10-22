@@ -9,7 +9,9 @@ const { startBackend } = require('../backend.cjs')
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'koma-backend-'))
-  fs.writeFileSync(path.join(root, 'server.js'), `
+  fs.writeFileSync(
+    path.join(root, 'server.js'),
+    `
     const http = require('node:http');
     const server = http.createServer((req, res) => {
       res.setHeader('Content-Type', 'application/json');
@@ -17,7 +19,8 @@ function fixture() {
     });
     server.listen(Number(process.env.PORT), process.env.HOSTNAME);
     process.on('SIGTERM', () => server.close(() => process.exit(0)));
-  `)
+  `,
+  )
   return root
 }
 
@@ -56,7 +59,11 @@ test('falha de inicialização não deixa um processo supervisor ativo', async (
 
 test('pastas do Windows ficam em AppData e o runtime é node.exe', () => {
   const { desktopPaths, bundledNode } = require('../paths.cjs')
-  const paths = desktopPaths({ APPDATA: 'C:\\Users\\J\\AppData\\Roaming', LOCALAPPDATA: 'C:\\Users\\J\\AppData\\Local' }, 'win32', 'C:\\Users\\J')
+  const paths = desktopPaths(
+    { APPDATA: 'C:\\Users\\J\\AppData\\Roaming', LOCALAPPDATA: 'C:\\Users\\J\\AppData\\Local' },
+    'win32',
+    'C:\\Users\\J',
+  )
   assert.equal(paths.configDir, 'C:\\Users\\J\\AppData\\Roaming\\KOMA')
   assert.equal(paths.dataDir, 'C:\\Users\\J\\AppData\\Local\\KOMA\\library')
   assert.equal(paths.logDir, 'C:\\Users\\J\\AppData\\Local\\KOMA\\logs')

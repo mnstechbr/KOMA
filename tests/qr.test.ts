@@ -3,7 +3,9 @@ import { qrMatrix, reedSolomon } from '../lib/qr'
 
 describe('QR code de "Ler no celular"', () => {
   it('calcula a correção Reed-Solomon do exemplo da norma (HELLO WORLD, 1-M)', () => {
-    expect(reedSolomon([32, 91, 11, 120, 209, 114, 220, 77, 67, 64, 236, 17, 236, 17, 236, 17], 10)).toEqual([196, 35, 39, 119, 235, 215, 231, 226, 93, 23])
+    expect(reedSolomon([32, 91, 11, 120, 209, 114, 220, 77, 67, 64, 236, 17, 236, 17, 236, 17], 10)).toEqual([
+      196, 35, 39, 119, 235, 215, 231, 226, 93, 23,
+    ])
   })
   it('escolhe a versão pelo tamanho e desenha localizadores e temporização', () => {
     const matrix = qrMatrix('http://192.168.15.23:47321/?k=0123456789abcdef0123')

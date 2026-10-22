@@ -1,6 +1,6 @@
 name: Erro de tradução / Translation error
 description: Uma fala ficou errada numa página traduzida. / A line came out wrong on a translated page.
-title: "[Tradução] "
+title: '[Tradução] '
 body:
   - type: markdown
     attributes:
@@ -11,26 +11,26 @@ body:
     id: versao
     attributes:
       label: Versão do KOMA / KOMA version
-      placeholder: "0.4.58"
+      placeholder: '0.4.58'
     validations:
       required: true
   - type: input
     id: sistema
     attributes:
       label: Sistema / System
-      placeholder: "Linux x64, Windows 11"
+      placeholder: 'Linux x64, Windows 11'
   - type: input
     id: tipo
     attributes:
       label: Tipo de erro / Error type
-      placeholder: "Texto em inglês sobrando, frase fora do balão, letra grande demais, nome errado"
+      placeholder: 'Texto em inglês sobrando, frase fora do balão, letra grande demais, nome errado'
     validations:
       required: true
   - type: input
     id: idiomas
     attributes:
       label: Idiomas (origem → destino) / Languages (source → target)
-      placeholder: "en → pt-br"
+      placeholder: 'en → pt-br'
   - type: textarea
     id: ocr
     attributes:

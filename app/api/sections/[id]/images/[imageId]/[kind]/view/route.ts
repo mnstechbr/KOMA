@@ -13,35 +13,23 @@ export async function GET(_: Request, { params }: RouteParams) {
   const user = authController.getUserFromToken(token)
 
   if (!user) {
-    return Response.json(
-      { message: 'Token inválido ou expirado', error: 'Unauthorized', statusCode: 401 },
-      { status: 401 }
-    )
+    return Response.json({ message: 'Token inválido ou expirado', error: 'Unauthorized', statusCode: 401 }, { status: 401 })
   }
 
   const { id, imageId, kind } = await params
   if (kind !== 'original' && kind !== 'translated') {
-    return Response.json(
-      { message: 'Tipo de imagem inválido', error: 'Bad Request', statusCode: 400 },
-      { status: 400 }
-    )
+    return Response.json({ message: 'Tipo de imagem inválido', error: 'Bad Request', statusCode: 400 }, { status: 400 })
   }
 
   const sectionId = Number.parseInt(id, 10)
   const parsedImageId = Number.parseInt(imageId, 10)
   if (!Number.isFinite(sectionId) || !Number.isFinite(parsedImageId)) {
-    return Response.json(
-      { message: 'Parâmetros inválidos', error: 'Bad Request', statusCode: 400 },
-      { status: 400 }
-    )
+    return Response.json({ message: 'Parâmetros inválidos', error: 'Bad Request', statusCode: 400 }, { status: 400 })
   }
 
   const file = sectionsController.resolveImageFile(sectionId, parsedImageId, kind, user.id)
   if (!file) {
-    return Response.json(
-      { message: 'Imagem não encontrada', error: 'Not Found', statusCode: 404 },
-      { status: 404 }
-    )
+    return Response.json({ message: 'Imagem não encontrada', error: 'Not Found', statusCode: 404 }, { status: 404 })
   }
 
   const buffer = fs.readFileSync(file.filePath)

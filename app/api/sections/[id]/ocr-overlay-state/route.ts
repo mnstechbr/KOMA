@@ -29,17 +29,12 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   try {
     const payload = await request.json()
     const bodyRecord = asObjectRecord(payload)
-    const rawState = bodyRecord && Object.prototype.hasOwnProperty.call(bodyRecord, 'state')
-      ? bodyRecord.state
-      : payload
+    const rawState = bodyRecord && Object.prototype.hasOwnProperty.call(bodyRecord, 'state') ? bodyRecord.state : payload
 
     const result = await overlayStateService.saveState(id, user.id, rawState)
     if (!result.ok) {
       if (result.error === 'too-large') {
-        return NextResponse.json(
-          { message: 'Estado do overlay excede o tamanho máximo permitido.' },
-          { status: 413 }
-        )
+        return NextResponse.json({ message: 'Estado do overlay excede o tamanho máximo permitido.' }, { status: 413 })
       }
       return NextResponse.json({ message: 'Payload de estado inválido.' }, { status: 400 })
     }
@@ -47,9 +42,6 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ ok: true, state: result.state })
   } catch (error) {
     console.error('Overlay state route error:', error)
-    return NextResponse.json(
-      { message: 'Erro ao salvar estado do overlay.' },
-      { status: 500 }
-    )
+    return NextResponse.json({ message: 'Erro ao salvar estado do overlay.' }, { status: 500 })
   }
 }

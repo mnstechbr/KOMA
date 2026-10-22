@@ -8,13 +8,16 @@ describe('OCR em processo separado', () => {
   it('manda os pedidos ao worker e devolve o resultado; o apagamento volta para o mesmo buffer', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koma-ml-'))
     const file = path.join(dir, 'ml-worker.mjs')
-    fs.writeFileSync(file, `import { parentPort } from 'node:worker_threads'
+    fs.writeFileSync(
+      file,
+      `import { parentPort } from 'node:worker_threads'
 parentPort.on('message', ({ id, method, args }) => {
   if (method === 'extract') parentPort.postMessage({ id, value: { detections: [{ ocr_text: 'bytes:' + args[0].length + ':' + args[1] }] } })
   else if (method === 'inpaint') { args[0].fill(7); parentPort.postMessage({ id, value: { ok: true, data: args[0] } }) }
   else if (method === 'probe') parentPort.postMessage({ id, error: 'sem placa' })
   else parentPort.postMessage({ id, value: true })
-})`)
+})`,
+    )
     vi.stubEnv('KOMA_ML_WORKER', file)
     const ml = await import('../lib/server/ml')
     expect(ml.separateMl()).toBe(true)

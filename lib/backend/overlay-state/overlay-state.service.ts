@@ -1,23 +1,9 @@
 import type { OverlayStateRepository } from './overlay-state.repository'
-import type {
-  OverlayItemOverrideState,
-  OverlayManualItemState,
-  OverlayStateRecord,
-  SaveOverlayStateResult,
-} from './overlay-state.types'
+import type { OverlayItemOverrideState, OverlayManualItemState, OverlayStateRecord, SaveOverlayStateResult } from './overlay-state.types'
 
 const MAX_OVERLAY_STATE_BYTES = 900_000
 
-const ALLOWED_FONT_FAMILIES = new Set([
-  'sans',
-  'serif',
-  'mono',
-  'comic',
-  'manga',
-  'anime',
-  'manhwa',
-  'condensed',
-])
+const ALLOWED_FONT_FAMILIES = new Set(['sans', 'serif', 'mono', 'comic', 'manga', 'anime', 'manhwa', 'condensed'])
 const ALLOWED_SHAPES = new Set(['rect', 'oval'])
 
 function asObjectRecord(value: unknown) {
@@ -131,12 +117,18 @@ function sanitizeManualItems(rawValue: unknown) {
       const y2 = clampRange(Math.max(y1Raw, y2Raw), 0, 100_000)
       if (x2 <= x1 || y2 <= y1) continue
 
-      const ocrTextRaw = typeof imageManualItem.ocr_text === 'string'
-        ? imageManualItem.ocr_text
-        : (typeof imageManualItem.ocrText === 'string' ? imageManualItem.ocrText : '')
-      const translatedTextRaw = typeof imageManualItem.translated_text === 'string'
-        ? imageManualItem.translated_text
-        : (typeof imageManualItem.translatedText === 'string' ? imageManualItem.translatedText : '')
+      const ocrTextRaw =
+        typeof imageManualItem.ocr_text === 'string'
+          ? imageManualItem.ocr_text
+          : typeof imageManualItem.ocrText === 'string'
+            ? imageManualItem.ocrText
+            : ''
+      const translatedTextRaw =
+        typeof imageManualItem.translated_text === 'string'
+          ? imageManualItem.translated_text
+          : typeof imageManualItem.translatedText === 'string'
+            ? imageManualItem.translatedText
+            : ''
       const ocrText = ocrTextRaw.trim().slice(0, 12_000)
       const translatedText = translatedTextRaw.trim().slice(0, 12_000)
       if (!ocrText && !translatedText) continue
@@ -207,7 +199,6 @@ function sanitizeOverlayState(rawValue: unknown): OverlayStateRecord | null {
     updated_at: new Date().toISOString(),
   }
 }
-
 
 export class OverlayStateService {
   constructor(private readonly repository: OverlayStateRepository) {}

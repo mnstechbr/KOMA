@@ -5,7 +5,10 @@ export type UploadedImage = {
 }
 
 function normalizeMime(value: string | null) {
-  return String(value || '').split(';', 1)[0].trim().toLowerCase()
+  return String(value || '')
+    .split(';', 1)[0]
+    .trim()
+    .toLowerCase()
 }
 
 function bufferFromDataUrl(value: string) {
@@ -28,9 +31,7 @@ async function imageFromJson(request: Request): Promise<UploadedImage | null> {
 
   if (!payload || typeof payload !== 'object') return null
   const body = payload as Record<string, unknown>
-  const dataUrl = typeof body.dataUrl === 'string'
-    ? body.dataUrl
-    : (typeof body.imageDataUrl === 'string' ? body.imageDataUrl : '')
+  const dataUrl = typeof body.dataUrl === 'string' ? body.dataUrl : typeof body.imageDataUrl === 'string' ? body.imageDataUrl : ''
   const fromDataUrl = dataUrl ? bufferFromDataUrl(dataUrl) : null
   if (fromDataUrl) {
     return {

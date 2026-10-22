@@ -7,7 +7,15 @@ import type { OcrDevice } from './manga-ocr-node'
 // compilado (koma-ml/ml-worker.mjs, ver scripts/build-ml-worker.mjs); sem ele
 // (testes, modo de desenvolvimento) tudo roda como antes, na própria thread.
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void }
-const shared = globalThis as typeof globalThis & { __komaMl?: { worker: Worker | null; next: number; pending: Map<number, Pending>; config: { device: OcrDevice; threads: number } | null; promo: string[] } }
+const shared = globalThis as typeof globalThis & {
+  __komaMl?: {
+    worker: Worker | null
+    next: number
+    pending: Map<number, Pending>
+    config: { device: OcrDevice; threads: number } | null
+    promo: string[]
+  }
+}
 const state = (shared.__komaMl ||= { worker: null, next: 1, pending: new Map(), config: null, promo: [] })
 
 function workerFile() {
@@ -24,7 +32,8 @@ function worker() {
     const pending = state.pending.get(id)
     if (!pending) return
     state.pending.delete(id)
-    if (error !== undefined) pending.reject(new Error(error)); else pending.resolve(value)
+    if (error !== undefined) pending.reject(new Error(error))
+    else pending.resolve(value)
   })
   // Worker caiu (falta de memória, erro nativo): os pedidos em andamento falham e o próximo cria outro.
   const fail = (reason: string) => {
@@ -33,7 +42,10 @@ function worker() {
     for (const pending of state.pending.values()) pending.reject(new Error(reason))
     state.pending.clear()
   }
-  created.on('error', (error) => { console.error('[KOMA] OCR separado falhou', { message: error.message }); fail(error.message) })
+  created.on('error', (error) => {
+    console.error('[KOMA] OCR separado falhou', { message: error.message })
+    fail(error.message)
+  })
   created.on('exit', (code) => fail(`OCR separado encerrou (${code}).`))
   state.worker = created
   if (state.config) void call('configure', [state.config])
@@ -54,20 +66,33 @@ export function shareMlPromoNames(names: string[]) {
   if (worker()) void call('promo', [names]).catch(() => undefined)
 }
 /** O OCR roda num processo separado (pacote desktop)? */
-export function separateMl() { return Boolean(workerFile()) }
+export function separateMl() {
+  return Boolean(workerFile())
+}
 
 export async function configureMl(config: { device: OcrDevice; threads: number }) {
   if (state.config && state.config.device === config.device && state.config.threads === config.threads) return
   state.config = config
-  if (worker()) { await call('configure', [config]); return }
+  if (worker()) {
+    await call('configure', [config])
+    return
+  }
   const [{ configureOcr }, { configureInpaint }] = await Promise.all([import('./manga-ocr-node'), import('./inpaint')])
-  configureOcr(config); configureInpaint(config.device)
+  configureOcr(config)
+  configureInpaint(config.device)
 }
-export async function extractText(bytes: Buffer, language = 'auto'): Promise<Awaited<ReturnType<typeof import('./manga-ocr-node')['extractTextBoxesNode']>>> {
+export async function extractText(
+  bytes: Buffer,
+  language = 'auto',
+): Promise<Awaited<ReturnType<(typeof import('./manga-ocr-node'))['extractTextBoxesNode']>>> {
   if (worker()) return call('extract', [new Uint8Array(bytes), language])
   return (await import('./manga-ocr-node')).extractTextBoxesNode(bytes, language)
 }
-export async function recognizeText(bytes: Buffer, timeout = 10, language = 'auto'): Promise<Awaited<ReturnType<typeof import('./manga-ocr-node')['recognizeImageTextNode']>>> {
+export async function recognizeText(
+  bytes: Buffer,
+  timeout = 10,
+  language = 'auto',
+): Promise<Awaited<ReturnType<(typeof import('./manga-ocr-node'))['recognizeImageTextNode']>>> {
   if (worker()) return call('recognize', [new Uint8Array(bytes), timeout, language])
   return (await import('./manga-ocr-node')).recognizeImageTextNode(bytes, timeout, language)
 }
@@ -80,7 +105,11 @@ export async function textMaskOf(image: Buffer): Promise<Uint8Array | null> {
   return (await import('./inpaint')).textMask(image)
 }
 /** Desenha a página traduzida (no worker, quando existe; senão com os modelos daqui). */
-export async function renderPage(original: Buffer, items: import('./render-translation').RenderItem[], models?: import('./render-translation').EraseModels): Promise<Buffer> {
+export async function renderPage(
+  original: Buffer,
+  items: import('./render-translation').RenderItem[],
+  models?: import('./render-translation').EraseModels,
+): Promise<Buffer> {
   if (worker()) return Buffer.from(await call<Uint8Array>('render', [new Uint8Array(original), items]))
   return (await import('./render-translation')).renderTranslatedPage(original, items, undefined, models)
 }

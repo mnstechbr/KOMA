@@ -23,13 +23,13 @@ export function validationErrorResponse(error: ZodError) {
       statusCode: 400,
       details: toValidationIssues(error),
     },
-    { status: 400 }
+    { status: 400 },
   )
 }
 
 export function parseParams<TSchema extends ZodTypeAny>(
   payload: unknown,
-  schema: TSchema
+  schema: TSchema,
 ): { success: true; data: z.infer<TSchema> } | { success: false; response: NextResponse } {
   const result = schema.safeParse(payload)
   if (!result.success) {
@@ -37,4 +37,3 @@ export function parseParams<TSchema extends ZodTypeAny>(
   }
   return { success: true, data: result.data }
 }
-

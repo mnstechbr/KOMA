@@ -5,7 +5,7 @@ import type { ImageKind, SectionImageFileInput } from './sections.types'
 export class SectionsService {
   constructor(
     private readonly repository: SectionsRepository,
-    private readonly processing: SectionsProcessingService
+    private readonly processing: SectionsProcessingService,
   ) {}
 
   listSections(userId: number) {
@@ -13,7 +13,9 @@ export class SectionsService {
   }
 
   private formDataFlag(formData: FormData, key: string) {
-    const value = String(formData.get(key) ?? '').trim().toLowerCase()
+    const value = String(formData.get(key) ?? '')
+      .trim()
+      .toLowerCase()
     return value === '1' || value === 'true' || value === 'yes' || value === 'on'
   }
 

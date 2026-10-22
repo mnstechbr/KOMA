@@ -27,7 +27,12 @@ async function stopProcess(child, timeout = 5000) {
   }
   child.kill('SIGTERM')
   let timer
-  await Promise.race([exited, new Promise((resolve) => { timer = setTimeout(resolve, timeout) })])
+  await Promise.race([
+    exited,
+    new Promise((resolve) => {
+      timer = setTimeout(resolve, timeout)
+    }),
+  ])
   clearTimeout(timer)
   if (child.exitCode === null && child.signalCode === null) {
     child.kill('SIGKILL')
@@ -44,16 +49,25 @@ async function startBackend({ nodePath, serverDir, dataDir, logFd, parentPid = p
     stdio: ['ignore', logFd, logFd],
     windowsHide: true,
     env: {
-      ...process.env, NODE_ENV: 'production', HOSTNAME: '127.0.0.1', PORT: String(port),
-      KOMA_DESKTOP: '1', KOMA_DATA_DIR: dataDir, KOMA_INSTANCE_ID: instance,
+      ...process.env,
+      NODE_ENV: 'production',
+      HOSTNAME: '127.0.0.1',
+      PORT: String(port),
+      KOMA_DESKTOP: '1',
+      KOMA_DATA_DIR: dataDir,
+      KOMA_INSTANCE_ID: instance,
       KOMA_BOOTSTRAP_TOKEN: bootstrapToken,
-      NEXT_TELEMETRY_DISABLED: '1', SECTION_IMAGE_PROCESSING_CONCURRENCY: '2',
-      SKIP_DB_BOOTSTRAP: '0', ELECTRON_RUN_AS_NODE: '',
+      NEXT_TELEMETRY_DISABLED: '1',
+      SECTION_IMAGE_PROCESSING_CONCURRENCY: '2',
+      SKIP_DB_BOOTSTRAP: '0',
+      ELECTRON_RUN_AS_NODE: '',
       KOMA_AUTOMATION_DISABLED: automation ? '0' : '1',
     },
   })
   let spawnError
-  child.on('error', (error) => { spawnError = error })
+  child.on('error', (error) => {
+    spawnError = error
+  })
   const deadline = Date.now() + timeout
   try {
     while (Date.now() < deadline) {
@@ -64,10 +78,13 @@ async function startBackend({ nodePath, serverDir, dataDir, logFd, parentPid = p
         const health = await response.json()
         if (response.ok && health.application === 'KOMA' && health.instance === instance) {
           return {
-            child, url, stop: () => stopProcess(child),
+            child,
+            url,
+            stop: () => stopProcess(child),
             bootstrap: async () => {
               const response = await fetch(`${url}/api/local/bootstrap`, {
-                method: 'POST', headers: { 'x-koma-bootstrap-token': bootstrapToken, Origin: url },
+                method: 'POST',
+                headers: { 'x-koma-bootstrap-token': bootstrapToken, Origin: url },
                 signal: AbortSignal.timeout(15000),
               })
               if (!response.ok) throw new Error('Não foi possível abrir sua biblioteca local.')
@@ -77,7 +94,9 @@ async function startBackend({ nodePath, serverDir, dataDir, logFd, parentPid = p
             },
           }
         }
-      } catch { /* O servidor ainda pode estar carregando migrations e bibliotecas. */ }
+      } catch {
+        /* O servidor ainda pode estar carregando migrations e bibliotecas. */
+      }
       await delay(100)
     }
     throw new Error('O serviço local não ficou pronto em 30 segundos. Consulte os logs do KOMA.')

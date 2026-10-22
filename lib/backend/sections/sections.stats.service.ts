@@ -7,7 +7,6 @@ function toNum(value: unknown) {
   return Number.isFinite(n) ? n : 0
 }
 
-
 export class SectionsStatsService {
   constructor(private readonly repository: SectionsRepository) {}
 

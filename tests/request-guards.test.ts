@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  isIpHostname,
-  isStateChangingMethod,
-  isTrustedOrigin,
-  requestTargetsIpAddress,
-} from '../lib/security/request-guards'
+import { isIpHostname, isStateChangingMethod, isTrustedOrigin, requestTargetsIpAddress } from '../lib/security/request-guards'
 
 function requestWithHeaders(headers: HeadersInit, url = 'http://localhost:3080/api/example') {
   return new Request(url, { headers })
@@ -49,20 +44,41 @@ describe('request origin guards', () => {
   })
 
   it('detects requests targeting an IP address', () => {
-    expect(requestTargetsIpAddress(requestWithHeaders({
-      origin: 'http://outro-app.example',
-      host: '192.168.1.50:3080',
-    }, 'http://192.168.1.50:3080/api/local/health'))).toBe(true)
-    expect(requestTargetsIpAddress(requestWithHeaders({
-      origin: 'http://192.168.0.130:3080',
-      host: '192.168.0.130:3080',
-    }, 'http://192.168.0.130:3080/api/local/health'))).toBe(true)
+    expect(
+      requestTargetsIpAddress(
+        requestWithHeaders(
+          {
+            origin: 'http://outro-app.example',
+            host: '192.168.1.50:3080',
+          },
+          'http://192.168.1.50:3080/api/local/health',
+        ),
+      ),
+    ).toBe(true)
+    expect(
+      requestTargetsIpAddress(
+        requestWithHeaders(
+          {
+            origin: 'http://192.168.0.130:3080',
+            host: '192.168.0.130:3080',
+          },
+          'http://192.168.0.130:3080/api/local/health',
+        ),
+      ),
+    ).toBe(true)
 
-    expect(requestTargetsIpAddress(requestWithHeaders({
-      origin: 'http://outro-app.example',
-      host: '127.0.0.1:3080',
-      'x-forwarded-host': 'koma.example.com',
-    }, 'http://127.0.0.1:3080/api/local/health'))).toBe(false)
+    expect(
+      requestTargetsIpAddress(
+        requestWithHeaders(
+          {
+            origin: 'http://outro-app.example',
+            host: '127.0.0.1:3080',
+            'x-forwarded-host': 'koma.example.com',
+          },
+          'http://127.0.0.1:3080/api/local/health',
+        ),
+      ),
+    ).toBe(false)
   })
 
   it('rejects cross-origin browser requests by default', () => {

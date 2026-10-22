@@ -50,7 +50,6 @@ export type LineCrop = {
   y2: number
 }
 
-
 export function assertModelFile(filePath: string, label: string) {
   if (!fs.existsSync(filePath)) throw new Error(`${label} não encontrado: ${filePath}`)
   const header = fs.readFileSync(filePath, { encoding: null, flag: 'r' }).subarray(0, 48).toString('utf8')
@@ -68,18 +67,16 @@ export function resolveIntraOpThreads() {
 }
 
 export function readPaddleDict(filePath: string) {
-  const entries = fs.readFileSync(filePath, 'utf8').split(/\r?\n/).map((line) => line.replace(/\r$/, ''))
+  const entries = fs
+    .readFileSync(filePath, 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\r$/, ''))
   while (entries.length > 0 && entries[entries.length - 1] === '') entries.pop()
   return ['<blank>', ...entries, ' ']
 }
 
 export async function decodeRgb(imageBytes: Buffer): Promise<ImageRaw> {
-  const { data, info } = await sharp(imageBytes)
-    .rotate()
-    .removeAlpha()
-    .toColourspace('srgb')
-    .raw()
-    .toBuffer({ resolveWithObject: true })
+  const { data, info } = await sharp(imageBytes).rotate().removeAlpha().toColourspace('srgb').raw().toBuffer({ resolveWithObject: true })
   return {
     data,
     width: info.width,
@@ -100,17 +97,17 @@ export function decodeYoloOutput(output: ort.Tensor, originalWidth: number, orig
   for (let anchor = 0; anchor < anchors; anchor += 1) {
     const x = data[anchor]
     const y = data[anchors + anchor]
-    const w = data[(anchors * 2) + anchor]
-    const h = data[(anchors * 3) + anchor]
-    const confidence = data[(anchors * 4) + anchor]
-    const classConfidence = rows > 5 ? data[(anchors * 5) + anchor] : 1
+    const w = data[anchors * 2 + anchor]
+    const h = data[anchors * 3 + anchor]
+    const confidence = data[anchors * 4 + anchor]
+    const classConfidence = rows > 5 ? data[anchors * 5 + anchor] : 1
     const conf = confidence * (classConfidence > 0.01 ? classConfidence : 1)
     if (conf < DETECT_CONF) continue
 
-    const x1 = clamp((x - (w / 2)) * scaleX, 0, originalWidth)
-    const y1 = clamp((y - (h / 2)) * scaleY, 0, originalHeight)
-    const x2 = clamp((x + (w / 2)) * scaleX, 0, originalWidth)
-    const y2 = clamp((y + (h / 2)) * scaleY, 0, originalHeight)
+    const x1 = clamp((x - w / 2) * scaleX, 0, originalWidth)
+    const y1 = clamp((y - h / 2) * scaleY, 0, originalHeight)
+    const x2 = clamp((x + w / 2) * scaleX, 0, originalWidth)
+    const y2 = clamp((y + h / 2) * scaleY, 0, originalHeight)
     const area = Math.max(0, x2 - x1) * Math.max(0, y2 - y1)
     if (area < DETECT_MIN_BOX_AREA) continue
     boxes.push({ x1, y1, x2, y2, conf })
@@ -126,7 +123,7 @@ export function nonMaxSuppression(boxes: Box[], iouThreshold: number) {
     if (picked.some((existing) => iou(existing, box) > iouThreshold)) continue
     picked.push(box)
   }
-  picked.sort((a, b) => (a.y1 - b.y1) || (a.x1 - b.x1))
+  picked.sort((a, b) => a.y1 - b.y1 || a.x1 - b.x1)
   return picked
 }
 
@@ -139,21 +136,28 @@ export function mergeSplitBalloons(boxes: Box[]) {
     changed = false
     for (let i = 0; i < merged.length && !changed; i += 1) {
       for (let j = i + 1; j < merged.length; j += 1) {
-        const a = merged[i]; const b = merged[j]
+        const a = merged[i]
+        const b = merged[j]
         const overlapX = Math.min(a.x2, b.x2) - Math.max(a.x1, b.x1)
         const overlapY = Math.min(a.y2, b.y2) - Math.max(a.y1, b.y1)
         if (overlapX <= 0 || overlapY <= 0) continue
         const sideBySide = overlapY >= 0.7 * Math.min(a.y2 - a.y1, b.y2 - b.y1)
         const stacked = overlapX >= 0.7 * Math.min(a.x2 - a.x1, b.x2 - b.x1)
         if (!sideBySide && !stacked) continue
-        merged[i] = { x1: Math.min(a.x1, b.x1), y1: Math.min(a.y1, b.y1), x2: Math.max(a.x2, b.x2), y2: Math.max(a.y2, b.y2), conf: Math.max(a.conf, b.conf) }
+        merged[i] = {
+          x1: Math.min(a.x1, b.x1),
+          y1: Math.min(a.y1, b.y1),
+          x2: Math.max(a.x2, b.x2),
+          y2: Math.max(a.y2, b.y2),
+          conf: Math.max(a.conf, b.conf),
+        }
         merged.splice(j, 1)
         changed = true
         break
       }
     }
   }
-  return merged.sort((a, b) => (a.y1 - b.y1) || (a.x1 - b.x1))
+  return merged.sort((a, b) => a.y1 - b.y1 || a.x1 - b.x1)
 }
 
 export function overlapRatio(a: number[], b: number[]) {
@@ -175,7 +179,17 @@ export function lineIou(a: [number, number, number, number], b: [number, number,
 export function mergeLines(lines: Array<[number, number, number, number]>) {
   const kept: Array<[number, number, number, number]> = []
   for (const line of [...lines].sort((a, b) => lineArea(b) - lineArea(a))) {
-    if (kept.some((other) => lineIou(other, line) > 0.4 || (Math.max(0, Math.min(other[2], line[2]) - Math.max(other[0], line[0])) * Math.max(0, Math.min(other[3], line[3]) - Math.max(other[1], line[1]))) / Math.max(1, lineArea(line)) > 0.7)) continue
+    if (
+      kept.some(
+        (other) =>
+          lineIou(other, line) > 0.4 ||
+          (Math.max(0, Math.min(other[2], line[2]) - Math.max(other[0], line[0])) *
+            Math.max(0, Math.min(other[3], line[3]) - Math.max(other[1], line[1]))) /
+            Math.max(1, lineArea(line)) >
+            0.7,
+      )
+    )
+      continue
     kept.push(line)
   }
   return kept.sort((a, b) => a[1] - b[1] || a[0] - b[0])
@@ -183,23 +197,35 @@ export function mergeLines(lines: Array<[number, number, number, number]>) {
 /** Agrupa detecções de janelas diferentes que são o mesmo balão (caixa ou linha em comum). */
 export function mergeTileGroups(found: TileDetection[]) {
   const parent = found.map((_, index) => index)
-  const root = (i: number): number => parent[i] === i ? i : (parent[i] = root(parent[i]))
-  for (let i = 0; i < found.length; i++) for (let j = i + 1; j < found.length; j++) {
-    const a = found[i]; const b = found[j]
-    if (a.tile === b.tile) continue
-    const sameBox = overlapRatio(a.box, b.box) > 0.5
-    const sameLine = (a.lines || []).some((la) => (b.lines || []).some((lb) => lineIou(la, lb) > 0.4))
-    if (sameBox || sameLine) parent[root(j)] = root(i)
-  }
+  const root = (i: number): number => (parent[i] === i ? i : (parent[i] = root(parent[i])))
+  for (let i = 0; i < found.length; i++)
+    for (let j = i + 1; j < found.length; j++) {
+      const a = found[i]
+      const b = found[j]
+      if (a.tile === b.tile) continue
+      const sameBox = overlapRatio(a.box, b.box) > 0.5
+      const sameLine = (a.lines || []).some((la) => (b.lines || []).some((lb) => lineIou(la, lb) > 0.4))
+      if (sameBox || sameLine) parent[root(j)] = root(i)
+    }
   const groups = new Map<number, TileDetection[]>()
-  found.forEach((detection, index) => { const key = root(index); groups.set(key, [...(groups.get(key) || []), detection]) })
+  found.forEach((detection, index) => {
+    const key = root(index)
+    groups.set(key, [...(groups.get(key) || []), detection])
+  })
   return [...groups.values()]
 }
 
-export function dedupeDetections<T extends { box: [number, number, number, number]; ocr_text: string; lines?: Array<[number, number, number, number]> }>(detections: T[]) {
+export function dedupeDetections<
+  T extends { box: [number, number, number, number]; ocr_text: string; lines?: Array<[number, number, number, number]> },
+>(detections: T[]) {
   const area = (d: T) => {
     const l = d.lines?.length ? d.lines : [d.box]
-    return [Math.min(...l.map((v) => v[0])), Math.min(...l.map((v) => v[1])), Math.max(...l.map((v) => v[2])), Math.max(...l.map((v) => v[3]))]
+    return [
+      Math.min(...l.map((v) => v[0])),
+      Math.min(...l.map((v) => v[1])),
+      Math.max(...l.map((v) => v[2])),
+      Math.max(...l.map((v) => v[3])),
+    ]
   }
   const letters = (d: T) => (d.ocr_text.match(/[\p{L}\p{N}]/gu) || []).length
   const kept: T[] = []
@@ -236,10 +262,7 @@ export function expandBox(box: Box, width: number, height: number, margin: numbe
 }
 
 export async function segmentTextLines(cropBuffer: Buffer): Promise<LineCrop[]> {
-  const { data, info } = await sharp(cropBuffer)
-    .greyscale()
-    .raw()
-    .toBuffer({ resolveWithObject: true })
+  const { data, info } = await sharp(cropBuffer).greyscale().raw().toBuffer({ resolveWithObject: true })
   const width = info.width
   const height = info.height
   if (width <= 0 || height <= 0) return [{ buffer: cropBuffer, x1: 0, x2: width, y1: 0, y2: height }]
@@ -249,14 +272,14 @@ export async function segmentTextLines(cropBuffer: Buffer): Promise<LineCrop[]> 
   const darkInk = mean >= 128
   const threshold = darkInk ? Math.max(0, mean - 34) : Math.min(255, mean + 34)
   const rowCounts = new Array<number>(height).fill(0)
-  const xStart = Math.max(0, Math.floor(width * 0.10))
-  const xEnd = Math.min(width, Math.ceil(width * 0.90))
+  const xStart = Math.max(0, Math.floor(width * 0.1))
+  const xEnd = Math.min(width, Math.ceil(width * 0.9))
   const scanWidth = Math.max(1, xEnd - xStart)
 
   for (let y = 0; y < height; y += 1) {
     let count = 0
     for (let x = xStart; x < xEnd; x += 1) {
-      const value = data[(y * width) + x]
+      const value = data[y * width + x]
       if (darkInk ? value < threshold : value > threshold) count += 1
     }
     rowCounts[y] = count
@@ -284,9 +307,7 @@ export async function segmentTextLines(cropBuffer: Buffer): Promise<LineCrop[]> 
   const saneMerged = merged.filter(([y1, y2]) => {
     const lineHeight = y2 - y1
     const isBorderBand = (y1 <= 2 || y2 >= height - 2) && medianRangeHeight > 0 && lineHeight > medianRangeHeight * 1.5
-    const isTooTall = medianRangeHeight > 0
-      ? lineHeight > Math.max(12, medianRangeHeight * 2.8)
-      : lineHeight > height * 0.55
+    const isTooTall = medianRangeHeight > 0 ? lineHeight > Math.max(12, medianRangeHeight * 2.8) : lineHeight > height * 0.55
     return !isBorderBand && !isTooTall
   })
   const usable = saneMerged.length > 0 ? saneMerged : [[0, height] as [number, number]]
@@ -309,7 +330,7 @@ export function lineInkBounds(
   y1: number,
   y2: number,
   darkInk: boolean,
-  threshold: number
+  threshold: number,
 ): [number, number] {
   let left = width
   let right = -1
@@ -320,7 +341,7 @@ export function lineInkBounds(
 
   for (let y = minY; y < maxY; y += 1) {
     for (let x = minX; x < maxX; x += 1) {
-      const value = data[(y * width) + x]
+      const value = data[y * width + x]
       const isInk = darkInk ? value < threshold : value > threshold
       if (!isInk) continue
       left = Math.min(left, x)
@@ -331,10 +352,7 @@ export function lineInkBounds(
   if (right < left) return [0, width]
 
   const pad = Math.max(2, Math.floor(width * 0.015))
-  return [
-    clamp(left - pad, 0, width - 1),
-    clamp(right + pad + 1, 1, width),
-  ]
+  return [clamp(left - pad, 0, width - 1), clamp(right + pad + 1, 1, width)]
 }
 
 export function mergeLineRanges(ranges: Array<[number, number]>, gap: number) {
@@ -358,12 +376,7 @@ export async function prepareRecognitionInput(lineBuffer: Buffer) {
   let width = Math.max(16, Math.round((sourceWidth / sourceHeight) * OCR_LINE_HEIGHT))
   width = Math.min(OCR_MAX_LINE_WIDTH, Math.max(16, Math.ceil(width / 8) * 8))
 
-  const raw = await sharp(lineBuffer)
-    .resize(width, OCR_LINE_HEIGHT, { fit: 'fill' })
-    .removeAlpha()
-    .toColourspace('srgb')
-    .raw()
-    .toBuffer()
+  const raw = await sharp(lineBuffer).resize(width, OCR_LINE_HEIGHT, { fit: 'fill' }).removeAlpha().toColourspace('srgb').raw().toBuffer()
 
   const floatData = new Float32Array(3 * OCR_LINE_HEIGHT * width)
   const plane = OCR_LINE_HEIGHT * width
@@ -371,9 +384,9 @@ export async function prepareRecognitionInput(lineBuffer: Buffer) {
     for (let x = 0; x < width; x += 1) {
       const src = (y * width + x) * 3
       const dst = y * width + x
-      floatData[dst] = ((raw[src] / 255) - 0.5) / 0.5
-      floatData[plane + dst] = ((raw[src + 1] / 255) - 0.5) / 0.5
-      floatData[(plane * 2) + dst] = ((raw[src + 2] / 255) - 0.5) / 0.5
+      floatData[dst] = (raw[src] / 255 - 0.5) / 0.5
+      floatData[plane + dst] = (raw[src + 1] / 255 - 0.5) / 0.5
+      floatData[plane * 2 + dst] = (raw[src + 2] / 255 - 0.5) / 0.5
     }
   }
 
@@ -396,7 +409,7 @@ export function ctcDecodeScored(output: ort.Tensor, dict: string[]) {
     let bestIndex = 0
     let bestValue = -Infinity
     let sum = 0
-    const offset = batchOffset + (t * classes)
+    const offset = batchOffset + t * classes
     for (let c = 0; c < classes; c += 1) {
       const value = data[offset + c]
       sum += value
@@ -429,7 +442,9 @@ export function isSpeechLine(raw: string, score: number, language: string) {
 
 /** Texto das linhas lidas: palavras da mesma fileira ficam na mesma linha. */
 export function keptText(kept: Array<{ text: string; row: number }>) {
-  return normalizeOcrText(kept.map((item, index) => `${index && kept[index - 1].row !== item.row ? '\n' : index ? ' ' : ''}${item.text}`).join(''))
+  return normalizeOcrText(
+    kept.map((item, index) => `${index && kept[index - 1].row !== item.row ? '\n' : index ? ' ' : ''}${item.text}`).join(''),
+  )
 }
 
 export function normalizeOcrText(value: string) {
@@ -445,7 +460,7 @@ export function scoreText(value: string) {
   if (!normalized) return 0
   const letters = normalized.replace(/[^\p{L}\p{N}]/gu, '').length
   const replacement = (normalized.match(/[�□]/g) || []).length
-  return letters - (replacement * 4)
+  return letters - replacement * 4
 }
 
 export function clamp(value: number, min: number, max: number) {

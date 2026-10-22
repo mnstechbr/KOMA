@@ -1,5 +1,7 @@
 export const migration006WorkRecovery = {
-  version: 6, name: '006_work_recovery', up: `
+  version: 6,
+  name: '006_work_recovery',
+  up: `
     ALTER TABLE works ADD COLUMN last_processed_at INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE work_pages ADD COLUMN recovery_attempted INTEGER NOT NULL DEFAULT 0;
     CREATE TABLE work_source_versions (

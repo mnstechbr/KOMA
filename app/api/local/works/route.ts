@@ -20,13 +20,31 @@ export async function POST(request: Request) {
     await ensureSources(worksRepository.database)
     const metadata = await getCatalogWork(body.sourceId)
     // Capítulos escolhidos na tela de adicionar; sem escolha, todos.
-    const choice = Array.isArray(body.chapters) ? (body.chapters as Array<{ key?: unknown; number?: unknown }>).filter((item) => typeof item?.key === 'string').slice(0, 5000).map((item) => ({ key: String(item.key), number: typeof item.number === 'string' ? item.number : null })) : []
+    const choice = Array.isArray(body.chapters)
+      ? (body.chapters as Array<{ key?: unknown; number?: unknown }>)
+          .filter((item) => typeof item?.key === 'string')
+          .slice(0, 5000)
+          .map((item) => ({ key: String(item.key), number: typeof item.number === 'string' ? item.number : null }))
+      : []
     // "Já está lendo?": número do capítulo em que a pessoa parou.
     const startFrom = typeof body.startFrom === 'string' && /^\d{1,5}(\.\d{1,3})?$/.test(body.startFrom) ? Number(body.startFrom) : null
     // A mesma obra em outras fontes (cartão da busca): ficam vinculadas desde o começo.
-    const also = Array.isArray(body.also) ? (body.also as unknown[]).filter((item): item is string => typeof item === 'string').slice(0, 10).flatMap((item) => { try { return [validateCatalogId(item)] } catch { return [] } }) : []
+    const also = Array.isArray(body.also)
+      ? (body.also as unknown[])
+          .filter((item): item is string => typeof item === 'string')
+          .slice(0, 10)
+          .flatMap((item) => {
+            try {
+              return [validateCatalogId(item)]
+            } catch {
+              return []
+            }
+          })
+      : []
     const id = worksRepository.add(auth.user.id, metadata, choice, startFrom, also)
     startWorkAutomation()
     return NextResponse.json({ id }, { status: 201 })
-  } catch (error) { return sourceFailure(error) }
+  } catch (error) {
+    return sourceFailure(error)
+  }
 }

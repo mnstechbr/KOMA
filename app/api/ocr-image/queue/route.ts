@@ -15,22 +15,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Nenhum arquivo válido para OCR.' }, { status: 400 })
     }
 
-    const { jobKey, queueKey, job } = await ocrJobsService.enqueueImage(
-      Buffer.from(await file.arrayBuffer())
-    )
+    const { jobKey, queueKey, job } = await ocrJobsService.enqueueImage(Buffer.from(await file.arrayBuffer()))
 
-    return NextResponse.json({
-      job_key: jobKey,
-      queue_key: queueKey,
-      status: job.status,
-      queue_position: 0,
-      queue_length: 1,
-      redis: {
+    return NextResponse.json(
+      {
         job_key: jobKey,
         queue_key: queueKey,
+        status: job.status,
+        queue_position: 0,
+        queue_length: 1,
+        redis: {
+          job_key: jobKey,
+          queue_key: queueKey,
+        },
+        job,
       },
-      job,
-    }, { status: 200 })
+      { status: 200 },
+    )
   } catch (error) {
     console.error('OCR queue route error:', error)
     return NextResponse.json({ message: 'Erro ao enfileirar OCR da área selecionada.' }, { status: 500 })

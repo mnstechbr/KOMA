@@ -15,10 +15,19 @@ const pinnedModels = {
 export async function verifyModels(root, modelsDir) {
   for (const name of await fs.readdir(path.join(root, 'models'))) {
     let pointer = ''
-    try { pointer = execFileSync('git', ['show', `9c7e2706d894a53df1a8bb0ccd6270a8196aaad5:models/${name}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }) } catch { /* Modelo posterior ao baseline. */ }
+    try {
+      pointer = execFileSync('git', ['show', `9c7e2706d894a53df1a8bb0ccd6270a8196aaad5:models/${name}`], {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+    } catch {
+      /* Modelo posterior ao baseline. */
+    }
     const hash = pinnedModels[name] || pointer.match(/oid sha256:([a-f0-9]{64})/)?.[1]
     if (!hash) continue
     const data = await fs.readFile(path.join(modelsDir, name))
-    if (crypto.createHash('sha256').update(data).digest('hex') !== hash) throw new Error(`Modelo inválido: ${name}. Execute npm run desktop:resources.`)
+    if (crypto.createHash('sha256').update(data).digest('hex') !== hash)
+      throw new Error(`Modelo inválido: ${name}. Execute npm run desktop:resources.`)
   }
 }
