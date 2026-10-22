@@ -3,13 +3,12 @@ name: Windows
 # Gera o instalador do KOMA para Windows 11 e testa num Windows real:
 # instala em silêncio, abre o app com a verificação automática da janela,
 # confere que o serviço local fecha junto e desinstala preservando a biblioteca.
+# Só quando sai uma versão para publicar (tag v*) ou quando pedido à mão; cada
+# commit no main passa só pelo CI de testes.
 on:
   push:
-    branches:
-      - main
     tags:
       - 'v*'
-  pull_request:
   workflow_dispatch:
 
 jobs:
