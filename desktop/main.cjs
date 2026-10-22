@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, Menu, shell, session } = require('electron')
+const { app, BrowserWindow, dialog, Menu, Notification, Tray, nativeImage, shell, session } = require('electron')
 // Rótulos do menu da janela nos idiomas da interface.
 const MENU_LABELS = {
   en: { 'Biblioteca': 'Library', 'Preferências': 'Settings', 'Abrir pasta de diagnóstico': 'Open diagnostics folder', 'Sair': 'Quit', 'Editar': 'Edit', 'Desfazer': 'Undo', 'Refazer': 'Redo', 'Recortar': 'Cut', 'Copiar': 'Copy', 'Colar': 'Paste', 'Selecionar tudo': 'Select all', 'Exibir': 'View', 'Recarregar': 'Reload', 'Tela cheia': 'Full screen' },
@@ -10,6 +10,7 @@ const os = require('node:os')
 const { startBackend } = require('./backend.cjs')
 const { allowedExternalLink } = require('./external-links.cjs')
 const { desktopPaths, bundledNode } = require('./paths.cjs')
+const { labels, noticeText, syncAutostart } = require('./background.cjs')
 
 const { configDir, dataDir, logDir } = desktopPaths(process.env, process.platform, os.homedir())
 for (const dir of [configDir, dataDir, logDir]) fs.mkdirSync(dir, { recursive: true, mode: 0o700 })
@@ -22,13 +23,52 @@ let window
 let backend
 let quitting = false
 let logFd
+// Segundo plano: com a bandeja ligada, fechar a janela só a esconde; "--hidden"
+// (início com o computador) abre direto na bandeja.
+let tray = null
+const startHidden = process.argv.includes('--hidden')
+const showWindow = () => { if (!window) return; if (window.isMinimized()) window.restore(); window.show(); window.focus() }
+async function startBackground(token, language) {
+  const text = labels(language)
+  const bundleRoot = path.resolve(__dirname, '../../..')
+  const icon = nativeImage.createFromPath(path.join(__dirname, 'koma.png')).resize({ width: 22, height: 22 })
+  const setTray = (enabled) => {
+    if (enabled && !tray) {
+      tray = new Tray(icon)
+      tray.setToolTip('KOMA')
+      tray.setContextMenu(Menu.buildFromTemplate([{ label: text.open, click: showWindow }, { type: 'separator' }, { label: text.quit, click: () => app.quit() }]))
+      tray.on('click', showWindow)
+    } else if (!enabled && tray) { tray.destroy(); tray = null }
+  }
+  const fetchSettings = async (notices) => {
+    const response = await fetch(`${backend.url}/api/local/background${notices ? '?notices=1' : ''}`, { headers: { Cookie: `koma-session=${token}` }, signal: AbortSignal.timeout(15000) })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    return response.json()
+  }
+  const apply = (settings) => {
+    setTray(settings.tray)
+    try { syncAutostart({ enabled: settings.tray && settings.autostart, platform: process.platform, env: process.env, home: os.homedir(), bundleRoot, app }) }
+    catch (error) { console.error('[KOMA] Início com o computador não foi ajustado', error.message) }
+    for (const notice of settings.notices || []) {
+      if (!settings.notify || !Notification.isSupported()) continue
+      const { title, body } = noticeText(notice, language)
+      const shown = new Notification({ title, body, icon: path.join(__dirname, 'koma.png') })
+      shown.on('click', () => { showWindow(); void window?.loadURL(`${backend.url}/inicio/obras/${notice.workId}/ler/${notice.chapterId}`) })
+      shown.show()
+    }
+  }
+  try { apply(await fetchSettings(false)) } catch { setTray(true) }
+  // A cada minuto: preferências mudadas na tela e capítulos novos prontos.
+  const poll = () => { void fetchSettings(true).then(apply).catch(() => { /* Serviço ocupado: tenta no próximo minuto. */ }) }
+  setInterval(() => { if (!quitting) poll() }, 60000).unref()
+  return { poll }
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
-    if (window) { if (window.isMinimized()) window.restore(); window.show(); window.focus() }
-  })
-  app.on('window-all-closed', () => app.quit())
+  app.on('second-instance', () => showWindow())
+  app.on('window-all-closed', () => { if (!tray) app.quit() })
   process.on('SIGTERM', () => app.quit())
   process.on('SIGINT', () => app.quit())
   app.on('before-quit', (event) => {
@@ -91,9 +131,13 @@ if (!app.requestSingleInstanceLock()) {
       ] },
       { label: label('Exibir'), submenu: [{ label: label('Recarregar'), role: 'reload' }, { label: label('Tela cheia'), role: 'togglefullscreen' }] },
     ]))
+    window.on('close', (event) => { if (!quitting && tray) { event.preventDefault(); window.hide() } })
     await window.loadURL(backend.url)
     if (quitting) return
-    window.show()
+    const background = process.env.KOMA_DESKTOP_TEST === '1' ? null : await startBackground(localSession.sessionToken, language)
+    // Aberto escondido só quando a bandeja existe; sem ela a janela precisa aparecer.
+    if (!startHidden || !tray) window.show()
+    if (background) background.poll()
     // Usado somente pela verificação automatizada do pacote, sem habilitar IPC no renderer.
     if (process.env.KOMA_DESKTOP_TEST === '1') {
       await require('./window-checks.cjs').runWindowChecks(window, logDir)

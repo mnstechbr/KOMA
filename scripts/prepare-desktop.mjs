@@ -41,7 +41,7 @@ await verifyModels(root, path.join(server, 'models'))
 await fs.cp(path.join(root, 'desktop/node_modules/electron/dist'), path.join(target, 'electron'), { recursive: true, verbatimSymlinks: true })
 const electronApp = path.join(target, 'electron/resources/app')
 await fs.mkdir(electronApp, { recursive: true })
-for (const name of ['main.cjs', 'external-links.cjs', 'paths.cjs', 'backend.cjs', 'supervisor.cjs', 'window-checks.cjs', 'package.json', 'koma.png']) {
+for (const name of ['main.cjs', 'background.cjs', 'external-links.cjs', 'paths.cjs', 'backend.cjs', 'supervisor.cjs', 'window-checks.cjs', 'package.json', 'koma.png']) {
   await fs.copyFile(path.join(root, 'desktop', name), path.join(electronApp, name))
 }
 await fs.mkdir(path.join(target, 'runtime'), { recursive: true })
