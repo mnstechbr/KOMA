@@ -15,10 +15,16 @@ import type { WorksRepository, WorkRow } from './repository'
 // Volumes com numeração reiniciada e especiais preservam sua identidade.
 export function mergeChapterSources(groups: SourceChapter[][], existing: SourceChapter[] = [], target = 'pt-br') {
   const result = new Map<string, SourceChapter>(existing.map((chapter) => [chapter.key, { ...chapter }]))
-  for (const chapters of groups)
+  for (const chapters of groups) {
+    // Fonte que recomeça a numeração a cada volume (dois "capítulo 1" em volumes
+    // diferentes): nela, o volume faz parte da identidade do capítulo.
+    const perNumber = new Map<string, number>()
+    for (const chapter of chapters) if (chapter.number) perNumber.set(chapter.number, (perNumber.get(chapter.number) || 0) + 1)
     for (const chapter of chapters) {
       const numbered = chapter.number ? [...result.values()].filter((item) => item.number === chapter.number) : []
-      const key = result.has(chapter.key) ? chapter.key : !chapter.volume && numbered.length === 1 ? numbered[0].key : chapter.key
+      // Capítulo com volume (como no MangaDex) junta ao de mesmo número sem ambiguidade.
+      const mergeable = numbered.length === 1 && (!chapter.volume || perNumber.get(chapter.number!) === 1)
+      const key = result.has(chapter.key) ? chapter.key : mergeable ? numbered[0].key : chapter.key
       const previous = result.get(key)
       if (!previous) result.set(key, { ...chapter })
       else {
@@ -32,6 +38,7 @@ export function mergeChapterSources(groups: SourceChapter[][], existing: SourceC
         ]
       }
     }
+  }
   // A versão principal de cada capítulo segue a prioridade de fontes (original
   // primeiro); capítulos já existentes mantêm a versão em uso na fila.
   const ranked = [...result.values()].map((chapter) => {

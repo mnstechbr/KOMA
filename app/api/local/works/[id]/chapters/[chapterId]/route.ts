@@ -94,7 +94,8 @@ export async function PATCH(request: Request, { params }: Context) {
   if ('response' in auth) return auth.response
   const { id, chapterId } = await params
   const { action } = (await request.json().catch(() => ({}))) as { action?: string }
-  if (action !== 'redo' && action !== 'download') return NextResponse.json({ message: 'Ação inválida.' }, { status: 400 })
+  if (action !== 'redo' && action !== 'download' && action !== 'skip' && action !== 'retry')
+    return NextResponse.json({ message: 'Ação inválida.' }, { status: 400 })
   if (!worksRepository.chapterAction(numericId(id), numericId(chapterId), auth.user.id, action))
     return NextResponse.json({ message: 'Capítulo não encontrado.' }, { status: 404 })
   startWorkAutomation()
