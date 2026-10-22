@@ -7,6 +7,7 @@ import { PrefSection } from './pref-section'
 import { StorageSettings } from './storage-settings'
 import { LanguageSettings } from './language-settings'
 import { SourceSettings } from './source-settings'
+import { BackgroundSettings } from './background-settings'
 import { PerformanceSettings } from './performance-settings'
 import { SubscriptionConnections } from './subscription-connections'
 import { OpenRouterKey } from './openrouter-key'
@@ -163,6 +164,7 @@ export function PreferencesPage() {
     <div className="koma-pref-list">
       <PrefSection id="translation" title={t('Tradução')} hint={t('Quem traduz, revisão, glossário e teste')}><TranslationSettings /></PrefSection>
       <PrefSection id="sources" title={t('Fontes')} hint={t('Onde o KOMA procura os capítulos')}><SourceSettings /></PrefSection>
+      <PrefSection id="background" title={t('Segundo plano')} hint={t('Bandeja, iniciar com o computador, procura diária e avisos')}><BackgroundSettings /></PrefSection>
       <PrefSection id="storage" title={t('Armazenamento na nuvem')} hint={t('Guardar os capítulos no Google Drive, OneDrive ou outra nuvem')}><StorageSettings /></PrefSection>
       <PrefSection id="performance" title={t('Desempenho')} hint={t('Quanto do computador o KOMA usa para preparar capítulos')}><PerformanceSettings /></PrefSection>
       <PrefSection id="language" title={t('Idioma e aparência')} hint={t('Idioma das telas e das traduções, fundo animado')}><LanguageSettings /><AppearanceSettings /></PrefSection>

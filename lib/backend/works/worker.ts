@@ -18,6 +18,7 @@ import { listSourceChapters, sourcePages } from './mangadex'
 import { sourceBytes, SourceError } from './source-http'
 import { catalogMetadata } from './catalog'
 import { ensureSources } from './custom-sources'
+import { scheduledCheck } from './background'
 import { chapterPages, discoverWorkChapters } from './chapter-sources'
 import { chaptersDoneRendering, clearEmptyRenders, nextPagesToRender, nextPagesToUpgrade, renderWorkPage, upgradeWorkPage } from './render'
 import { localizeNextWork } from './synopsis'
@@ -474,6 +475,8 @@ export function startWorkAutomation() {
       if (!claimAutomationLock(repository, state.owner)) return
       applyPerformance(repository.database)
       await ensureSources(repository.database)
+      // Procura diária por capítulos novos, a partir do horário das Preferências.
+      scheduledCheck(repository.database, (userId) => repository.refreshAll(userId))
       const launch = (workId: number, phase: ActiveTask['phase'], run: (signal: AbortSignal) => Promise<unknown>, chapterId?: number) => {
         const key = phase === 'sync' ? `sync:${workId}` : `${phase}:${chapterId}`
         const controller = new AbortController()

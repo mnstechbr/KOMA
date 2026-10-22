@@ -1,7 +1,7 @@
 {
   "name": "koma-desktop",
   "productName": "KOMA",
-  "version": "0.4.56",
+  "version": "0.4.57",
   "private": true,
   "description": "Biblioteca pessoal de mangás e tradução em português brasileiro",
   "license": "AGPL-3.0-or-later",
