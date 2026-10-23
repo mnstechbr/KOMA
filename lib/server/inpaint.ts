@@ -28,8 +28,9 @@ const shared = ((
       threads?: number
       cudaDir?: string
       cudaError?: string
-      detector: Promise<ort.InferenceSession> | null
-      lama: Promise<ort.InferenceSession> | null
+      engine?: 'onnxruntime' | 'openvino'
+      detector: Promise<Runner> | null
+      lama: Promise<Runner> | null
     }
   }
 ).__komaInpaint ||= { device: 'cpu', threads: 0, detector: null, lama: null })
@@ -45,7 +46,7 @@ export function configureInpaint(next: DrawDevice, threads = 0, cudaDir = '') {
 }
 /** Dispositivo em uso no desenho e o erro, se o CUDA falhou e o desenho voltou para o WebGPU. */
 export function drawStatus() {
-  return { device: shared.device, cudaError: shared.cudaError || null }
+  return { device: shared.device, engine: shared.engine || 'onnxruntime', cudaError: shared.cudaError || null }
 }
 const intraThreads = () => Number(process.env.KOMA_INPAINT_THREADS) || shared.threads || 0
 const options = (device: DrawDevice): ort.InferenceSession.SessionOptions => ({
@@ -107,7 +108,54 @@ export function prepareCuda(
     }
   cudaPrepared = dir
 }
-async function createSession(file: string) {
+// O que o desenho precisa de uma sessão: nomes das entradas e saídas e rodar.
+type Runner = {
+  inputNames: readonly string[]
+  outputNames: readonly string[]
+  run(feeds: Record<string, ort.Tensor>): Promise<Record<string, { data: unknown }>>
+}
+// OpenVINO (Intel, Apache-2.0) roda o detector de letras na CPU muito mais rápido que o
+// onnxruntime (medido: 210 ms contra 6,4 s por janela), com a mesma máscara e as mesmas
+// páginas desenhadas. O LaMa fica no onnxruntime: no OpenVINO ele ganhava pouco (1,5 vez)
+// e o arredondamento diferente mudava pixels. Sem o pacote (ou se falhar), tudo no onnxruntime.
+type OpenVino = typeof import('openvino-node').addon
+let openvino: Promise<OpenVino | null> | null = null
+async function openvinoRunner(file: string): Promise<Runner | null> {
+  if (process.env.KOMA_OPENVINO === '0' || file === LAMA) return null
+  openvino ||= import('openvino-node')
+    .then((module) => module.addon ?? (module as unknown as { default: { addon: OpenVino } }).default.addon)
+    .catch(() => null)
+  const ov = await openvino
+  if (!ov) return null
+  const core = new ov.Core()
+  const compiled = await core.compileModel(file, 'CPU', intraThreads() > 0 ? { INFERENCE_NUM_THREADS: String(intraThreads()) } : {})
+  return {
+    inputNames: compiled.inputs.map((input) => input.getAnyName()),
+    outputNames: compiled.outputs.map((output) => output.getAnyName()),
+    async run(feeds) {
+      const request = compiled.createInferRequest()
+      const inputs = Object.fromEntries(
+        Object.entries(feeds).map(([name, tensor]) => [name, new ov.Tensor(ov.element.f32, [...tensor.dims], tensor.data as Float32Array)]),
+      )
+      const outputs = await request.inferAsync(inputs)
+      // Cópia: os dados não podem depender da vida do pedido do OpenVINO.
+      return Object.fromEntries(
+        Object.entries(outputs).map(([name, tensor]) => [name, { data: Float32Array.from(tensor.data as Float32Array) }]),
+      )
+    },
+  }
+}
+async function createSession(file: string): Promise<Runner> {
+  if (shared.device === 'cpu') {
+    const runner = await openvinoRunner(file).catch((error) => {
+      console.error('[KOMA] OpenVINO indisponível; o desenho segue no onnxruntime', {
+        message: error instanceof Error ? error.message : String(error),
+      })
+      return null
+    })
+    if (file !== LAMA) shared.engine = runner ? 'openvino' : 'onnxruntime'
+    if (runner) return runner
+  } else shared.engine = 'onnxruntime'
   if (shared.device === 'cuda') {
     try {
       prepareCuda(shared.cudaDir || '')
