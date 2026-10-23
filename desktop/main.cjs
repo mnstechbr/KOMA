@@ -223,6 +223,7 @@ if (!app.requestSingleInstanceLock()) {
         serverDir: path.join(bundleRoot, 'server'),
         dataDir,
         logFd,
+        portFile: path.join(configDir, 'porta'),
         automation: process.env.KOMA_AUTOMATION_DISABLED !== '1',
       })
       if (quitting) {

@@ -2,16 +2,46 @@ const { spawn } = require('node:child_process')
 const net = require('node:net')
 const path = require('node:path')
 const crypto = require('node:crypto')
+const fs = require('node:fs')
 const { setTimeout: delay } = require('node:timers/promises')
 
-async function freePort() {
+async function freePort(preferred = 0) {
   const server = net.createServer()
-  await new Promise((resolve, reject) => {
-    server.once('error', reject)
-    server.listen(0, '127.0.0.1', resolve)
-  })
+  try {
+    await new Promise((resolve, reject) => {
+      server.once('error', reject)
+      server.listen(preferred, '127.0.0.1', resolve)
+    })
+  } catch (error) {
+    if (!preferred) throw error
+    return freePort(0)
+  }
   const port = server.address().port
   await new Promise((resolve) => server.close(resolve))
+  return port
+}
+
+// A janela guarda preferências no localStorage, que é separado por origem
+// (inclui a porta). Com uma porta nova a cada abertura, tudo voltava ao padrão;
+// por isso a primeira porta escolhida fica salva e é reaproveitada enquanto
+// estiver livre.
+async function stablePort(portFile) {
+  if (!portFile) return freePort()
+  let saved = 0
+  try {
+    saved = Number(fs.readFileSync(portFile, 'utf8').trim())
+  } catch {
+    /* Primeira abertura. */
+  }
+  const valid = Number.isInteger(saved) && saved >= 1024 && saved <= 65535
+  const port = await freePort(valid ? saved : 0)
+  if (!valid) {
+    try {
+      fs.writeFileSync(portFile, `${port}\n`, { mode: 0o600 })
+    } catch {
+      /* Sem gravar, a próxima abertura só escolhe outra porta. */
+    }
+  }
   return port
 }
 
@@ -40,8 +70,17 @@ async function stopProcess(child, timeout = 5000) {
   }
 }
 
-async function startBackend({ nodePath, serverDir, dataDir, logFd, parentPid = process.pid, timeout = 30000, automation = true }) {
-  const port = await freePort()
+async function startBackend({
+  nodePath,
+  serverDir,
+  dataDir,
+  logFd,
+  portFile,
+  parentPid = process.pid,
+  timeout = 30000,
+  automation = true,
+}) {
+  const port = await stablePort(portFile)
   const instance = crypto.randomUUID()
   const bootstrapToken = crypto.randomBytes(32).toString('hex')
   const url = `http://127.0.0.1:${port}`

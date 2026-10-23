@@ -35,6 +35,23 @@ test('serviço local fica pronto, atende loopback e encerra toda a árvore', asy
   fs.rmSync(root, { recursive: true })
 })
 
+test('a porta do serviço é reaproveitada para o localStorage da janela não se perder', async () => {
+  const root = fixture()
+  const portFile = path.join(root, 'porta')
+  const first = await startBackend({ nodePath: process.execPath, serverDir: root, dataDir: root, logFd: 'ignore', portFile })
+  await first.stop()
+  const saved = Number(fs.readFileSync(portFile, 'utf8'))
+  assert.equal(first.url, `http://127.0.0.1:${saved}`)
+  const second = await startBackend({ nodePath: process.execPath, serverDir: root, dataDir: root, logFd: 'ignore', portFile })
+  assert.equal(second.url, first.url)
+  // Porta ocupada por outro programa: abre em outra, sem trocar a salva.
+  const third = await startBackend({ nodePath: process.execPath, serverDir: root, dataDir: root, logFd: 'ignore', portFile })
+  assert.notEqual(third.url, first.url)
+  assert.equal(Number(fs.readFileSync(portFile, 'utf8')), saved)
+  await Promise.all([second.stop(), third.stop()])
+  fs.rmSync(root, { recursive: true })
+})
+
 test('a perda do processo da janela encerra o backend', async () => {
   const root = fixture()
   const parent = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'])
