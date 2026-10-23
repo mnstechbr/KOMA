@@ -470,3 +470,8 @@ export function clamp(value: number, min: number, max: number) {
 export function elapsedMs(started: number) {
   return Math.max(0, Math.round(performance.now() - started))
 }
+
+/** A placa de vídeo só vale a pena se fizer o mesmo trabalho em até 60% do tempo do processador. */
+export function gpuFaster(gpuMs: number, cpuMs: number | null) {
+  return cpuMs === null || gpuMs <= cpuMs * 0.6
+}

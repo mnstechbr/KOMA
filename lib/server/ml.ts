@@ -118,7 +118,7 @@ export async function recognizeText(
   if (worker()) return call('ocr', 'recognize', [new Uint8Array(bytes), timeout, language])
   return (await import('./manga-ocr-node')).recognizeImageTextNode(bytes, timeout, language)
 }
-export async function probeGpuDevice(): Promise<{ available: boolean; ms: number | null }> {
+export async function probeGpuDevice(): Promise<{ available: boolean; ms: number | null; cpuMs?: number | null }> {
   if (worker()) return call('ocr', 'probe', [])
   return (await import('./manga-ocr-node')).probeGpu()
 }

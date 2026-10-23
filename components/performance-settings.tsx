@@ -11,6 +11,9 @@ interface Snapshot {
   profile: Profile
   machine: { cores: number; memoryGb: number }
   gpu: boolean | null
+  gpuSpeedup?: number | null
+  slowGpu?: boolean
+  cards?: Array<{ name: string; kind: 'dedicated' | 'integrated' | null; active: boolean }>
 }
 
 // Quanto do computador o KOMA usa para preparar capítulos.
@@ -63,8 +66,10 @@ export function PerformanceSettings() {
       title: t('Máximo'),
       note:
         data.gpu === false
-          ? t('Placa de vídeo não disponível neste computador.')
-          : t('Lê o texto das páginas na placa de vídeo, cerca de 3 vezes mais rápido que o Equilibrado.'),
+          ? data.slowGpu
+            ? t('A placa de vídeo deste computador é mais lenta que o processador.')
+            : t('Placa de vídeo não disponível neste computador.')
+          : t('Lê e desenha as páginas na placa de vídeo, várias vezes mais rápido que o Equilibrado.'),
       disabled: data.gpu === false,
     },
   ]
@@ -76,9 +81,20 @@ export function PerformanceSettings() {
         {data.gpu === null
           ? t('verificando a placa de vídeo…')
           : data.gpu
-            ? t('placa de vídeo disponível')
-            : t('sem placa de vídeo compatível')}
+            ? data.gpuSpeedup
+              ? t('placa de vídeo {n}× mais rápida que o processador', { n: data.gpuSpeedup.toLocaleString(locale) })
+              : t('placa de vídeo disponível')
+            : data.slowGpu
+              ? t('a placa de vídeo é mais lenta que o processador e fica sem uso')
+              : t('sem placa de vídeo compatível')}
       </p>
+      {data.cards?.length ? (
+        <p className="koma-note">
+          {data.cards
+            .map((card) => (card.kind ? `${card.name} (${card.kind === 'dedicated' ? t('dedicada') : t('integrada')})` : card.name))
+            .join(' · ')}
+        </p>
+      ) : null}
       <div className="flex flex-col gap-2">
         {options.map((option) => (
           <label key={option.mode} className="koma-switch">
