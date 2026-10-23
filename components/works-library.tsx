@@ -2,17 +2,19 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { BookOpen, Heart, Loader2, Plus, RefreshCw, Search } from 'lucide-react'
-import { normalizeTitle, type WorkSummary } from '@/lib/works'
+import { normalizeTitle, workPendingChapters, workPreparing, type WorkSummary } from '@/lib/works'
 import { BrushProgress, WorkCover, chapterLabel, workKind, type Translate } from '@/components/koma-ui'
 import { useT } from '@/components/i18n'
 
 type Filter = 'all' | 'news' | 'favorites' | 'preparing'
-const preparing = (work: WorkSummary) => work.syncRequested || work.readyChapters < work.totalChapters
+const preparing = workPreparing
+const pendingChapters = workPendingChapters
 const hasNews = (work: WorkSummary) => work.readChapters > 0 && work.unreadReady > 0
 
 function stamp(work: WorkSummary, t: Translate) {
   if (work.syncRequested) return { text: t('Buscando'), tone: 'is-ink' }
   if (hasNews(work)) return { text: t('+{n} para ler', { n: work.unreadReady }), tone: '' }
+  if (!preparing(work) && pendingChapters(work)) return { text: t('{n} com pendência', { n: pendingChapters(work) }), tone: 'is-paper' }
   if (work.readChapters > 0 && !preparing(work)) return { text: t('Em dia'), tone: 'is-ink' }
   if (preparing(work))
     return { text: t('{ready}/{total} prontos', { ready: work.readyChapters, total: work.totalChapters }), tone: 'is-paper' }

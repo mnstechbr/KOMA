@@ -8,59 +8,196 @@ import sharp from 'sharp'
 // desenho por baixo delas. Os dois são opcionais: sem os arquivos, o desenho usa
 // o apagamento por cor de antes.
 const MODELS = process.env.KOMA_MODELS_DIR || path.join(/*turbopackIgnore: true*/ process.cwd(), 'models')
-const DETECTOR = path.join(MODELS, 'comic-text-detector.onnx')
+// Versão só com a saída da máscara (scripts/onnx-prune.mjs): mesmos valores, metade do
+// tempo na CPU. Sem ela (código-fonte sem npm run desktop:resources), o modelo completo.
+const DETECTOR = [path.join(MODELS, 'comic-text-detector-seg.onnx'), path.join(MODELS, 'comic-text-detector.onnx')]
+const detectorFile = () => DETECTOR.find((file) => fs.existsSync(file)) || DETECTOR[1]
 const LAMA = path.join(MODELS, 'lama_fp32.onnx')
 const SIDE = 1024
 const LAMA_SIDE = 512
 
 // Mesmo dispositivo do OCR (placa de vídeo no perfil Máximo); definido pelo perfil de desempenho.
-// Compartilhado entre as cópias do módulo que o Next carrega em cada rota (o
-// editor de balões desenha pela rota, com os modelos já carregados pela fila).
+// Com o complemento CUDA (opcional, só Linux com NVIDIA), o desenho usa CUDA e o OCR
+// continua no WebGPU. Compartilhado entre as cópias do módulo que o Next carrega em
+// cada rota (o editor de balões desenha pela rota, com os modelos já carregados pela fila).
+export type DrawDevice = 'cpu' | 'webgpu' | 'cuda'
 const shared = ((
   globalThis as typeof globalThis & {
-    __komaInpaint?: { device: 'cpu' | 'webgpu'; detector: Promise<ort.InferenceSession> | null; lama: Promise<ort.InferenceSession> | null }
+    __komaInpaint?: {
+      device: DrawDevice
+      threads?: number
+      cudaDir?: string
+      cudaError?: string
+      engine?: 'onnxruntime' | 'openvino'
+      detector: Promise<Runner> | null
+      lama: Promise<Runner> | null
+    }
   }
-).__komaInpaint ||= { device: 'cpu', detector: null, lama: null })
-export function configureInpaint(next: 'cpu' | 'webgpu') {
-  if (next === shared.device) return
+).__komaInpaint ||= { device: 'cpu', threads: 0, detector: null, lama: null })
+/** Dispositivo e threads do ONNX no desenho (0 = padrão do onnxruntime), conforme o perfil. */
+export function configureInpaint(next: DrawDevice, threads = 0, cudaDir = '') {
+  if (next === shared.device && threads === (shared.threads || 0) && cudaDir === (shared.cudaDir || '')) return
   shared.device = next
+  shared.threads = threads
+  shared.cudaDir = cudaDir
+  if (next === 'cuda') shared.cudaError = undefined
   shared.detector = null
   shared.lama = null
 }
-const options = (): ort.InferenceSession.SessionOptions => ({
-  executionProviders: shared.device === 'webgpu' ? ['webgpu', 'cpu'] : ['cpu'],
+/** Dispositivo em uso no desenho e o erro, se o CUDA falhou e o desenho voltou para o WebGPU. */
+export function drawStatus() {
+  return { device: shared.device, engine: shared.engine || 'onnxruntime', cudaError: shared.cudaError || null }
+}
+const intraThreads = () => Number(process.env.KOMA_INPAINT_THREADS) || shared.threads || 0
+const options = (device: DrawDevice): ort.InferenceSession.SessionOptions => ({
+  executionProviders: device === 'cuda' ? ['cuda', 'cpu'] : device === 'webgpu' ? ['webgpu', 'cpu'] : ['cpu'],
   graphOptimizationLevel: 'all',
   logSeverityLevel: 3,
+  // KOMA_INPAINT_THREADS só para medições (tests/pipeline-benchmark.real.test.ts).
+  ...(intraThreads() > 0 ? { intraOpNumThreads: intraThreads() } : {}),
 })
 
+// Bibliotecas da NVIDIA que o provider CUDA do onnxruntime pede, na ordem de dependência.
+export const CUDA_LIBS = [
+  'libcudart.so.13',
+  'libcublasLt.so.13',
+  'libcublas.so.13',
+  'libcufft.so.12',
+  'libcurand.so.10',
+  'libnvrtc.so.13',
+  'libcudnn.so.9',
+]
+export const CUDA_PROVIDER = 'libonnxruntime_providers_cuda.so'
+let cudaPrepared = ''
+/**
+ * Deixa o CUDA pronto sem reiniciar o app: o provider precisa estar ao lado do
+ * onnxruntime (link para a pasta do complemento) e as bibliotecas da NVIDIA são
+ * carregadas pelo caminho completo antes, com RTLD_NODELETE, para o provider achá-las
+ * pelo nome sem LD_LIBRARY_PATH.
+ */
+export function prepareCuda(
+  dir: string,
+  ortDir = path.join(/*turbopackIgnore: true*/ process.cwd(), 'node_modules/onnxruntime-node/bin/napi-v6/linux/x64'),
+  load = process.dlopen,
+) {
+  if (cudaPrepared === dir) return
+  if (process.platform !== 'linux' || process.arch !== 'x64') throw new Error('O complemento CUDA só funciona no Linux x64.')
+  const lib = path.join(dir, 'lib')
+  for (const name of [...CUDA_LIBS, CUDA_PROVIDER])
+    if (!fs.existsSync(path.join(lib, name))) throw new Error(`Arquivo do CUDA ausente: ${name}`)
+  const target = path.join(ortDir, CUDA_PROVIDER)
+  const source = path.join(lib, CUDA_PROVIDER)
+  let link: string | null = null
+  try {
+    link = fs.readlinkSync(target)
+  } catch {
+    /* Não é link: arquivo do próprio pacote (modo de desenvolvimento) ou ausente. */
+  }
+  if (link !== source && !(link === null && fs.existsSync(target))) {
+    fs.rmSync(target, { force: true })
+    fs.symlinkSync(source, target)
+  }
+  // RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE (glibc): a biblioteca fica carregada mesmo
+  // depois que o Node recusa o arquivo por não ser um módulo dele.
+  const flags = 0x2 | 0x100 | 0x1000
+  for (const name of CUDA_LIBS)
+    try {
+      load({ exports: {} }, path.join(lib, name), flags)
+    } catch (error) {
+      if (!/self-register/i.test(error instanceof Error ? error.message : String(error))) throw error
+    }
+  cudaPrepared = dir
+}
+// O que o desenho precisa de uma sessão: nomes das entradas e saídas e rodar.
+type Runner = {
+  inputNames: readonly string[]
+  outputNames: readonly string[]
+  run(feeds: Record<string, ort.Tensor>): Promise<Record<string, { data: unknown }>>
+}
+// OpenVINO (Intel, Apache-2.0) roda o detector de letras na CPU muito mais rápido que o
+// onnxruntime (medido: 210 ms contra 6,4 s por janela), com a mesma máscara e as mesmas
+// páginas desenhadas. O LaMa fica no onnxruntime: no OpenVINO ele ganhava pouco (1,5 vez)
+// e o arredondamento diferente mudava pixels. Sem o pacote (ou se falhar), tudo no onnxruntime.
+type OpenVino = typeof import('openvino-node').addon
+let openvino: Promise<OpenVino | null> | null = null
+async function openvinoRunner(file: string): Promise<Runner | null> {
+  if (process.env.KOMA_OPENVINO === '0' || file === LAMA) return null
+  openvino ||= import('openvino-node')
+    .then((module) => module.addon ?? (module as unknown as { default: { addon: OpenVino } }).default.addon)
+    .catch(() => null)
+  const ov = await openvino
+  if (!ov) return null
+  const core = new ov.Core()
+  // KOMA_OPENVINO_DEVICE=GPU só para medir o gráfico integrado da Intel.
+  const device = process.env.KOMA_OPENVINO_DEVICE || 'CPU'
+  const compiled = await core.compileModel(
+    file,
+    device,
+    device === 'CPU' && intraThreads() > 0 ? { INFERENCE_NUM_THREADS: String(intraThreads()) } : {},
+  )
+  return {
+    inputNames: compiled.inputs.map((input) => input.getAnyName()),
+    outputNames: compiled.outputs.map((output) => output.getAnyName()),
+    async run(feeds) {
+      const request = compiled.createInferRequest()
+      const inputs = Object.fromEntries(
+        Object.entries(feeds).map(([name, tensor]) => [name, new ov.Tensor(ov.element.f32, [...tensor.dims], tensor.data as Float32Array)]),
+      )
+      const outputs = await request.inferAsync(inputs)
+      // Cópia: os dados não podem depender da vida do pedido do OpenVINO.
+      return Object.fromEntries(
+        Object.entries(outputs).map(([name, tensor]) => [name, { data: Float32Array.from(tensor.data as Float32Array) }]),
+      )
+    },
+  }
+}
+async function createSession(file: string): Promise<Runner> {
+  if (shared.device === 'cpu') {
+    const runner = await openvinoRunner(file).catch((error) => {
+      console.error('[KOMA] OpenVINO indisponível; o desenho segue no onnxruntime', {
+        message: error instanceof Error ? error.message : String(error),
+      })
+      return null
+    })
+    if (file !== LAMA) shared.engine = runner ? 'openvino' : 'onnxruntime'
+    if (runner) return runner
+  } else shared.engine = 'onnxruntime'
+  if (shared.device === 'cuda') {
+    try {
+      prepareCuda(shared.cudaDir || '')
+      return await ort.InferenceSession.create(file, options('cuda'))
+    } catch (error) {
+      // Faltou arquivo, driver antigo, placa ocupada: volta sozinho para a placa via WebGPU e avisa.
+      shared.cudaError = error instanceof Error ? error.message.slice(0, 300) : String(error)
+      shared.device = 'webgpu'
+      console.error('[KOMA] CUDA indisponível; o desenho voltou para o WebGPU', { message: shared.cudaError })
+    }
+  }
+  return ort.InferenceSession.create(file, options(shared.device))
+}
+
 export function inpaintAvailable() {
-  return fs.existsSync(DETECTOR) && fs.existsSync(LAMA)
+  return fs.existsSync(detectorFile()) && fs.existsSync(LAMA)
 }
 
 /**
- * Máscara das letras da página inteira (1 = letra), no tamanho original. Páginas
- * altas (webtoon) são lidas em janelas quadradas que se sobrepõem.
+ * Máscara das letras (1 = letra), no tamanho original, lida sob demanda: páginas
+ * altas (webtoon) são lidas em janelas quadradas que se sobrepõem, e só as janelas
+ * que cobrem as linhas pedidas rodam. Cada pixel das linhas pedidas sai igual ao da
+ * página inteira (é a união das mesmas janelas); fora delas pode ficar 0.
  */
-export async function textMask(image: Buffer): Promise<Uint8Array | null> {
-  if (!inpaintAvailable()) return null
-  shared.detector ||= ort.InferenceSession.create(DETECTOR, options())
-  const session = await shared.detector
-  const { data, info } = await sharp(image, { limitInputPixels: 50000000 })
-    .rotate()
-    .removeAlpha()
-    .toColourspace('srgb')
-    .raw()
-    .toBuffer({ resolveWithObject: true })
-  const W = info.width
-  const H = info.height
-  const mask = new Uint8Array(W * H)
-  const window = Math.min(H, Math.max(W, Math.round(W * 1.3)))
-  for (let top = 0; ; top += Math.max(1, Math.round(window * 0.8))) {
-    const start = Math.min(top, H - window)
+export function textMaskReader(image: Buffer) {
+  type Page = { data: Buffer; W: number; H: number; mask: Uint8Array; window: number; starts: number[] }
+  let page: Promise<Page> | null = null
+  const windows = new Map<number, Promise<void>>()
+  const read = async (p: Page, start: number) => {
+    shared.detector ||= createSession(detectorFile())
+    const session = await shared.detector
+    const { data, W, mask, window } = p
     const scale = SIDE / Math.max(W, window)
     const w = Math.max(1, Math.round(W * scale))
     const h = Math.max(1, Math.round(window * scale))
-    const crop = await sharp(data, { raw: { width: W, height: H, channels: 3 } })
+    const crop = await sharp(data, { raw: { width: W, height: p.H, channels: 3 } })
       .extract({ left: 0, top: start, width: W, height: window })
       .resize(w, h)
       .raw()
@@ -80,9 +217,40 @@ export async function textMask(image: Buffer): Promise<Uint8Array | null> {
       for (let x = 0; x < W; x++) {
         if (seg[Math.min(h - 1, Math.floor(y * scale)) * SIDE + Math.min(w - 1, Math.floor(x * scale))] > 0.3) mask[(start + y) * W + x] = 1
       }
-    if (start + window >= H) break
   }
-  return mask
+  return async (top = 0, bottom = Infinity): Promise<Uint8Array | null> => {
+    if (!inpaintAvailable()) return null
+    page ||= (async () => {
+      const { data, info } = await sharp(image, { limitInputPixels: 50000000 })
+        .rotate()
+        .removeAlpha()
+        .toColourspace('srgb')
+        .raw()
+        .toBuffer({ resolveWithObject: true })
+      const W = info.width
+      const H = info.height
+      const window = Math.min(H, Math.max(W, Math.round(W * 1.3)))
+      const starts: number[] = []
+      for (let next = 0; ; next += Math.max(1, Math.round(window * 0.8))) {
+        const start = Math.min(next, H - window)
+        starts.push(start)
+        if (start + window >= H) break
+      }
+      return { data, W, H, mask: new Uint8Array(W * H), window, starts }
+    })()
+    const p = await page
+    for (const start of p.starts) {
+      if (start >= bottom || start + p.window <= top) continue
+      if (!windows.has(start)) windows.set(start, read(p, start))
+      await windows.get(start)
+    }
+    return p.mask
+  }
+}
+
+/** Máscara das letras da página inteira. */
+export function textMask(image: Buffer): Promise<Uint8Array | null> {
+  return textMaskReader(image)()
 }
 
 /**
@@ -91,7 +259,7 @@ export async function textMask(image: Buffer): Promise<Uint8Array | null> {
  */
 export async function lamaInpaint(data: Float32Array, width: number, height: number, mask: Uint8Array) {
   if (!inpaintAvailable()) return false
-  shared.lama ||= ort.InferenceSession.create(LAMA, options())
+  shared.lama ||= createSession(LAMA)
   const session = await shared.lama
   let x1 = width
   let y1 = height

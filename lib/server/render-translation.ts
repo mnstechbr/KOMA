@@ -19,6 +19,7 @@ import {
   paintMask,
   dilate,
   texturedInterior,
+  boxTest,
   type Box,
   type RenderItem,
   type RenderDiagnostic,
@@ -128,9 +129,8 @@ export async function renderTranslatedPage(original: Buffer, items: RenderItem[]
       const l = left
       const t = top
       inErase = (x, y) => x + l >= ex1 && x + l < ex2 && y + t >= ey1 && y + t < ey2
-      inLinePadded = (x, y) =>
-        lines.some(([x1, y1, x2, y2]) => x + l >= x1 - linePad && x + l <= x2 + linePad && y + t >= y1 - linePad && y + t <= y2 + linePad)
-      inLine = (x, y) => lines.some(([x1, y1, x2, y2]) => x + l >= x1 && x + l <= x2 && y + t >= y1 && y + t <= y2)
+      inLinePadded = boxTest(lines, linePad, l, t, region.width, region.height)
+      inLine = boxTest(lines, 0, l, t, region.width, region.height)
       // Cor do fundo: entre as linhas e na folga em volta delas, onde não há letras.
       background = dominant(region, (x, y) => inErase(x, y) && !inLine(x, y))
       spiky = false
@@ -270,11 +270,23 @@ export async function renderTranslatedPage(original: Buffer, items: RenderItem[]
           // A borda da própria imagem não conta: a letra cortada ao meio entre duas imagens é letra.
           const out = (xx: number, yy: number) => xx + left >= 0 && yy + top >= 0 && xx + left < W && yy + top < H && !inArea(xx, yy)
           if (out(x - 1, y) || out(x + 1, y) || out(x, y - 1) || out(x, y + 1)) touchesEdge = true
-          for (const next of [x > 0 ? i - 1 : -1, x < width - 1 ? i + 1 : -1, y > 0 ? i - width : -1, y < height - 1 ? i + width : -1])
-            if (next >= 0 && ink[next] && !seen[next]) {
-              seen[next] = 1
-              stack.push(next)
-            }
+          // Mesma ordem de vizinhos de antes, sem criar array por pixel.
+          if (x > 0 && ink[i - 1] && !seen[i - 1]) {
+            seen[i - 1] = 1
+            stack.push(i - 1)
+          }
+          if (x < width - 1 && ink[i + 1] && !seen[i + 1]) {
+            seen[i + 1] = 1
+            stack.push(i + 1)
+          }
+          if (y > 0 && ink[i - width] && !seen[i - width]) {
+            seen[i - width] = 1
+            stack.push(i - width)
+          }
+          if (y < height - 1 && ink[i + width] && !seen[i + width]) {
+            seen[i + width] = 1
+            stack.push(i + width)
+          }
         }
         const share = within / component.length
         // Traço fino que sai da área do texto é contorno do balão, mesmo quando passa
@@ -362,14 +374,11 @@ export async function renderTranslatedPage(original: Buffer, items: RenderItem[]
     // Fundo escuro "liso" costuma ter listras e granulado: lá entra a reconstrução.
     const plainLight = flat && !textured && luminance(background.rgb[0], background.rgb[1], background.rgb[2]) > 160
     if (models && !(interior && !textured)) {
-      const page = await models.mask()
+      const page = await models.mask(top, top + height)
       if (page) {
         // Só as letras desta fala: em volta das linhas dela, nunca o texto do balão vizinho.
         const reach = Math.max(linePad, Math.round(lineHeight * 0.25))
-        const near = (x: number, y: number) =>
-          lines.some(
-            ([x1, y1, x2, y2]) => x + left >= x1 - reach && x + left <= x2 + reach && y + top >= y1 - reach && y + top <= y2 + reach,
-          )
+        const near = boxTest(lines, reach, left, top, width, height)
         const letters = new Uint8Array(width * height)
         let count = 0
         for (let y = 0; y < height; y++)
@@ -485,11 +494,23 @@ export async function renderTranslatedPage(original: Buffer, items: RenderItem[]
           if (inLinePadded(x, y)) within++
           if (y < minY) minY = y
           if (y > maxY) maxY = y
-          for (const next of [x > 0 ? i - 1 : -1, x < width - 1 ? i + 1 : -1, y > 0 ? i - width : -1, y < height - 1 ? i + width : -1])
-            if (next >= 0 && same[next] && !seen[next]) {
-              seen[next] = 1
-              stack.push(next)
-            }
+          // Mesma ordem de vizinhos de antes, sem criar array por pixel.
+          if (x > 0 && same[i - 1] && !seen[i - 1]) {
+            seen[i - 1] = 1
+            stack.push(i - 1)
+          }
+          if (x < width - 1 && same[i + 1] && !seen[i + 1]) {
+            seen[i + 1] = 1
+            stack.push(i + 1)
+          }
+          if (y > 0 && same[i - width] && !seen[i - width]) {
+            seen[i - width] = 1
+            stack.push(i - width)
+          }
+          if (y < height - 1 && same[i + width] && !seen[i + width]) {
+            seen[i + width] = 1
+            stack.push(i + width)
+          }
         }
         // Letras com brilho grudam umas nas outras entre linhas: altas, mas inteiras dentro do texto.
         const share = within / component.length
@@ -654,7 +675,7 @@ export async function renderTranslatedPage(original: Buffer, items: RenderItem[]
         clamp(Math.ceil(ox2) + margin, pl + 1, W) - pl,
         clamp(Math.ceil(oy2) + margin, pt + 1, H) - pt,
       )
-      const seeds = (x: number, y: number) => lines.some(([x1, y1, x2, y2]) => x + pl >= x1 && x + pl <= x2 && y + pt >= y1 && y + pt <= y2)
+      const seeds = boxTest(lines, 0, pl, pt, wide.width, wide.height)
       const around = (x: number, y: number) => x + pl >= ex1 && x + pl < ex2 && y + pt >= ey1 && y + pt < ey2
       const ground = dominant(wide, around)
       const found = ground.share > 0.5 ? balloonInterior(wide, ground.rgb, seeds) : texturedInterior(wide, around, seeds, lineHeight)

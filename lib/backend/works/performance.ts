@@ -1,5 +1,7 @@
 import os from 'node:os'
 import type Database from 'better-sqlite3'
+import type { GpuProbe } from '@/lib/server/ocr-helpers'
+import { HEAT_LIMITS, USAGE_LEVELS, usageState, type UsageLevel } from './usage-limit'
 
 // Perfis de desempenho, medidos com 30 páginas reais (tests/ocr-benchmark.real.test.ts):
 // - Leve (PC com até 4 núcleos ou até 8 GB): OCR com 2 páginas × 2 threads foi o
@@ -19,6 +21,8 @@ export interface PerformanceLimits {
   render: number
   upgrade: number
   imageThreads: number
+  /** Threads do ONNX no desenho (detector de letras e LaMa), no worker do desenho; 0 = padrão do onnxruntime. */
+  drawThreads: number
 }
 
 const KEY = 'koma:performance:v1'
@@ -39,9 +43,20 @@ export function limitsFor(profile: PerformanceProfile, cores = os.availableParal
       render: 1,
       upgrade: 1,
       imageThreads: Math.min(2, cores),
+      drawThreads: 0,
     }
   if (profile === 'maximo')
-    return { downloads: 6, ocrSlots: 6, ocrThreads: 2, ocrDevice: 'webgpu', translation: 6, render: 4, upgrade: 4, imageThreads: 0 }
+    return {
+      downloads: 6,
+      ocrSlots: 6,
+      ocrThreads: 2,
+      ocrDevice: 'webgpu',
+      translation: 6,
+      render: 4,
+      upgrade: 4,
+      imageThreads: 0,
+      drawThreads: 0,
+    }
   return {
     downloads: 4,
     ocrSlots: 4,
@@ -51,6 +66,7 @@ export function limitsFor(profile: PerformanceProfile, cores = os.availableParal
     render: 4,
     upgrade: 4,
     imageThreads: 0,
+    drawThreads: 0,
   }
 }
 
@@ -60,25 +76,53 @@ export function autoProfile(gpuAvailable: boolean, machine = hardware()): Perfor
   return gpuAvailable ? 'maximo' : 'equilibrado'
 }
 
-export function getPerformanceMode(database: Database.Database): PerformanceMode {
+function readSettings(database: Database.Database): Record<string, unknown> {
   const row = database.prepare('SELECT value FROM kv_store WHERE key = ?').get(KEY) as { value: string } | undefined
   try {
-    const mode = row ? JSON.parse(row.value).mode : 'auto'
-    return mode === 'auto' || PROFILES.includes(mode) ? mode : 'auto'
+    const value = row ? JSON.parse(row.value) : {}
+    return value && typeof value === 'object' ? value : {}
   } catch {
-    return 'auto'
+    return {}
   }
 }
 
-export function savePerformanceMode(database: Database.Database, mode: unknown): PerformanceMode {
-  if (mode !== 'auto' && !PROFILES.includes(mode as PerformanceProfile)) throw new Error('Perfil de desempenho inválido.')
+function writeSettings(database: Database.Database, patch: Record<string, unknown>) {
   database
     .prepare(
       `INSERT INTO kv_store (key, value, expires_at) VALUES (?, ?, NULL)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = NULL`,
     )
-    .run(KEY, JSON.stringify({ mode }))
+    .run(KEY, JSON.stringify({ ...readSettings(database), ...patch }))
+}
+
+export function getPerformanceMode(database: Database.Database): PerformanceMode {
+  const mode = readSettings(database).mode ?? 'auto'
+  return mode === 'auto' || PROFILES.includes(mode as PerformanceProfile) ? (mode as PerformanceMode) : 'auto'
+}
+
+export function savePerformanceMode(database: Database.Database, mode: unknown): PerformanceMode {
+  if (mode !== 'auto' && !PROFILES.includes(mode as PerformanceProfile)) throw new Error('Perfil de desempenho inválido.')
+  writeSettings(database, { mode })
   return mode as PerformanceMode
+}
+
+/** Limite de uso escolhido: "Uso máximo" (100, 75 ou 50%) e a guarda de temperatura (ligada por padrão). */
+export function getUsageLimit(database: Database.Database): { usage: UsageLevel; guard: boolean } {
+  const settings = readSettings(database)
+  return {
+    usage: USAGE_LEVELS.includes(settings.usage as UsageLevel) ? (settings.usage as UsageLevel) : 100,
+    guard: settings.guard !== false,
+  }
+}
+
+export function saveUsageLimit(database: Database.Database, next: { usage?: unknown; guard?: unknown }) {
+  if (next.usage !== undefined && !USAGE_LEVELS.includes(next.usage as UsageLevel)) throw new Error('Limite de uso inválido.')
+  if (next.guard !== undefined && typeof next.guard !== 'boolean') throw new Error('Limite de uso inválido.')
+  writeSettings(database, {
+    ...(next.usage !== undefined ? { usage: next.usage } : {}),
+    ...(next.guard !== undefined ? { guard: next.guard } : {}),
+  })
+  return getUsageLimit(database)
 }
 
 /** Perfil em uso: o escolhido, ou o automático. Máximo sem placa de vídeo vira Equilibrado. */
@@ -89,13 +133,39 @@ export function resolveProfile(mode: PerformanceMode, gpuAvailable: boolean, mac
 }
 
 // Estado em uso pelo processo (fila de preparação e OCR).
-const runtime: { gpu: boolean | null; probing: Promise<boolean> | null } = { gpu: null, probing: null }
+const runtime: {
+  gpu: boolean | null
+  speedup: number | null
+  slowGpu: boolean
+  wrongGpu: boolean
+  probing: Promise<boolean> | null
+} = {
+  gpu: null,
+  speedup: null,
+  slowGpu: false,
+  wrongGpu: false,
+  probing: null,
+}
 
-/** Testa a placa de vídeo uma vez por abertura do app. */
-export function detectGpu(probe: () => Promise<{ available: boolean }>) {
+/**
+ * Testa a placa de vídeo uma vez por abertura do app. Ela só conta se for mais rápida que o
+ * processador e der o mesmo resultado que ele (senão o perfil fica no Equilibrado).
+ */
+export function detectGpu(probe: () => Promise<GpuProbe>) {
   runtime.probing ||= probe()
     .then((result) => {
       runtime.gpu = result.available
+      runtime.speedup = result.ms && result.cpuMs ? Math.round((result.cpuMs / result.ms) * 10) / 10 : null
+      runtime.wrongGpu = !result.available && Boolean(result.wrong)
+      runtime.slowGpu = !result.available && !runtime.wrongGpu && result.ms != null
+      if (runtime.wrongGpu)
+        console.warn('[KOMA] Placa de vídeo recusada: resultado diferente do processador', {
+          model: result.wrong,
+          drift: result.drift,
+          ms: result.ms,
+          cpuMs: result.cpuMs,
+        })
+      else console.info('[KOMA] Teste da placa de vídeo', result)
       return result.available
     })
     .catch(() => {
@@ -108,9 +178,66 @@ export function gpuAvailable() {
   return runtime.gpu === true
 }
 
+export interface GraphicsCard {
+  name: string
+  kind: 'dedicated' | 'integrated' | null
+  active: boolean
+}
+/**
+ * Placas de vídeo informadas pela janela (Electron app.getGPUInfo, em KOMA_GPUS), só
+ * para mostrar em Preferências; quem decide o perfil é a medição da própria placa.
+ */
+export function graphicsCards(raw = process.env.KOMA_GPUS): GraphicsCard[] {
+  let list: Array<{ vendorId?: number; deviceId?: number; vendorString?: string; deviceString?: string; active?: boolean }>
+  try {
+    list = JSON.parse(raw || '[]')
+    if (!Array.isArray(list)) return []
+  } catch {
+    return []
+  }
+  const vendors: Record<number, string> = { 0x10de: 'NVIDIA', 0x1002: 'AMD', 0x8086: 'Intel' }
+  return list
+    .filter((card) => card && (card.vendorId || card.deviceString))
+    .map((card) => {
+      const vendor = vendors[card.vendorId || 0] || card.vendorString || ''
+      const name =
+        (card.deviceString || '').trim() || [vendor, (card.deviceId || 0).toString(16).padStart(4, '0')].filter(Boolean).join(' ')
+      const device = card.deviceId || 0
+      let kind: GraphicsCard['kind'] = null
+      if (card.vendorId === 0x10de) kind = 'dedicated'
+      else if (card.vendorId === 0x8086)
+        // Intel Arc (placas dedicadas): 0x56xx e 0xe2xx; o resto é gráfico integrado.
+        kind =
+          /\bArc\b/i.test(name) || (device >= 0x5690 && device <= 0x56ff) || (device >= 0xe200 && device <= 0xe2ff)
+            ? 'dedicated'
+            : 'integrated'
+      else if (card.vendorId === 0x1002)
+        kind = /Radeon(\(TM\))? Graphics|Vega \d+ Graphics|Radeon \d{3}M\b/i.test(name)
+          ? 'integrated'
+          : /Radeon|FirePro/i.test(name)
+            ? 'dedicated'
+            : null
+      return { name, kind, active: Boolean(card.active) }
+    })
+}
+
 export function currentPerformance(database: Database.Database) {
   const mode = getPerformanceMode(database)
   const machine = hardware()
   const profile = resolveProfile(mode, gpuAvailable(), machine)
-  return { mode, profile, limits: limitsFor(profile, machine.cores), machine, gpu: runtime.gpu }
+  return {
+    mode,
+    profile,
+    limits: limitsFor(profile, machine.cores),
+    machine,
+    gpu: runtime.gpu,
+    gpuSpeedup: runtime.speedup,
+    slowGpu: runtime.slowGpu,
+    wrongGpu: runtime.wrongGpu,
+    cards: graphicsCards(),
+    ...getUsageLimit(database),
+    hot: usageState().hot,
+    temps: usageState().temps,
+    heatLimits: { cpu: HEAT_LIMITS.cpu, gpu: HEAT_LIMITS.gpu },
+  }
 }

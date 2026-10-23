@@ -61,6 +61,47 @@ export function writeRegion(canvas: Canvas, region: Region) {
 }
 export const luminance = (r: number, g: number, b: number) => r * 0.299 + g * 0.587 + b * 0.114
 
+/**
+ * Teste "o pixel (x, y) da região está em alguma das caixas, com folga pad?" por mapa
+ * pré-calculado, em vez de percorrer as caixas a cada pixel. Mesmo resultado da
+ * comparação direta (as bordas do mapa são acertadas com ela); fora da região, ou com
+ * coordenada não inteira, usa a comparação direta.
+ */
+export function boxTest(boxes: Box[], pad: number, left: number, top: number, width: number, height: number) {
+  const direct = (x: number, y: number) =>
+    boxes.some(([x1, y1, x2, y2]) => x + left >= x1 - pad && x + left <= x2 + pad && y + top >= y1 - pad && y + top <= y2 + pad)
+  let map: Uint8Array | null = null
+  const build = () => {
+    const built = new Uint8Array(width * height)
+    for (const [x1, y1, x2, y2] of boxes) {
+      const low = (min: number, offset: number) => {
+        let v = Math.max(0, Math.ceil(min - pad - offset))
+        while (v > 0 && v - 1 + offset >= min - pad) v--
+        while (v + offset < min - pad) v++
+        return v
+      }
+      const high = (max: number, offset: number, size: number) => {
+        let v = Math.min(size - 1, Math.floor(max + pad - offset))
+        while (v < size - 1 && v + 1 + offset <= max + pad) v++
+        while (v >= 0 && v + offset > max + pad) v--
+        return v
+      }
+      const ax = low(x1, left)
+      const bx = high(x2, left, width)
+      const ay = low(y1, top)
+      const by = high(y2, top, height)
+      if (ax > bx) continue
+      for (let y = ay; y <= by; y++) built.fill(1, y * width + ax, y * width + bx + 1)
+    }
+    return built
+  }
+  return (x: number, y: number) => {
+    if (x < 0 || y < 0 || x >= width || y >= height || !Number.isInteger(x) || !Number.isInteger(y)) return direct(x, y)
+    map ||= build()
+    return map[y * width + x] === 1
+  }
+}
+
 /** Cor dominante (histograma grosso) e a fração de pixels que ela cobre. */
 export function dominant(region: Region, inside: (x: number, y: number) => boolean) {
   const bins = new Map<number, { n: number; r: number; g: number; b: number }>()
@@ -295,15 +336,21 @@ export function balloonInterior(region: Region, rgb: number[], seed: (x: number,
       }
     }
   if (!stack.length) return null
+  // Vizinhos sem criar array por pixel; o conjunto preenchido não depende da ordem.
+  const grow = (next: number) => {
+    if (!inside[next] && near(next)) {
+      inside[next] = 1
+      stack.push(next)
+    }
+  }
   while (stack.length) {
     const i = stack.pop()!
     const x = i % width
     const y = (i - x) / width
-    for (const next of [x > 0 ? i - 1 : -1, x < width - 1 ? i + 1 : -1, y > 0 ? i - width : -1, y < height - 1 ? i + width : -1])
-      if (next >= 0 && !inside[next] && near(next)) {
-        inside[next] = 1
-        stack.push(next)
-      }
+    if (x > 0) grow(i - 1)
+    if (x < width - 1) grow(i + 1)
+    if (y > 0) grow(i - width)
+    if (y < height - 1) grow(i + width)
   }
   let leak = 0
   for (let x = 0; x < width; x++) leak += inside[x] + inside[(height - 1) * width + x]
@@ -337,8 +384,10 @@ export function balloonInterior(region: Region, rgb: number[], seed: (x: number,
     const i = stack.pop()!
     const x = i % width
     const y = (i - x) / width
-    for (const next of [x > 0 ? i - 1 : -1, x < width - 1 ? i + 1 : -1, y > 0 ? i - width : -1, y < height - 1 ? i + width : -1])
-      if (next >= 0) push(next)
+    if (x > 0) push(i - 1)
+    if (x < width - 1) push(i + 1)
+    if (y > 0) push(i - width)
+    if (y < height - 1) push(i + width)
   }
   const holes = new Uint8Array(size)
   let x1 = width
@@ -462,6 +511,7 @@ export function texturedInterior(
  * inteira (1 = letra); "inpaint" reconstrói os pixels marcados de uma região.
  */
 export interface EraseModels {
-  mask: () => Promise<Uint8Array | null>
+  /** Máscara das letras no tamanho da página; só as linhas de top a bottom precisam estar certas. */
+  mask: (top?: number, bottom?: number) => Promise<Uint8Array | null>
   inpaint: (data: Float32Array, width: number, height: number, mask: Uint8Array) => Promise<boolean>
 }

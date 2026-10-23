@@ -1,7 +1,8 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { verifyModels } from './desktop-models.mjs'
+import { packagedModel, verifyModels } from './desktop-models.mjs'
+import { openvinoFile } from './openvino-files.mjs'
 import { buildMlWorker } from './build-ml-worker.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -23,21 +24,28 @@ for (const entry of ['.next', 'node_modules', 'package.json', 'server.js']) {
 }
 await fs.copyFile(path.join(root, 'package.json'), path.join(server, 'package.json'))
 for (const entry of ['public', 'models']) {
-  await fs.cp(path.join(root, entry), path.join(server, entry), { recursive: true, verbatimSymlinks: true })
+  await fs.cp(path.join(root, entry), path.join(server, entry), {
+    recursive: true,
+    verbatimSymlinks: true,
+    filter: (source) => packagedModel(path.basename(source)),
+  })
 }
 await fs.cp(path.join(root, '.next/static'), path.join(server, '.next/static'), { recursive: true, verbatimSymlinks: true })
 // OCR e apagamento num processo separado (worker thread), fora da thread das telas.
 await fs.cp(await buildMlWorker(), path.join(server, 'koma-ml'), { recursive: true })
-for (const name of ['sharp', 'onnxruntime-node', 'better-sqlite3']) {
+for (const name of ['sharp', 'onnxruntime-node', 'better-sqlite3', 'openvino-node']) {
+  // O rastreamento do Next pode ter copiado o pacote inteiro; fica só o que a lista abaixo permite.
+  if (name === 'openvino-node') await fs.rm(path.join(server, 'node_modules', name), { recursive: true, force: true })
   await fs.cp(path.join(root, 'node_modules', name), path.join(server, 'node_modules', name), {
     recursive: true,
     verbatimSymlinks: true,
     filter: (source) => {
-      if (name !== 'onnxruntime-node') return true
       const relative = path
         .relative(path.join(root, 'node_modules', name), source)
         .split(path.sep)
         .join('/')
+      if (name === 'openvino-node') return openvinoFile(relative)
+      if (name !== 'onnxruntime-node') return true
       if (/bin\/napi-v6\/(win32|darwin)/.test(relative) || /bin\/napi-v6\/linux\/(arm64|arm)/.test(relative)) return false
       return !/libonnxruntime_providers_(cuda|tensorrt)\.so$/.test(relative)
     },

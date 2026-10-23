@@ -4,6 +4,7 @@ import sharp from 'sharp'
 import { recoverOcr } from '@/lib/server/ocr-recovery'
 import { inspectPublicationSources } from './publication-sources'
 import { configureMl } from '@/lib/server/ml'
+import { cudaActive, cudaDir } from './cuda-addon'
 import { SectionsRepository } from '../sections/sections.repository'
 import type { OcrDetection } from '../sections/sections.types'
 import { WorksRepository } from './repository'
@@ -11,6 +12,7 @@ import { listSourceChapters, sourcePages } from './mangadex'
 import { catalogMetadata } from './catalog'
 import { discoverWorkChapters } from './chapter-sources'
 import { currentPerformance } from './performance'
+import { configureUsage, paced } from './usage-limit'
 
 export async function balloonColors(bytes: Buffer, detection: OcrDetection) {
   const box = detection.box!
@@ -96,7 +98,7 @@ export async function withOcrSlot<T>(task: () => Promise<T>) {
   while (ocrRunning >= ocrSlots) await new Promise<void>((resolve) => ocrWaiting.push(resolve))
   ocrRunning++
   try {
-    return await task()
+    return await paced('ocr', task)
   } finally {
     ocrRunning--
     ocrWaiting.shift()?.()
@@ -138,18 +140,29 @@ export let RENDER_TASKS = 4
 export let UPGRADE_TASKS = 4
 export let appliedProfile = ''
 export function applyPerformance(database: WorksRepository['database']) {
-  const { profile, limits } = currentPerformance(database)
+  const { profile, limits, usage, guard } = currentPerformance(database)
+  configureUsage({ usage, guard, gpu: limits.ocrDevice === 'webgpu', slots: { ocr: limits.ocrSlots, render: limits.render } })
   DOWNLOAD_TASKS = limits.downloads
   TRANSLATION_TASKS = limits.translation
   RENDER_TASKS = limits.render
   UPGRADE_TASKS = limits.upgrade
   ocrSlots = limits.ocrSlots
-  void configureMl({ device: limits.ocrDevice, threads: limits.ocrThreads })
+  // Complemento CUDA (opcional): só no Máximo, só o desenho; o OCR continua no WebGPU.
+  void cudaActive(database)
+    .catch(() => false)
+    .then((cuda) =>
+      configureMl({
+        device: limits.ocrDevice,
+        threads: limits.ocrThreads,
+        drawThreads: limits.drawThreads,
+        ...(cuda && profile === 'maximo' ? { drawDevice: 'cuda' as const, cudaDir: cudaDir() } : {}),
+      }),
+    )
   sharp.concurrency(limits.imageThreads)
-  const key = `${profile}:${JSON.stringify(limits)}`
+  const key = `${profile}:${usage}:${guard}:${JSON.stringify(limits)}`
   if (key !== appliedProfile) {
     appliedProfile = key
-    console.info('[KOMA] Perfil de desempenho', { profile, ...limits })
+    console.info('[KOMA] Perfil de desempenho', { profile, usage, guard, ...limits })
   }
   // Vagas novas de OCR liberam quem esperava.
   while (ocrRunning < ocrSlots && ocrWaiting.length) ocrWaiting.shift()?.()

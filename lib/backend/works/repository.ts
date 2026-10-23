@@ -8,6 +8,7 @@ import { localizeMetadata } from './synopsis'
 import { pendingRenderPages } from './render'
 import { customWorkUrl } from './catalog'
 import { SAME_LANGUAGE_SQL } from '@/lib/languages'
+import { hostsByChapter, phantomChapters } from './phantom-chapters'
 
 // Fontes diferentes tentadas para o mesmo capítulo antes de marcar erro.
 const MAX_VERSION_ATTEMPTS = 6
@@ -55,6 +56,10 @@ export interface PageRow {
   height: number | null
 }
 const now = () => new Date().toISOString()
+// Aviso guardado no capítulo fantasma dispensado automaticamente (identifica quem pode voltar à fila).
+const PHANTOM_NOTE = / lista este capítulo; as outras fontes pulam do anterior para o seguinte\./
+const phantomMessage = (host: string) =>
+  `Só ${host} lista este capítulo; as outras fontes pulam do anterior para o seguinte. Ele não conta no total e não prende a fila.`
 
 export class WorksRepository {
   constructor(public readonly database: Database.Database = db) {}
@@ -143,7 +148,10 @@ export class WorksRepository {
   list(userId: number): WorkSummary[] {
     const rows = this.database
       .prepare(
-        `SELECT w.*, COUNT(c.id) AS total_chapters,
+        `SELECT w.*, COALESCE(SUM(c.state<>'skipped'),0) AS total_chapters, COALESCE(SUM(c.phantom<>1),0) AS cataloged_chapters,
+      COALESCE(SUM(c.state='error'),0) AS error_chapters,
+      COALESCE(SUM(c.state NOT IN ('ready','partial','error','skipped') AND c.state<>'blocked' AND c.retry_after>@now),0) AS waiting_chapters,
+      COALESCE(SUM(c.state NOT IN ('ready','partial','error','skipped') AND (c.state='blocked' OR c.retry_after<=@now)),0) AS active_chapters,
       COALESCE(SUM(c.state IN ('ready','partial')),0) AS ready_chapters, COALESCE(SUM(c.read_done),0) AS read_chapters,
       COALESCE(SUM(c.state IN ('ready','partial') AND c.read_done=0 AND c.position > (SELECT COALESCE(MAX(r.position),-1) FROM work_chapters r WHERE r.work_id=w.id AND r.read_done=1)),0) AS unread_ready,
       COALESCE(SUM(c.page_count),0) AS total_pages,
@@ -151,13 +159,17 @@ export class WorksRepository {
       (SELECT COUNT(*) FROM work_pages p JOIN work_chapters cp ON cp.id=p.chapter_id WHERE cp.work_id=w.id AND p.image_id IS NOT NULL) AS downloaded_pages,
       (SELECT COUNT(*) FROM work_chapters cp WHERE cp.work_id=w.id AND cp.page_count>0 AND (SELECT COUNT(*) FROM work_pages p WHERE p.chapter_id=cp.id AND p.image_id IS NOT NULL)=cp.page_count) AS downloaded_chapters,
       (SELECT COUNT(*) FROM work_pages p JOIN work_chapters cp ON cp.id=p.chapter_id WHERE cp.work_id=w.id AND (p.upgrade_pending=1 OR p.render_stale=1)) AS revision_pending
-      FROM works w LEFT JOIN work_chapters c ON c.work_id=w.id WHERE w.user_id=? GROUP BY w.id ORDER BY COALESCE(w.last_opened_at,w.created_at) DESC,w.id DESC`,
+      FROM works w LEFT JOIN work_chapters c ON c.work_id=w.id WHERE w.user_id=@userId GROUP BY w.id ORDER BY COALESCE(w.last_opened_at,w.created_at) DESC,w.id DESC`,
       )
-      .all(userId) as Array<
+      .all({ userId, now: Date.now() }) as Array<
       WorkRow & {
         favorite: number
         last_synced_at: string | null
         total_chapters: number
+        cataloged_chapters: number
+        error_chapters: number
+        waiting_chapters: number
+        active_chapters: number
         ready_chapters: number
         read_chapters: number
         total_pages: number
@@ -192,6 +204,10 @@ export class WorksRepository {
         syncRequested: Boolean(row.sync_requested),
         lastSyncedAt: row.last_synced_at,
         totalChapters: row.total_chapters,
+        catalogedChapters: row.cataloged_chapters,
+        errorChapters: row.error_chapters,
+        waitingChapters: row.waiting_chapters,
+        activeChapters: row.active_chapters,
         readyChapters: row.ready_chapters,
         readChapters: row.read_chapters,
         totalPages: row.total_pages,
@@ -201,7 +217,7 @@ export class WorksRepository {
         lastOpenedAt: row.last_opened_at,
         unreadReady: row.unread_ready,
         nextChapter: (next.get(row.id, row.id) as WorkSummary['nextChapter'] | undefined) ?? null,
-        translationWait: row.ready_chapters < row.total_chapters ? this.cooldown() : null,
+        translationWait: row.active_chapters > 0 ? this.cooldown() : null,
         targetLanguage: row.target_language || 'pt-br',
         revisionPending: row.revision_pending,
         coverUrl: metadata.coverFile
@@ -228,6 +244,8 @@ export class WorksRepository {
         ready_pages: number
         read_done: number
         created_at: string
+        phantom: number
+        retry_after: number
       }
     >
     const chapters: WorkChapter[] = rows.map((c) => ({
@@ -246,6 +264,8 @@ export class WorksRepository {
       readyPages: c.ready_pages,
       read: Boolean(c.read_done),
       createdAt: c.created_at,
+      phantom: c.phantom === 1,
+      retryAt: c.state === 'queued' && c.retry_after > Date.now() ? c.retry_after : null,
     }))
     const sources = this.database
       .prepare(
@@ -364,6 +384,7 @@ export class WorksRepository {
         }
       }
       if (choice.length && chapters.length) this.database.prepare('UPDATE works SET chapter_choice=NULL WHERE id=?').run(workId)
+      this.markPhantoms(workId)
       // Capítulo esperando a fonte voltar e que ganhou outra versão nesta busca: tenta já.
       this.database
         .prepare(
@@ -379,6 +400,65 @@ export class WorksRepository {
         .run(now(), workId, workId, chapters.length ? '' : 'A fonte não disponibiliza páginas para esta obra neste momento.', now(), workId)
       return added
     })()
+  }
+  /**
+   * Capítulos fantasma (lib/backend/works/phantom-chapters.ts) pelas versões já conhecidas
+   * de todas as fontes: dispensa os novos e devolve à fila os que outra fonte passou a listar.
+   */
+  markPhantoms(workId: number) {
+    const versions = (
+      this.database
+        .prepare(
+          "SELECT chapter_key AS key, source_id AS sourceId, json_extract(metadata_json,'$.number') AS number FROM work_source_versions WHERE work_id=?",
+        )
+        .all(workId) as Array<{ key: string; sourceId: string; number: string | number | null }>
+    ).map((version) => ({ ...version, number: version.number === null ? null : String(version.number) }))
+    const phantoms = phantomChapters(versions)
+    const hosts = hostsByChapter(versions)
+    const rows = this.database
+      .prepare('SELECT id,chapter_key,state,phantom,message FROM work_chapters WHERE work_id=?')
+      .all(workId) as Array<{
+      id: number
+      chapter_key: string
+      state: string
+      phantom: number
+      message: string
+    }>
+    let changed = 0
+    for (const row of rows) {
+      const only = phantoms.get(row.chapter_key)
+      if (only && row.phantom === 0 && !['ready', 'partial'].includes(row.state)) {
+        // Dispensado pela pessoa: continua igual, só sai do total.
+        if (row.state === 'skipped') this.database.prepare('UPDATE work_chapters SET phantom=1 WHERE id=?').run(row.id)
+        else
+          this.database
+            .prepare("UPDATE work_chapters SET state='skipped',phantom=1,attempts=0,retry_after=0,message=?,updated_at=? WHERE id=?")
+            .run(phantomMessage(only), now(), row.id)
+        changed++
+      } else if (!only && row.phantom === 1 && (hosts.get(row.chapter_key)?.size || 0) >= 2) {
+        // Outra fonte passou a listar o capítulo: deixa de ser fantasma.
+        if (row.state === 'skipped' && PHANTOM_NOTE.test(row.message))
+          this.database
+            .prepare(
+              "UPDATE work_chapters SET state='queued',phantom=0,attempts=0,version_attempts=0,retry_after=0,message='',updated_at=? WHERE id=?",
+            )
+            .run(now(), row.id)
+        else this.database.prepare('UPDATE work_chapters SET phantom=0 WHERE id=?').run(row.id)
+        changed++
+      }
+    }
+    if (
+      changed &&
+      !this.database
+        .prepare("SELECT 1 FROM work_chapters WHERE work_id=? AND state NOT IN ('ready','partial','error','skipped') LIMIT 1")
+        .get(workId)
+    )
+      this.database
+        .prepare(
+          "UPDATE works SET stage=CASE WHEN EXISTS(SELECT 1 FROM work_chapters WHERE work_id=? AND state IN ('partial','error')) THEN 'partial' ELSE 'ready' END,message='',updated_at=? WHERE id=?",
+        )
+        .run(workId, now(), workId)
+    return changed
   }
   stage(workId: number, stage: string, message = '') {
     this.database.prepare('UPDATE works SET stage=?,message=?,updated_at=? WHERE id=?').run(stage, message, now(), workId)
@@ -596,8 +676,11 @@ export class WorksRepository {
         this.database.prepare('UPDATE works SET sync_requested=1,sync_attempts=0,sync_retry_after=0 WHERE id=?').run(workId)
       } else if (action === 'download') {
         if (chapter.state !== 'skipped') return false
+        // Fantasma que a pessoa quer mesmo assim: volta a contar e não é dispensado de novo.
         this.database
-          .prepare("UPDATE work_chapters SET state='queued',attempts=0,retry_after=0,message='',updated_at=? WHERE id=?")
+          .prepare(
+            "UPDATE work_chapters SET state='queued',phantom=CASE WHEN phantom=1 THEN 2 ELSE phantom END,attempts=0,retry_after=0,message='',updated_at=? WHERE id=?",
+          )
           .run(now(), chapterId)
       } else {
         const images = 'SELECT image_id FROM work_pages WHERE chapter_id=? AND image_id IS NOT NULL'

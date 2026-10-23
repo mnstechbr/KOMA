@@ -218,11 +218,27 @@ if (!app.requestSingleInstanceLock()) {
       }
       logFd = fs.openSync(logFile, 'a', 0o600)
       const bundleRoot = path.resolve(__dirname, '../../..')
+      // Placas de vídeo do computador, só para mostrar em Preferências > Desempenho
+      // (o perfil automático decide pela medição da própria placa).
+      try {
+        const info = await Promise.race([app.getGPUInfo('basic'), new Promise((resolve) => setTimeout(resolve, 3000, null))])
+        const cards = (info?.gpuDevice || []).map(({ vendorId, deviceId, vendorString, deviceString, active }) => ({
+          vendorId,
+          deviceId,
+          vendorString,
+          deviceString,
+          active,
+        }))
+        if (cards.length) process.env.KOMA_GPUS = JSON.stringify(cards)
+      } catch {
+        /* Sem a lista, a tela só não mostra o nome da placa. */
+      }
       backend = await startBackend({
         nodePath: bundledNode(bundleRoot, process.platform),
         serverDir: path.join(bundleRoot, 'server'),
         dataDir,
         logFd,
+        portFile: path.join(configDir, 'porta'),
         automation: process.env.KOMA_AUTOMATION_DISABLED !== '1',
       })
       if (quitting) {
