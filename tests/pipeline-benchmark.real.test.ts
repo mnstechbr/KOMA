@@ -223,12 +223,9 @@ function sampler() {
         /* Sem sensor. */
       }
     const gpu = await nvidia()
-    if (gpu && gpu.every(Number.isFinite)) {
-      series.gpuUtil.push(gpu[0])
-      series.vramMb.push(gpu[1])
-      series.gpuTemp.push(gpu[2])
-      series.gpuWatts.push(gpu[3])
-    }
+    // nvidia-smi devolve "[N/A]" em campos que a placa não informa: cada um entra só se for número.
+    const lists = [series.gpuUtil, series.vramMb, series.gpuTemp, series.gpuWatts]
+    if (gpu) lists.forEach((list, index) => Number.isFinite(gpu[index]) && list.push(gpu[index]))
   }
   tick()
   const timer = setInterval(tick, 250)
