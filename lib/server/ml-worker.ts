@@ -3,7 +3,7 @@
 // as telas do app. Recebe pedidos do lib/server/ml.ts e devolve as respostas.
 import { parentPort } from 'node:worker_threads'
 import { configureOcr, extractTextBoxesNode, probeGpu, recognizeImageTextNode } from './manga-ocr-node'
-import { configureInpaint, inpaintAvailable, lamaInpaint, textMask, textMaskReader } from './inpaint'
+import { configureInpaint, drawStatus, inpaintAvailable, lamaInpaint, textMask, textMaskReader } from './inpaint'
 import { renderTranslatedPage, type RenderItem } from './render-translation'
 import { setPromoNames } from '@/lib/promo-text'
 
@@ -13,10 +13,11 @@ const handlers: Record<string, (...args: never[]) => unknown> = {
     configureOcr(ocr)
     return true
   },
-  configureDraw: (draw: { device: 'cpu' | 'webgpu'; drawThreads?: number }) => {
-    configureInpaint(draw.device, draw.drawThreads || 0)
+  configureDraw: (draw: { device: 'cpu' | 'webgpu'; drawThreads?: number; drawDevice?: 'cpu' | 'webgpu' | 'cuda'; cudaDir?: string }) => {
+    configureInpaint(draw.drawDevice || draw.device, draw.drawThreads || 0, draw.cudaDir || '')
     return true
   },
+  drawStatus: () => drawStatus(),
   extract: (bytes: Uint8Array, language: string) => extractTextBoxesNode(Buffer.from(bytes), language),
   recognize: (bytes: Uint8Array, timeout: number, language: string) => recognizeImageTextNode(Buffer.from(bytes), timeout, language),
   probe: () => probeGpu(),

@@ -17,34 +17,110 @@ const SIDE = 1024
 const LAMA_SIDE = 512
 
 // Mesmo dispositivo do OCR (placa de vídeo no perfil Máximo); definido pelo perfil de desempenho.
-// Compartilhado entre as cópias do módulo que o Next carrega em cada rota (o
-// editor de balões desenha pela rota, com os modelos já carregados pela fila).
+// Com o complemento CUDA (opcional, só Linux com NVIDIA), o desenho usa CUDA e o OCR
+// continua no WebGPU. Compartilhado entre as cópias do módulo que o Next carrega em
+// cada rota (o editor de balões desenha pela rota, com os modelos já carregados pela fila).
+export type DrawDevice = 'cpu' | 'webgpu' | 'cuda'
 const shared = ((
   globalThis as typeof globalThis & {
     __komaInpaint?: {
-      device: 'cpu' | 'webgpu'
+      device: DrawDevice
       threads?: number
+      cudaDir?: string
+      cudaError?: string
       detector: Promise<ort.InferenceSession> | null
       lama: Promise<ort.InferenceSession> | null
     }
   }
 ).__komaInpaint ||= { device: 'cpu', threads: 0, detector: null, lama: null })
 /** Dispositivo e threads do ONNX no desenho (0 = padrão do onnxruntime), conforme o perfil. */
-export function configureInpaint(next: 'cpu' | 'webgpu', threads = 0) {
-  if (next === shared.device && threads === (shared.threads || 0)) return
+export function configureInpaint(next: DrawDevice, threads = 0, cudaDir = '') {
+  if (next === shared.device && threads === (shared.threads || 0) && cudaDir === (shared.cudaDir || '')) return
   shared.device = next
   shared.threads = threads
+  shared.cudaDir = cudaDir
+  if (next === 'cuda') shared.cudaError = undefined
   shared.detector = null
   shared.lama = null
 }
+/** Dispositivo em uso no desenho e o erro, se o CUDA falhou e o desenho voltou para o WebGPU. */
+export function drawStatus() {
+  return { device: shared.device, cudaError: shared.cudaError || null }
+}
 const intraThreads = () => Number(process.env.KOMA_INPAINT_THREADS) || shared.threads || 0
-const options = (): ort.InferenceSession.SessionOptions => ({
-  executionProviders: shared.device === 'webgpu' ? ['webgpu', 'cpu'] : ['cpu'],
+const options = (device: DrawDevice): ort.InferenceSession.SessionOptions => ({
+  executionProviders: device === 'cuda' ? ['cuda', 'cpu'] : device === 'webgpu' ? ['webgpu', 'cpu'] : ['cpu'],
   graphOptimizationLevel: 'all',
   logSeverityLevel: 3,
   // KOMA_INPAINT_THREADS só para medições (tests/pipeline-benchmark.real.test.ts).
   ...(intraThreads() > 0 ? { intraOpNumThreads: intraThreads() } : {}),
 })
+
+// Bibliotecas da NVIDIA que o provider CUDA do onnxruntime pede, na ordem de dependência.
+export const CUDA_LIBS = [
+  'libcudart.so.13',
+  'libcublasLt.so.13',
+  'libcublas.so.13',
+  'libcufft.so.12',
+  'libcurand.so.10',
+  'libnvrtc.so.13',
+  'libcudnn.so.9',
+]
+export const CUDA_PROVIDER = 'libonnxruntime_providers_cuda.so'
+let cudaPrepared = ''
+/**
+ * Deixa o CUDA pronto sem reiniciar o app: o provider precisa estar ao lado do
+ * onnxruntime (link para a pasta do complemento) e as bibliotecas da NVIDIA são
+ * carregadas pelo caminho completo antes, com RTLD_NODELETE, para o provider achá-las
+ * pelo nome sem LD_LIBRARY_PATH.
+ */
+export function prepareCuda(
+  dir: string,
+  ortDir = path.join(/*turbopackIgnore: true*/ process.cwd(), 'node_modules/onnxruntime-node/bin/napi-v6/linux/x64'),
+  load = process.dlopen,
+) {
+  if (cudaPrepared === dir) return
+  if (process.platform !== 'linux' || process.arch !== 'x64') throw new Error('O complemento CUDA só funciona no Linux x64.')
+  const lib = path.join(dir, 'lib')
+  for (const name of [...CUDA_LIBS, CUDA_PROVIDER])
+    if (!fs.existsSync(path.join(lib, name))) throw new Error(`Arquivo do CUDA ausente: ${name}`)
+  const target = path.join(ortDir, CUDA_PROVIDER)
+  const source = path.join(lib, CUDA_PROVIDER)
+  let link: string | null = null
+  try {
+    link = fs.readlinkSync(target)
+  } catch {
+    /* Não é link: arquivo do próprio pacote (modo de desenvolvimento) ou ausente. */
+  }
+  if (link !== source && !(link === null && fs.existsSync(target))) {
+    fs.rmSync(target, { force: true })
+    fs.symlinkSync(source, target)
+  }
+  // RTLD_NOW | RTLD_GLOBAL | RTLD_NODELETE (glibc): a biblioteca fica carregada mesmo
+  // depois que o Node recusa o arquivo por não ser um módulo dele.
+  const flags = 0x2 | 0x100 | 0x1000
+  for (const name of CUDA_LIBS)
+    try {
+      load({ exports: {} }, path.join(lib, name), flags)
+    } catch (error) {
+      if (!/self-register/i.test(error instanceof Error ? error.message : String(error))) throw error
+    }
+  cudaPrepared = dir
+}
+async function createSession(file: string) {
+  if (shared.device === 'cuda') {
+    try {
+      prepareCuda(shared.cudaDir || '')
+      return await ort.InferenceSession.create(file, options('cuda'))
+    } catch (error) {
+      // Faltou arquivo, driver antigo, placa ocupada: volta sozinho para a placa via WebGPU e avisa.
+      shared.cudaError = error instanceof Error ? error.message.slice(0, 300) : String(error)
+      shared.device = 'webgpu'
+      console.error('[KOMA] CUDA indisponível; o desenho voltou para o WebGPU', { message: shared.cudaError })
+    }
+  }
+  return ort.InferenceSession.create(file, options(shared.device))
+}
 
 export function inpaintAvailable() {
   return fs.existsSync(detectorFile()) && fs.existsSync(LAMA)
@@ -61,7 +137,7 @@ export function textMaskReader(image: Buffer) {
   let page: Promise<Page> | null = null
   const windows = new Map<number, Promise<void>>()
   const read = async (p: Page, start: number) => {
-    shared.detector ||= ort.InferenceSession.create(detectorFile(), options())
+    shared.detector ||= createSession(detectorFile())
     const session = await shared.detector
     const { data, W, mask, window } = p
     const scale = SIDE / Math.max(W, window)
@@ -129,7 +205,7 @@ export function textMask(image: Buffer): Promise<Uint8Array | null> {
  */
 export async function lamaInpaint(data: Float32Array, width: number, height: number, mask: Uint8Array) {
   if (!inpaintAvailable()) return false
-  shared.lama ||= ort.InferenceSession.create(LAMA, options())
+  shared.lama ||= createSession(LAMA)
   const session = await shared.lama
   let x1 = width
   let y1 = height

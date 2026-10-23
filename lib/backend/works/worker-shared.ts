@@ -4,6 +4,7 @@ import sharp from 'sharp'
 import { recoverOcr } from '@/lib/server/ocr-recovery'
 import { inspectPublicationSources } from './publication-sources'
 import { configureMl } from '@/lib/server/ml'
+import { cudaActive, cudaDir } from './cuda-addon'
 import { SectionsRepository } from '../sections/sections.repository'
 import type { OcrDetection } from '../sections/sections.types'
 import { WorksRepository } from './repository'
@@ -144,7 +145,17 @@ export function applyPerformance(database: WorksRepository['database']) {
   RENDER_TASKS = limits.render
   UPGRADE_TASKS = limits.upgrade
   ocrSlots = limits.ocrSlots
-  void configureMl({ device: limits.ocrDevice, threads: limits.ocrThreads, drawThreads: limits.drawThreads })
+  // Complemento CUDA (opcional): só no Máximo, só o desenho; o OCR continua no WebGPU.
+  void cudaActive(database)
+    .catch(() => false)
+    .then((cuda) =>
+      configureMl({
+        device: limits.ocrDevice,
+        threads: limits.ocrThreads,
+        drawThreads: limits.drawThreads,
+        ...(cuda && profile === 'maximo' ? { drawDevice: 'cuda' as const, cudaDir: cudaDir() } : {}),
+      }),
+    )
   sharp.concurrency(limits.imageThreads)
   const key = `${profile}:${JSON.stringify(limits)}`
   if (key !== appliedProfile) {

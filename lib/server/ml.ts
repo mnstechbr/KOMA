@@ -15,6 +15,10 @@ export interface MlConfig {
   threads: number
   /** Threads do ONNX no desenho (detector de letras e LaMa); 0 = padrão do onnxruntime. */
   drawThreads?: number
+  /** Dispositivo do desenho, quando difere do OCR (complemento CUDA). */
+  drawDevice?: 'cpu' | 'webgpu' | 'cuda'
+  /** Pasta do complemento CUDA (bibliotecas em lib/). */
+  cudaDir?: string
 }
 const shared = globalThis as typeof globalThis & {
   __komaMl2?: {
@@ -90,7 +94,9 @@ export async function configureMl(config: MlConfig) {
     current &&
     current.device === config.device &&
     current.threads === config.threads &&
-    (current.drawThreads || 0) === (config.drawThreads || 0)
+    (current.drawThreads || 0) === (config.drawThreads || 0) &&
+    (current.drawDevice || '') === (config.drawDevice || '') &&
+    (current.cudaDir || '') === (config.cudaDir || '')
   )
     return
   state.config = config
@@ -101,7 +107,12 @@ export async function configureMl(config: MlConfig) {
   }
   const [{ configureOcr }, { configureInpaint }] = await Promise.all([import('./manga-ocr-node'), import('./inpaint')])
   configureOcr(config)
-  configureInpaint(config.device, config.drawThreads || 0)
+  configureInpaint(config.drawDevice || config.device, config.drawThreads || 0, config.cudaDir || '')
+}
+/** Dispositivo em uso no desenho e o erro do CUDA, se ele falhou e o desenho voltou para o WebGPU. */
+export async function drawDeviceStatus(): Promise<{ device: string; cudaError: string | null }> {
+  if (worker('draw')) return call('draw', 'drawStatus', [])
+  return (await import('./inpaint')).drawStatus()
 }
 export async function extractText(
   bytes: Buffer,
