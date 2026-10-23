@@ -36,7 +36,9 @@ const HOUR = 60 * 60 * 1000
 const benchEp = process.env.KOMA_BENCH_EP
 // KOMA_BENCH_NOSPIN=1: threads do onnxruntime dormem em vez de girar esperando trabalho.
 const noSpin = process.env.KOMA_BENCH_NOSPIN === '1'
-if (benchEp || noSpin) {
+// KOMA_BENCH_WEBGPU_POWER=low-power (ou high-performance): qual placa o WebGPU escolhe num PC híbrido.
+const webgpuPower = process.env.KOMA_BENCH_WEBGPU_POWER
+if (benchEp || noSpin || webgpuPower) {
   const create = ort.InferenceSession.create.bind(ort.InferenceSession) as (...args: unknown[]) => Promise<ort.InferenceSession>
   const providers = benchEp === 'tensorrt' ? ['tensorrt', 'cuda', 'cpu'] : [benchEp, 'cpu']
   ;(ort.InferenceSession as unknown as { create: unknown }).create = (model: unknown, options?: ort.InferenceSession.SessionOptions) =>
@@ -46,7 +48,14 @@ if (benchEp || noSpin) {
       ...(benchEp && (process.env.KOMA_BENCH_EP_SCOPE !== 'draw' || /comic-text-detector|lama/.test(String(model)))
         ? { executionProviders: providers }
         : {}),
-      ...(noSpin ? { extra: { session: { intra_op: { allow_spinning: '0' }, inter_op: { allow_spinning: '0' } } } } : {}),
+      ...(noSpin || webgpuPower
+        ? {
+            extra: {
+              ...(noSpin ? { session: { intra_op: { allow_spinning: '0' }, inter_op: { allow_spinning: '0' } } } : {}),
+              ...(webgpuPower ? { ep: { webgpuexecutionprovider: { powerPreference: webgpuPower } } } : {}),
+            },
+          }
+        : {}),
     })
 }
 
