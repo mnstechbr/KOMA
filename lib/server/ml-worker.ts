@@ -11,7 +11,10 @@ type Request = { id: number; method: string; args: unknown[] }
 const handlers: Record<string, (...args: never[]) => unknown> = {
   configure: (ocr: { device: 'cpu' | 'webgpu'; threads: number }) => {
     configureOcr(ocr)
-    configureInpaint(ocr.device)
+    return true
+  },
+  configureDraw: (draw: { device: 'cpu' | 'webgpu'; drawThreads?: number }) => {
+    configureInpaint(draw.device, draw.drawThreads || 0)
     return true
   },
   extract: (bytes: Uint8Array, language: string) => extractTextBoxesNode(Buffer.from(bytes), language),

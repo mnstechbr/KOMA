@@ -181,7 +181,7 @@ it.skipIf(mode !== 'run')(
     expect(inpaintAvailable()).toBe(true)
     const limits = limitsFor(profile)
     configureOcr({ device: limits.ocrDevice, threads: limits.ocrThreads })
-    configureInpaint(limits.ocrDevice)
+    configureInpaint(limits.ocrDevice, limits.drawThreads)
     const bytes = manifest.pages.map((page) => fs.readFileSync(path.join(root, 'chapters', label, page.file)))
     const timing = (holder: { mask: number; inpaint: number }) => (original: Buffer) => {
       // Como o lib/server/ml-worker.ts monta os modelos do desenho.

@@ -19,6 +19,8 @@ export interface PerformanceLimits {
   render: number
   upgrade: number
   imageThreads: number
+  /** Threads do ONNX no desenho (detector de letras e LaMa), no worker do desenho; 0 = padrão do onnxruntime. */
+  drawThreads: number
 }
 
 const KEY = 'koma:performance:v1'
@@ -39,9 +41,20 @@ export function limitsFor(profile: PerformanceProfile, cores = os.availableParal
       render: 1,
       upgrade: 1,
       imageThreads: Math.min(2, cores),
+      drawThreads: 0,
     }
   if (profile === 'maximo')
-    return { downloads: 6, ocrSlots: 6, ocrThreads: 2, ocrDevice: 'webgpu', translation: 6, render: 4, upgrade: 4, imageThreads: 0 }
+    return {
+      downloads: 6,
+      ocrSlots: 6,
+      ocrThreads: 2,
+      ocrDevice: 'webgpu',
+      translation: 6,
+      render: 4,
+      upgrade: 4,
+      imageThreads: 0,
+      drawThreads: 0,
+    }
   return {
     downloads: 4,
     ocrSlots: 4,
@@ -51,6 +64,7 @@ export function limitsFor(profile: PerformanceProfile, cores = os.availableParal
     render: 4,
     upgrade: 4,
     imageThreads: 0,
+    drawThreads: 0,
   }
 }
 
