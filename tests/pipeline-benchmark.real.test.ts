@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import Database from 'better-sqlite3'
+import * as ort from 'onnxruntime-node'
 import sharp from 'sharp'
 import { expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
@@ -28,6 +29,16 @@ const root = process.env.KOMA_BENCH_DIR || path.join(os.homedir(), '.cache/koma-
 const library = process.env.KOMA_BENCH_LIBRARY || path.join(os.homedir(), '.local/share/koma/library')
 const maxPages = Number(process.env.KOMA_BENCH_MAX_PAGES || 40)
 const HOUR = 60 * 60 * 1000
+
+// KOMA_BENCH_EP=cuda (ou tensorrt) troca o dispositivo de todos os modelos só nesta medição,
+// para comparar com o WebGPU sem mudar o app. As bibliotecas da NVIDIA vêm por LD_LIBRARY_PATH.
+const benchEp = process.env.KOMA_BENCH_EP
+if (benchEp) {
+  const create = ort.InferenceSession.create.bind(ort.InferenceSession) as (...args: unknown[]) => Promise<ort.InferenceSession>
+  const providers = benchEp === 'tensorrt' ? ['tensorrt', 'cuda', 'cpu'] : [benchEp, 'cpu']
+  ;(ort.InferenceSession as unknown as { create: unknown }).create = (model: unknown, options?: ort.InferenceSession.SessionOptions) =>
+    create(model, { ...options, executionProviders: providers })
+}
 
 interface Manifest {
   label: string
@@ -262,6 +273,7 @@ it.skipIf(mode !== 'run')(
         when: new Date().toISOString(),
         machine: { cpus: os.availableParallelism(), memoryGb: Math.round(os.totalmem() / 1024 ** 3), load: os.loadavg() },
         limits,
+        executionProvider: benchEp || limits.ocrDevice,
         inpaintThreads: Number(process.env.KOMA_INPAINT_THREADS) || null,
         pages: manifest.pages.length,
         warmupMs: round(warmupMs),
