@@ -72,6 +72,8 @@ export interface WorkChapter extends SourceChapter {
   readyPages: number
   read: boolean
   createdAt: string
+  /** Listado por uma fonte só e pulado pelas outras: dispensado e fora do total. */
+  phantom?: boolean
 }
 export const preparationLabels: Record<string, string> = {
   discovering: 'Buscando capítulos',

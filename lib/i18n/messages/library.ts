@@ -23,6 +23,9 @@ export const libraryMessages: Catalog = {
     Biblioteca: 'Library',
     'Não foi possível abrir o capítulo.': 'Could not open the chapter.',
     'NÃO BAIXADO': 'NOT DOWNLOADED',
+    IGNORADO: 'IGNORED',
+    'Só uma fonte lista este capítulo e as outras pulam do anterior para o seguinte: ele parece não existir e não conta no total. Clique para baixar mesmo assim.':
+      'Only one source lists this chapter and the others go straight from the previous one to the next: it seems not to exist and does not count in the total. Click to download it anyway.',
     'Capítulo na fila para baixar e preparar.': 'Chapter queued to download and prepare.',
     'Baixar {name}': 'Download {name}',
     'Capítulo não escolhido ao adicionar. Clique para baixar e preparar.': 'Chapter not chosen when adding. Click to download and prepare.',
@@ -295,6 +298,9 @@ export const libraryMessages: Catalog = {
     Biblioteca: 'Biblioteca',
     'Não foi possível abrir o capítulo.': 'No se pudo abrir el capítulo.',
     'NÃO BAIXADO': 'NO DESCARGADO',
+    IGNORADO: 'IGNORADO',
+    'Só uma fonte lista este capítulo e as outras pulam do anterior para o seguinte: ele parece não existir e não conta no total. Clique para baixar mesmo assim.':
+      'Solo una fuente lista este capítulo y las demás pasan directamente del anterior al siguiente: parece no existir y no cuenta en el total. Haz clic para descargarlo de todos modos.',
     'Capítulo na fila para baixar e preparar.': 'Capítulo en cola para descargar y preparar.',
     'Baixar {name}': 'Descargar {name}',
     'Capítulo não escolhido ao adicionar. Clique para baixar e preparar.':

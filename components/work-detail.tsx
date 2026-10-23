@@ -43,6 +43,7 @@ function cell(chapter: WorkChapter, work: WorkSummary, t: Translate) {
     }
   }
   if (chapter.state === 'error') return { tone: 'is-error', tag: t('ERRO'), readable }
+  if (chapter.state === 'skipped' && chapter.phantom) return { tone: 'is-skipped', tag: t('IGNORADO'), readable }
   if (chapter.state === 'skipped') return { tone: 'is-skipped', tag: t('NÃO BAIXADO'), readable }
   return { tone: 'is-waiting', tag: t(waitingTags[chapter.state] || 'FILA'), readable }
 }
@@ -430,7 +431,13 @@ export function WorkDetail({ id }: { id: number }) {
                           disabled={busy}
                           onClick={() => void download(chapter)}
                           aria-label={t('Baixar {name}', { name })}
-                          title={t('Capítulo não escolhido ao adicionar. Clique para baixar e preparar.')}
+                          title={
+                            chapter.phantom
+                              ? t(
+                                  'Só uma fonte lista este capítulo e as outras pulam do anterior para o seguinte: ele parece não existir e não conta no total. Clique para baixar mesmo assim.',
+                                )
+                              : t('Capítulo não escolhido ao adicionar. Clique para baixar e preparar.')
+                          }
                         >
                           {body}
                         </button>
