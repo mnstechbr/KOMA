@@ -14,6 +14,7 @@ interface Snapshot {
   gpu: boolean | null
   gpuSpeedup?: number | null
   slowGpu?: boolean
+  wrongGpu?: boolean
   cards?: Array<{ name: string; kind: 'dedicated' | 'integrated' | null; active: boolean }>
 }
 
@@ -67,9 +68,11 @@ export function PerformanceSettings() {
       title: t('Máximo'),
       note:
         data.gpu === false
-          ? data.slowGpu
-            ? t('A placa de vídeo deste computador é mais lenta que o processador.')
-            : t('Placa de vídeo não disponível neste computador.')
+          ? data.wrongGpu
+            ? t('A placa de vídeo deste computador dá resultados diferentes do processador e perderia falas.')
+            : data.slowGpu
+              ? t('A placa de vídeo deste computador é mais lenta que o processador.')
+              : t('Placa de vídeo não disponível neste computador.')
           : t('Lê e desenha as páginas na placa de vídeo, várias vezes mais rápido que o Equilibrado.'),
       disabled: data.gpu === false,
     },
@@ -85,9 +88,11 @@ export function PerformanceSettings() {
             ? data.gpuSpeedup
               ? t('placa de vídeo {n}× mais rápida que o processador', { n: data.gpuSpeedup.toLocaleString(locale) })
               : t('placa de vídeo disponível')
-            : data.slowGpu
-              ? t('a placa de vídeo é mais lenta que o processador e fica sem uso')
-              : t('sem placa de vídeo compatível')}
+            : data.wrongGpu
+              ? t('a placa de vídeo dá resultados errados e fica sem uso')
+              : data.slowGpu
+                ? t('a placa de vídeo é mais lenta que o processador e fica sem uso')
+                : t('sem placa de vídeo compatível')}
       </p>
       {data.cards?.length ? (
         <p className="koma-note">

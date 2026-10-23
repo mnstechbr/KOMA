@@ -475,3 +475,51 @@ export function elapsedMs(started: number) {
 export function gpuFaster(gpuMs: number, cpuMs: number | null) {
   return cpuMs === null || gpuMs <= cpuMs * 0.6
 }
+
+/** Resultado do teste da placa de vídeo (velocidade e conferência com o processador). */
+export interface GpuProbe {
+  available: boolean
+  ms: number | null
+  cpuMs?: number | null
+  /** Maior diferença entre a saída da placa e a do processador, relativa à escala da saída (0 = iguais). */
+  drift?: number | null
+  /** Modelo em que a placa deu resultado diferente do processador (a placa foi recusada). */
+  wrong?: string | null
+}
+
+// Diferença máxima aceita: numa RTX 3070 o detector fica em 0,002% e os leitores em 0;
+// no gráfico integrado Intel UHD (Tiger Lake), que perde e inventa falas, até 55% no
+// detector e 93% num leitor.
+export const GPU_MAX_DRIFT = 0.05
+
+/** Maior diferença entre duas saídas, relativa ao maior valor da saída do processador. */
+export function outputDrift(cpu: ArrayLike<number>, gpu: ArrayLike<number>) {
+  if (cpu.length !== gpu.length) return Infinity
+  let scale = 0
+  let max = 0
+  for (let i = 0; i < cpu.length; i++) {
+    const delta = Math.abs(cpu[i] - gpu[i])
+    // NaN na placa (shader quebrado) também é resultado errado.
+    if (Number.isNaN(delta)) return Infinity
+    max = Math.max(max, delta)
+    scale = Math.max(scale, Math.abs(cpu[i]))
+  }
+  return max / Math.max(scale, 1e-6)
+}
+
+/** A placa só serve se der o mesmo resultado que o processador (rápida mas errada perde falas). */
+export function gpuAccurate(drift: number | null | undefined) {
+  return drift == null || drift <= GPU_MAX_DRIFT
+}
+
+/** Imagem de teste para os modelos: faixas escuras sobre fundo claro, parecidas com linhas de texto. */
+export function probePattern(shape: [number, number, number, number]) {
+  const [, , height, width] = shape
+  const data = new Float32Array(shape.reduce((a, b) => a * b))
+  for (let i = 0; i < data.length; i++) {
+    const x = i % width
+    const y = Math.floor(i / width) % height
+    data[i] = (x >> 3) % 3 === 0 && (y >> 4) % 2 === 0 ? 0.05 : 0.95
+  }
+  return data
+}

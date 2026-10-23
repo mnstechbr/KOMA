@@ -1,5 +1,6 @@
 import os from 'node:os'
 import type Database from 'better-sqlite3'
+import type { GpuProbe } from '@/lib/server/ocr-helpers'
 
 // Perfis de desempenho, medidos com 30 páginas reais (tests/ocr-benchmark.real.test.ts):
 // - Leve (PC com até 4 núcleos ou até 8 GB): OCR com 2 páginas × 2 threads foi o
@@ -103,20 +104,39 @@ export function resolveProfile(mode: PerformanceMode, gpuAvailable: boolean, mac
 }
 
 // Estado em uso pelo processo (fila de preparação e OCR).
-const runtime: { gpu: boolean | null; speedup: number | null; slowGpu: boolean; probing: Promise<boolean> | null } = {
+const runtime: {
+  gpu: boolean | null
+  speedup: number | null
+  slowGpu: boolean
+  wrongGpu: boolean
+  probing: Promise<boolean> | null
+} = {
   gpu: null,
   speedup: null,
   slowGpu: false,
+  wrongGpu: false,
   probing: null,
 }
 
-/** Testa a placa de vídeo uma vez por abertura do app (ela só conta se for mais rápida que o processador). */
-export function detectGpu(probe: () => Promise<{ available: boolean; ms?: number | null; cpuMs?: number | null }>) {
+/**
+ * Testa a placa de vídeo uma vez por abertura do app. Ela só conta se for mais rápida que o
+ * processador e der o mesmo resultado que ele (senão o perfil fica no Equilibrado).
+ */
+export function detectGpu(probe: () => Promise<GpuProbe>) {
   runtime.probing ||= probe()
     .then((result) => {
       runtime.gpu = result.available
       runtime.speedup = result.ms && result.cpuMs ? Math.round((result.cpuMs / result.ms) * 10) / 10 : null
-      runtime.slowGpu = !result.available && result.ms != null
+      runtime.wrongGpu = !result.available && Boolean(result.wrong)
+      runtime.slowGpu = !result.available && !runtime.wrongGpu && result.ms != null
+      if (runtime.wrongGpu)
+        console.warn('[KOMA] Placa de vídeo recusada: resultado diferente do processador', {
+          model: result.wrong,
+          drift: result.drift,
+          ms: result.ms,
+          cpuMs: result.cpuMs,
+        })
+      else console.info('[KOMA] Teste da placa de vídeo', result)
       return result.available
     })
     .catch(() => {
@@ -184,6 +204,7 @@ export function currentPerformance(database: Database.Database) {
     gpu: runtime.gpu,
     gpuSpeedup: runtime.speedup,
     slowGpu: runtime.slowGpu,
+    wrongGpu: runtime.wrongGpu,
     cards: graphicsCards(),
   }
 }

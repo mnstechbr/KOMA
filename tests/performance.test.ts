@@ -10,7 +10,7 @@ import {
   resolveProfile,
   savePerformanceMode,
 } from '../lib/backend/works/performance'
-import { gpuFaster } from '../lib/server/ocr-helpers'
+import { gpuAccurate, gpuFaster, outputDrift, probePattern } from '../lib/server/ocr-helpers'
 
 describe('perfis de desempenho', () => {
   it('escolhe Leve em PC pequeno, Máximo com placa de vídeo e Equilibrado sem ela', () => {
@@ -52,6 +52,34 @@ describe('perfis de desempenho', () => {
     for (const migration of SQLITE_MIGRATIONS) db.exec(migration.up)
     expect(fresh.currentPerformance(db)).toMatchObject({ gpu: false, slowGpu: true, gpuSpeedup: 0 })
     expect(fresh.resolveProfile('maximo', fresh.gpuAvailable(), { cores: 16, memoryGb: 16 })).toBe('equilibrado')
+  })
+  it('placa de vídeo só conta se der o mesmo resultado que o processador', () => {
+    const cpu = Float32Array.from([0, 300, 636, 12])
+    expect(outputDrift(cpu, cpu)).toBe(0)
+    // RTX 3070: diferença de arredondamento no detector (0,0038 numa escala de 636).
+    expect(gpuAccurate(outputDrift(cpu, Float32Array.from([0, 300.0038, 636, 12])))).toBe(true)
+    // Intel UHD integrada: 350 de diferença na mesma escala.
+    expect(gpuAccurate(outputDrift(cpu, Float32Array.from([0, 650, 636, 12])))).toBe(false)
+    expect(outputDrift(cpu, Float32Array.from([0, Number.NaN, 636, 12]))).toBe(Infinity)
+    expect(outputDrift(cpu, Float32Array.from([0, 300]))).toBe(Infinity)
+    expect(gpuAccurate(null)).toBe(true)
+    const pattern = probePattern([1, 3, 48, 384])
+    expect(pattern.length).toBe(3 * 48 * 384)
+    expect(new Set(pattern).size).toBe(2)
+  })
+  it('placa rápida mas errada fica sem uso e o automático fica no Equilibrado', async () => {
+    vi.resetModules()
+    const fresh = await import('../lib/backend/works/performance')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    // Medido no Intel UHD (Tiger Lake): 3 vezes mais rápido que a CPU, mas o detector diverge 55%.
+    await fresh.detectGpu(async () => ({ available: false, ms: 72, cpuMs: 210, drift: 0.55, wrong: 'yolo.onnx' }))
+    const db = new Database(':memory:')
+    for (const migration of SQLITE_MIGRATIONS) db.exec(migration.up)
+    expect(fresh.currentPerformance(db)).toMatchObject({ gpu: false, wrongGpu: true, slowGpu: false })
+    expect(fresh.resolveProfile('auto', fresh.gpuAvailable(), { cores: 16, memoryGb: 16 })).toBe('equilibrado')
+    expect(fresh.resolveProfile('maximo', fresh.gpuAvailable(), { cores: 16, memoryGb: 16 })).toBe('equilibrado')
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Placa de vídeo recusada'), expect.objectContaining({ model: 'yolo.onnx' }))
+    warn.mockRestore()
   })
   it('lê as placas informadas pela janela e separa dedicada de integrada', () => {
     const cards = graphicsCards(

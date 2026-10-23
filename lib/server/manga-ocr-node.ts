@@ -9,7 +9,10 @@ import * as ort from 'onnxruntime-node'
 import sharp from 'sharp'
 import {
   assertModelFile,
+  gpuAccurate,
   gpuFaster,
+  outputDrift,
+  probePattern,
   resolveIntraOpThreads,
   readPaddleDict,
   decodeRgb,
@@ -31,6 +34,7 @@ import {
   scoreText,
   elapsedMs,
   type Detection,
+  type GpuProbe,
   type Box,
   type TileDetection,
   DETECT_IMAGE_SIZE,
@@ -76,35 +80,62 @@ export function configureOcr(next: { device: OcrDevice; threads: number }) {
 /**
  * Testa a placa de vídeo com o detector de balões e mede o mesmo modelo no processador.
  * Funcionar não basta: sem placa, o WebGPU pode cair num renderizador por software
- * (llvmpipe), 40 vezes mais lento que a CPU. Nunca lança erro.
+ * (llvmpipe), 40 vezes mais lento que a CPU. Ser rápida também não: um gráfico integrado
+ * pode dar resultado errado (perde e inventa falas), então a saída do detector e dos
+ * leitores na placa é conferida com a do processador na mesma imagem de teste.
+ * Nunca lança erro.
  */
-export async function probeGpu(): Promise<{ available: boolean; ms: number | null; cpuMs?: number | null }> {
-  const input = new ort.Tensor('float32', new Float32Array(3 * DETECT_IMAGE_SIZE * DETECT_IMAGE_SIZE).fill(0.5), [
-    1,
-    3,
-    DETECT_IMAGE_SIZE,
-    DETECT_IMAGE_SIZE,
-  ])
-  // Tempo por execução, depois de uma execução de aquecimento.
-  const measure = async (options: ort.InferenceSession.SessionOptions) => {
-    const session = await ort.InferenceSession.create(YOLO_MODEL_PATH, { logSeverityLevel: 4, ...options })
+export async function probeGpu(): Promise<GpuProbe> {
+  const cpuOptions: ort.InferenceSession.SessionOptions = {
+    executionProviders: ['cpu'],
+    intraOpNumThreads: Math.min(4, os.availableParallelism()),
+  }
+  const gpuOptions: ort.InferenceSession.SessionOptions = { executionProviders: ['webgpu'] }
+  // Saída da primeira execução e tempo por execução nas seguintes (a primeira aquece).
+  const measure = async (file: string, shape: [number, number, number, number], options: ort.InferenceSession.SessionOptions, runs = 2) => {
+    const session = await ort.InferenceSession.create(file, { logSeverityLevel: 4, ...options })
     try {
-      await session.run({ [session.inputNames[0]]: input })
+      const input = { [session.inputNames[0]]: new ort.Tensor('float32', probePattern(shape), shape) }
+      const output = (await session.run(input))[session.outputNames[0]].data as Float32Array
       const started = performance.now()
-      for (let i = 0; i < 2; i++) await session.run({ [session.inputNames[0]]: input })
-      return (performance.now() - started) / 2
+      for (let i = 0; i < runs; i++) await session.run(input)
+      return { output, ms: runs ? (performance.now() - started) / runs : 0 }
     } finally {
       await session.release().catch(() => undefined)
     }
   }
-  let ms: number
+  const detectShape: [number, number, number, number] = [1, 3, DETECT_IMAGE_SIZE, DETECT_IMAGE_SIZE]
+  let gpu: Awaited<ReturnType<typeof measure>>
   try {
-    ms = await measure({ executionProviders: ['webgpu'] })
+    gpu = await measure(YOLO_MODEL_PATH, detectShape, gpuOptions)
   } catch {
     return { available: false, ms: null, cpuMs: null }
   }
-  const cpuMs = await measure({ executionProviders: ['cpu'], intraOpNumThreads: Math.min(4, os.availableParallelism()) }).catch(() => null)
-  return { available: gpuFaster(ms, cpuMs), ms: Math.round(ms), cpuMs: cpuMs === null ? null : Math.round(cpuMs) }
+  const cpu = await measure(YOLO_MODEL_PATH, detectShape, cpuOptions).catch(() => null)
+  const result: GpuProbe = { available: false, ms: Math.round(gpu.ms), cpuMs: cpu ? Math.round(cpu.ms) : null, drift: null, wrong: null }
+  // Conferência, mesmo se a placa for lenta (o motivo fica registrado): detector e cada
+  // leitor instalado, placa contra processador.
+  const checks: Array<[string, Float32Array | null, Float32Array | null]> = [[YOLO_MODEL_PATH, cpu?.output ?? null, gpu.output]]
+  const lineShape: [number, number, number, number] = [1, 3, OCR_LINE_HEIGHT, OCR_LINE_HEIGHT * 8]
+  for (const file of [OCR_REC_MODEL_PATH, OCR_LATIN_REC_MODEL_PATH, OCR_KOREAN_REC_MODEL_PATH]) {
+    if (!fs.existsSync(file)) continue
+    const onCpu = await measure(file, lineShape, cpuOptions, 0).catch(() => null)
+    const onGpu = await measure(file, lineShape, gpuOptions, 0).catch(() => null)
+    checks.push([file, onCpu?.output ?? null, onGpu?.output ?? null])
+  }
+  let drift = 0
+  for (const [file, onCpu, onGpu] of checks) {
+    if (!onCpu) continue
+    const value = onGpu ? outputDrift(onCpu, onGpu) : Infinity
+    if (value > drift) drift = value
+    if (!gpuAccurate(value)) {
+      result.wrong = path.basename(file)
+      break
+    }
+  }
+  result.drift = Number.isFinite(drift) ? Math.round(drift * 1e6) / 1e6 : null
+  result.available = !result.wrong && gpuFaster(gpu.ms, cpu?.ms ?? null)
+  return result
 }
 
 export async function extractTextBoxesNode(imageBytes: Buffer, language = 'auto') {

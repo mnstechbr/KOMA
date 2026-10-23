@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { Worker } from 'node:worker_threads'
 import type { OcrDevice } from './manga-ocr-node'
+import type { GpuProbe } from './ocr-helpers'
 
 // OCR e apagamento fora da thread das telas. O pacote desktop traz o worker já
 // compilado (koma-ml/ml-worker.mjs, ver scripts/build-ml-worker.mjs); sem ele
@@ -129,7 +130,7 @@ export async function recognizeText(
   if (worker()) return call('ocr', 'recognize', [new Uint8Array(bytes), timeout, language])
   return (await import('./manga-ocr-node')).recognizeImageTextNode(bytes, timeout, language)
 }
-export async function probeGpuDevice(): Promise<{ available: boolean; ms: number | null; cpuMs?: number | null }> {
+export async function probeGpuDevice(): Promise<GpuProbe> {
   if (worker()) return call('ocr', 'probe', [])
   return (await import('./manga-ocr-node')).probeGpu()
 }
