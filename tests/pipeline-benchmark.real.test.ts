@@ -6,7 +6,7 @@ import sharp from 'sharp'
 import { expect, it, vi } from 'vitest'
 vi.mock('server-only', () => ({}))
 import { configureOcr, extractTextBoxesNode } from '../lib/server/manga-ocr-node'
-import { configureInpaint, inpaintAvailable, lamaInpaint, textMask } from '../lib/server/inpaint'
+import { configureInpaint, inpaintAvailable, lamaInpaint, textMaskReader } from '../lib/server/inpaint'
 import { renderTranslatedPage, type RenderItem } from '../lib/server/render-translation'
 import { limitsFor, type PerformanceProfile } from '../lib/backend/works/performance'
 import { workPageItems } from '../lib/backend/works/render'
@@ -184,15 +184,15 @@ it.skipIf(mode !== 'run')(
     configureInpaint(limits.ocrDevice)
     const bytes = manifest.pages.map((page) => fs.readFileSync(path.join(root, 'chapters', label, page.file)))
     const timing = (holder: { mask: number; inpaint: number }) => (original: Buffer) => {
-      let mask: Promise<Uint8Array | null> | null = null
+      // Como o lib/server/ml-worker.ts monta os modelos do desenho.
+      const rows = textMaskReader(original)
       return {
-        mask: () =>
-          (mask ||= (async () => {
-            const started = performance.now()
-            const value = await textMask(original).catch(() => null)
-            holder.mask += performance.now() - started
-            return value
-          })()),
+        mask: async (top?: number, bottom?: number) => {
+          const started = performance.now()
+          const value = await rows(top, bottom).catch(() => null)
+          holder.mask += performance.now() - started
+          return value
+        },
         inpaint: async (data: Float32Array, width: number, height: number, holes: Uint8Array) => {
           const started = performance.now()
           const ok = await lamaInpaint(data, width, height, holes).catch(() => false)
