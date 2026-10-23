@@ -1,6 +1,7 @@
 import 'server-only'
 
 import fs from 'node:fs'
+import os from 'node:os'
 import { detectTextLines, groupLines, openPixels, readingRows, sameRow, type RawPixels, type TextBox } from './text-detect'
 import { isPromoText } from '@/lib/promo-text'
 import path from 'node:path'
@@ -8,6 +9,7 @@ import * as ort from 'onnxruntime-node'
 import sharp from 'sharp'
 import {
   assertModelFile,
+  gpuFaster,
   resolveIntraOpThreads,
   readPaddleDict,
   decodeRgb,
@@ -71,24 +73,38 @@ export function configureOcr(next: { device: OcrDevice; threads: number }) {
   runtimePromise = null
 }
 
-/** Testa se a placa de vídeo roda o detector de balões. Nunca lança erro. */
-export async function probeGpu(): Promise<{ available: boolean; ms: number | null }> {
-  try {
-    const started = performance.now()
-    const session = await ort.InferenceSession.create(YOLO_MODEL_PATH, { executionProviders: ['webgpu'], logSeverityLevel: 4 })
-    const input = new ort.Tensor('float32', new Float32Array(3 * DETECT_IMAGE_SIZE * DETECT_IMAGE_SIZE).fill(0.5), [
-      1,
-      3,
-      DETECT_IMAGE_SIZE,
-      DETECT_IMAGE_SIZE,
-    ])
-    await session.run({ [session.inputNames[0]]: input })
-    const ms = Math.round(performance.now() - started)
-    await session.release().catch(() => undefined)
-    return { available: true, ms }
-  } catch {
-    return { available: false, ms: null }
+/**
+ * Testa a placa de vídeo com o detector de balões e mede o mesmo modelo no processador.
+ * Funcionar não basta: sem placa, o WebGPU pode cair num renderizador por software
+ * (llvmpipe), 40 vezes mais lento que a CPU. Nunca lança erro.
+ */
+export async function probeGpu(): Promise<{ available: boolean; ms: number | null; cpuMs?: number | null }> {
+  const input = new ort.Tensor('float32', new Float32Array(3 * DETECT_IMAGE_SIZE * DETECT_IMAGE_SIZE).fill(0.5), [
+    1,
+    3,
+    DETECT_IMAGE_SIZE,
+    DETECT_IMAGE_SIZE,
+  ])
+  // Tempo por execução, depois de uma execução de aquecimento.
+  const measure = async (options: ort.InferenceSession.SessionOptions) => {
+    const session = await ort.InferenceSession.create(YOLO_MODEL_PATH, { logSeverityLevel: 4, ...options })
+    try {
+      await session.run({ [session.inputNames[0]]: input })
+      const started = performance.now()
+      for (let i = 0; i < 2; i++) await session.run({ [session.inputNames[0]]: input })
+      return (performance.now() - started) / 2
+    } finally {
+      await session.release().catch(() => undefined)
+    }
   }
+  let ms: number
+  try {
+    ms = await measure({ executionProviders: ['webgpu'] })
+  } catch {
+    return { available: false, ms: null, cpuMs: null }
+  }
+  const cpuMs = await measure({ executionProviders: ['cpu'], intraOpNumThreads: Math.min(4, os.availableParallelism()) }).catch(() => null)
+  return { available: gpuFaster(ms, cpuMs), ms: Math.round(ms), cpuMs: cpuMs === null ? null : Math.round(cpuMs) }
 }
 
 export async function extractTextBoxesNode(imageBytes: Buffer, language = 'auto') {

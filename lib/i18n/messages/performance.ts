@@ -15,8 +15,13 @@ export const performanceMessages: Catalog = {
       'For computers with up to 4 cores or up to 8 GB of memory. Prepares slowly and keeps the computer free.',
     'Usa só o processador, com várias páginas ao mesmo tempo.': 'Uses only the processor, with several pages at a time.',
     'Placa de vídeo não disponível neste computador.': 'No graphics card available on this computer.',
-    'Lê o texto das páginas na placa de vídeo, cerca de 3 vezes mais rápido que o Equilibrado.':
-      'Reads page text on the graphics card, about 3 times faster than Balanced.',
+    'Lê e desenha as páginas na placa de vídeo, várias vezes mais rápido que o Equilibrado.':
+      'Reads and draws pages on the graphics card, several times faster than Balanced.',
+    'A placa de vídeo deste computador é mais lenta que o processador.': "This computer's graphics card is slower than the processor.",
+    'placa de vídeo {n}× mais rápida que o processador': 'graphics card {n}× faster than the processor',
+    'a placa de vídeo é mais lenta que o processador e fica sem uso': 'the graphics card is slower than the processor and is not used',
+    dedicada: 'dedicated',
+    integrada: 'integrated',
     '{cores} núcleos · {memory} GB de memória': '{cores} cores · {memory} GB of memory',
     'verificando a placa de vídeo…': 'checking the graphics card…',
     'placa de vídeo disponível': 'graphics card available',
@@ -38,8 +43,14 @@ export const performanceMessages: Catalog = {
       'Para equipos con hasta 4 núcleos o hasta 8 GB de memoria. Prepara despacio y deja el equipo libre.',
     'Usa só o processador, com várias páginas ao mesmo tempo.': 'Usa solo el procesador, con varias páginas a la vez.',
     'Placa de vídeo não disponível neste computador.': 'No hay tarjeta gráfica disponible en este equipo.',
-    'Lê o texto das páginas na placa de vídeo, cerca de 3 vezes mais rápido que o Equilibrado.':
-      'Lee el texto de las páginas en la tarjeta gráfica, unas 3 veces más rápido que Equilibrado.',
+    'Lê e desenha as páginas na placa de vídeo, várias vezes mais rápido que o Equilibrado.':
+      'Lee y dibuja las páginas en la tarjeta gráfica, varias veces más rápido que Equilibrado.',
+    'A placa de vídeo deste computador é mais lenta que o processador.':
+      'La tarjeta gráfica de este equipo es más lenta que el procesador.',
+    'placa de vídeo {n}× mais rápida que o processador': 'tarjeta gráfica {n}× más rápida que el procesador',
+    'a placa de vídeo é mais lenta que o processador e fica sem uso': 'la tarjeta gráfica es más lenta que el procesador y no se usa',
+    dedicada: 'dedicada',
+    integrada: 'integrada',
     '{cores} núcleos · {memory} GB de memória': '{cores} núcleos · {memory} GB de memoria',
     'verificando a placa de vídeo…': 'comprobando la tarjeta gráfica…',
     'placa de vídeo disponível': 'tarjeta gráfica disponible',

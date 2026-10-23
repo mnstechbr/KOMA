@@ -103,13 +103,20 @@ export function resolveProfile(mode: PerformanceMode, gpuAvailable: boolean, mac
 }
 
 // Estado em uso pelo processo (fila de preparação e OCR).
-const runtime: { gpu: boolean | null; probing: Promise<boolean> | null } = { gpu: null, probing: null }
+const runtime: { gpu: boolean | null; speedup: number | null; slowGpu: boolean; probing: Promise<boolean> | null } = {
+  gpu: null,
+  speedup: null,
+  slowGpu: false,
+  probing: null,
+}
 
-/** Testa a placa de vídeo uma vez por abertura do app. */
-export function detectGpu(probe: () => Promise<{ available: boolean }>) {
+/** Testa a placa de vídeo uma vez por abertura do app (ela só conta se for mais rápida que o processador). */
+export function detectGpu(probe: () => Promise<{ available: boolean; ms?: number | null; cpuMs?: number | null }>) {
   runtime.probing ||= probe()
     .then((result) => {
       runtime.gpu = result.available
+      runtime.speedup = result.ms && result.cpuMs ? Math.round((result.cpuMs / result.ms) * 10) / 10 : null
+      runtime.slowGpu = !result.available && result.ms != null
       return result.available
     })
     .catch(() => {
@@ -122,9 +129,61 @@ export function gpuAvailable() {
   return runtime.gpu === true
 }
 
+export interface GraphicsCard {
+  name: string
+  kind: 'dedicated' | 'integrated' | null
+  active: boolean
+}
+/**
+ * Placas de vídeo informadas pela janela (Electron app.getGPUInfo, em KOMA_GPUS), só
+ * para mostrar em Preferências; quem decide o perfil é a medição da própria placa.
+ */
+export function graphicsCards(raw = process.env.KOMA_GPUS): GraphicsCard[] {
+  let list: Array<{ vendorId?: number; deviceId?: number; vendorString?: string; deviceString?: string; active?: boolean }>
+  try {
+    list = JSON.parse(raw || '[]')
+    if (!Array.isArray(list)) return []
+  } catch {
+    return []
+  }
+  const vendors: Record<number, string> = { 0x10de: 'NVIDIA', 0x1002: 'AMD', 0x8086: 'Intel' }
+  return list
+    .filter((card) => card && (card.vendorId || card.deviceString))
+    .map((card) => {
+      const vendor = vendors[card.vendorId || 0] || card.vendorString || ''
+      const name =
+        (card.deviceString || '').trim() || [vendor, (card.deviceId || 0).toString(16).padStart(4, '0')].filter(Boolean).join(' ')
+      const device = card.deviceId || 0
+      let kind: GraphicsCard['kind'] = null
+      if (card.vendorId === 0x10de) kind = 'dedicated'
+      else if (card.vendorId === 0x8086)
+        // Intel Arc (placas dedicadas): 0x56xx e 0xe2xx; o resto é gráfico integrado.
+        kind =
+          /\bArc\b/i.test(name) || (device >= 0x5690 && device <= 0x56ff) || (device >= 0xe200 && device <= 0xe2ff)
+            ? 'dedicated'
+            : 'integrated'
+      else if (card.vendorId === 0x1002)
+        kind = /Radeon(\(TM\))? Graphics|Vega \d+ Graphics|Radeon \d{3}M\b/i.test(name)
+          ? 'integrated'
+          : /Radeon|FirePro/i.test(name)
+            ? 'dedicated'
+            : null
+      return { name, kind, active: Boolean(card.active) }
+    })
+}
+
 export function currentPerformance(database: Database.Database) {
   const mode = getPerformanceMode(database)
   const machine = hardware()
   const profile = resolveProfile(mode, gpuAvailable(), machine)
-  return { mode, profile, limits: limitsFor(profile, machine.cores), machine, gpu: runtime.gpu }
+  return {
+    mode,
+    profile,
+    limits: limitsFor(profile, machine.cores),
+    machine,
+    gpu: runtime.gpu,
+    gpuSpeedup: runtime.speedup,
+    slowGpu: runtime.slowGpu,
+    cards: graphicsCards(),
+  }
 }
