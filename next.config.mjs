@@ -6,7 +6,7 @@ const nextConfig = {
   // Pacotes nativos (bindings .node) não podem ser bundlados pelo Turbopack:
   // sem isto o build falha em ambiente limpo ao coletar page data
   // ("Failed to load external module sharp-<hash>").
-  serverExternalPackages: ['sharp', 'onnxruntime-node', 'better-sqlite3'],
+  serverExternalPackages: ['sharp', 'onnxruntime-node', 'better-sqlite3', 'openvino-node'],
   outputFileTracingIncludes: {
     '/api/translate/extract': ['./models/**/*'],
     '/api/ocr-image/queue': ['./models/**/*'],
