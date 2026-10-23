@@ -5,6 +5,7 @@ import zlib from 'node:zlib'
 import { execFileSync } from 'node:child_process'
 import { packagedModel, verifyModels } from './desktop-models.mjs'
 import { buildMlWorker } from './build-ml-worker.mjs'
+import { openvinoFile } from './openvino-files.mjs'
 
 // Monta o pacote do KOMA para Windows 11 (x64) e o instalador .exe (NSIS).
 // Roda no Linux ou no Windows: usa o build do Next já feito (npm run build) e
@@ -20,6 +21,7 @@ const pinned = {
   'better-sqlite3': { version: '12.10.0', sha256: '0f6d948e6438f64c983d08a2048ef10d6f467f36a8c08f20d31f585c019eb83c' },
   sharp: { version: '0.32.6', sha256: '910ea72076e7d2334d492ad2d94f8bfbf740bf8adf175b30db748303432f1814' },
   nsis: { version: '3.0.5.0', sha256: '44755ffcf6401ef358369fa80fb4351d7d0d649d8d3deda39a8d29035cbb9747' },
+  'openvino-node': { version: '2026.4.1', sha256: '715f6fa9ae08bff5791e21895b5267b45fec5b4c6e084dbb0e5782a3145551ff' },
 }
 
 const sha256 = (data) => crypto.createHash('sha256').update(data).digest('hex')
@@ -49,6 +51,7 @@ for (const [name, dir] of [
   ['electron', null],
   ['better-sqlite3', 'node_modules/better-sqlite3'],
   ['sharp', 'node_modules/sharp'],
+  ['openvino-node', 'node_modules/openvino-node'],
 ]) {
   const installed = dir ? await moduleVersion(path.join(root, dir)) : desktopPkg.devDependencies.electron
   if (installed !== pinned[name].version)
@@ -95,6 +98,12 @@ const vipsTar = await fetchVerified(
   `libvips-${sharpConfig.libvips}-win32-x64.tar.br`,
   (data) => `sha512-${crypto.createHash('sha512').update(data).digest('base64')}` === vipsIntegrity,
 )
+// Detector de letras na CPU: runtime oficial do OpenVINO para Windows (o npm só traz o do Linux).
+const openvinoTar = await fetchVerified(
+  `https://storage.openvinotoolkit.org/repositories/openvino/nodejs_bindings/${pinned['openvino-node'].version}/win32/openvino_nodejs_bindings_win32_${pinned['openvino-node'].version}_x64.tar.gz`,
+  `openvino_nodejs_bindings_win32_${pinned['openvino-node'].version}_x64.tar.gz`,
+  pin(pinned['openvino-node'].sha256),
+)
 const nsisArchive = await fetchVerified(
   `https://github.com/electron-userland/electron-builder-binaries/releases/download/nsis-${pinned.nsis.version}/nsis-${pinned.nsis.version}.7z`,
   `nsis-${pinned.nsis.version}.7z`,
@@ -136,6 +145,7 @@ const skip = {
   'better-sqlite3': /^(build|deps|src)(\/|$)/,
   sharp: /^(build|vendor|src)(\/|$)/,
   'onnxruntime-node': /^bin\/napi-v6\/(linux|darwin)(\/|$)/,
+  'openvino-node': /^bin(\/|$)/,
 }
 for (const name of Object.keys(skip)) {
   await fs.rm(nativeDir(name), { recursive: true, force: true })
@@ -153,6 +163,13 @@ for (const name of Object.keys(skip)) {
 await fs.access(path.join(nativeDir('onnxruntime-node'), 'bin/napi-v6/win32/x64/onnxruntime_binding.node'))
 await untar(sqliteTar, nativeDir('better-sqlite3'))
 await untar(sharpTar, nativeDir('sharp'))
+const openvinoRuntime = path.join(work, 'openvino')
+await untar(openvinoTar, openvinoRuntime)
+await fs.cp(openvinoRuntime, path.join(nativeDir('openvino-node'), 'bin'), {
+  recursive: true,
+  filter: (source) => openvinoFile(`bin/${path.relative(openvinoRuntime, source).split(path.sep).join('/')}`.replace(/\/$/, '')),
+})
+await fs.access(path.join(nativeDir('openvino-node'), 'bin/ov_node_addon.node'))
 const vips = path.join(work, 'libvips')
 await fs.mkdir(vips, { recursive: true })
 await fs.writeFile(path.join(work, 'libvips.tar'), zlib.brotliDecompressSync(await fs.readFile(vipsTar)))
