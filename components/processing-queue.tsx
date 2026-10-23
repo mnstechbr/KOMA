@@ -2,15 +2,14 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Loader2, Pause, Play } from 'lucide-react'
-import { preparationLabels, type WorkSummary } from '@/lib/works'
+import { preparationLabels, workInQueue, type WorkSummary } from '@/lib/works'
 import { BrushProgress, WorkCover } from '@/components/koma-ui'
 import { useT } from '@/components/i18n'
 
-const inQueue = (work: WorkSummary) =>
-  work.syncRequested || work.readyChapters < work.totalChapters || work.revisionPending > 0 || ['error', 'blocked'].includes(work.stage)
+const inQueue = workInQueue
 
 // Obra pronta com páginas sendo refeitas: mostra o andamento da revisão.
-const revising = (work: WorkSummary) => work.revisionPending > 0 && work.readyChapters >= work.totalChapters && !work.syncRequested
+const revising = (work: WorkSummary) => work.revisionPending > 0 && work.activeChapters === 0 && !work.syncRequested
 
 export function ProcessingQueue() {
   const { t, locale } = useT()

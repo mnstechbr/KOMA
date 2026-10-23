@@ -54,7 +54,16 @@ export interface WorkSummary {
   downloadedPages: number
   downloadedChapters: number
   translationWait: { retryAt: number; code: string; message: string; manual: boolean } | null
+  /** Capítulos que o KOMA prepara (sem os dispensados e os fantasma). */
   totalChapters: number
+  /** Todos os capítulos listados, menos os fantasma (inclui os dispensados). */
+  catalogedChapters: number
+  /** Erro definitivo: fica como pendência na obra e não prende a fila. */
+  errorChapters: number
+  /** Esperando a fonte voltar (6 h, depois 24 h): pendência, fora da fila ativa. */
+  waitingChapters: number
+  /** Ainda em preparação agora (fila, download, leitura, tradução, desenho ou aguardando aprovação). */
+  activeChapters: number
   readyChapters: number
   readChapters: number
   totalPages: number
@@ -64,6 +73,14 @@ export interface WorkSummary {
   unreadReady: number
   nextChapter: { id: number; number: string | null; title: string } | null
 }
+// Fila de processamento: só o que está sendo preparado agora. Capítulo com erro definitivo
+// ou esperando a fonte voltar (6 h/24 h) fica como pendência na página da obra, sem segurar
+// a obra na fila (antes uma obra com um capítulo assim ficava "preparando" para sempre).
+export const workInQueue = (work: WorkSummary) =>
+  work.syncRequested || work.activeChapters > 0 || work.revisionPending > 0 || work.stage === 'blocked'
+export const workPreparing = (work: WorkSummary) => work.syncRequested || work.activeChapters > 0
+/** Capítulos com erro definitivo ou esperando a fonte voltar. */
+export const workPendingChapters = (work: WorkSummary) => work.errorChapters + work.waitingChapters
 export interface WorkChapter extends SourceChapter {
   id: number
   state: string
@@ -74,6 +91,8 @@ export interface WorkChapter extends SourceChapter {
   createdAt: string
   /** Listado por uma fonte só e pulado pelas outras: dispensado e fora do total. */
   phantom?: boolean
+  /** Esperando a fonte voltar até este horário (ms). */
+  retryAt?: number | null
 }
 export const preparationLabels: Record<string, string> = {
   discovering: 'Buscando capítulos',
