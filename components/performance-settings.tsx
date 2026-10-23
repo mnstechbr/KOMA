@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useT } from './i18n'
 import { SettingsSkeleton } from './koma-skeletons'
+import { CudaAddon } from './cuda-addon'
 
 type Profile = 'leve' | 'equilibrado' | 'maximo'
 type Mode = 'auto' | Profile
@@ -115,6 +116,7 @@ export function PerformanceSettings() {
         ))}
       </div>
       <p className="koma-note">{t('Em qualquer perfil, o KOMA trabalha com prioridade baixa: o que você estiver usando vem primeiro.')}</p>
+      <CudaAddon />
       <p role="status" aria-live="polite" className="text-sm">
         {message}
       </p>
