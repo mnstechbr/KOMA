@@ -223,6 +223,9 @@ class NodeOcrRuntime {
       intraOpNumThreads: ocrConfig.threads > 0 ? ocrConfig.threads : resolveIntraOpThreads(),
       interOpNumThreads: 1,
       logSeverityLevel: 3,
+      // Várias páginas dividem as mesmas sessões, que rodam uma por vez: threads girando à
+      // espera gastavam metade da CPU do OCR sem ganho (medido: mesmo tempo, 3 núcleos em vez de 6,6).
+      extra: { session: { intra_op: { allow_spinning: '0' } } },
     }
     const yoloSession = await ort.InferenceSession.create(YOLO_MODEL_PATH, sessionOptions)
     const recSession = await ort.InferenceSession.create(OCR_REC_MODEL_PATH, sessionOptions)
