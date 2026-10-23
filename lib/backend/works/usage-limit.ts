@@ -7,13 +7,15 @@ import { readTemperatures, type TemperatureOptions, type Temperatures } from '@/
 //   só começa quando o que já estava rodando termina: descansar uma tarefa só, ou pausar
 //   com outras ainda na fila da placa, não deixava o computador parado (medido: 75% dava
 //   o mesmo calor que 100%).
-// - Guarda de temperatura (ligada por padrão): CPU a partir de 90 °C ou placa a partir
+// - Guarda de temperatura (ligada por padrão): CPU a partir de 95 °C ou placa a partir
 //   de 83 °C, o KOMA passa a no máximo metade do tempo e metade das tarefas ao mesmo
 //   tempo, até as duas caírem HEAT_LIMITS.margin graus. Nunca para de vez.
 // Download e tradução não esquentam (rede) e não passam por aqui.
 export type UsageLevel = 100 | 75 | 50
 export const USAGE_LEVELS: UsageLevel[] = [100, 75, 50]
-export const HEAT_LIMITS = { cpu: 90, gpu: 83, margin: 5 }
+// CPU em 95 °C: notebooks passam de 90 °C trabalhando normalmente (num Alienware m15 R6,
+// 90 °C deixava a guarda ativa 87% do tempo e o Máximo 2 vezes mais lento).
+export const HEAT_LIMITS = { cpu: 95, gpu: 83, margin: 5 }
 const HOT_SHARE = 0.5
 // Leitura dos sensores no máximo a cada 5 s, e só enquanto há trabalho.
 const READ_EVERY_MS = 5000

@@ -20,6 +20,7 @@ interface Snapshot {
   guard?: boolean
   hot?: boolean
   temps?: { cpu: number | null; gpu: number | null }
+  heatLimits?: { cpu: number; gpu: number }
   cards?: Array<{ name: string; kind: 'dedicated' | 'integrated' | null; active: boolean }>
 }
 
@@ -158,8 +159,8 @@ export function PerformanceSettings() {
           <br />
           <span className="koma-note">
             {t('Processador a partir de {cpu} °C ou placa de vídeo a partir de {gpu} °C: metade do ritmo até esfriar. Nunca para de vez.', {
-              cpu: 90,
-              gpu: 83,
+              cpu: data.heatLimits?.cpu ?? 95,
+              gpu: data.heatLimits?.gpu ?? 83,
             })}
             {data.guard !== false && (data.temps?.cpu != null || data.temps?.gpu != null) ? (
               <>
