@@ -1,3 +1,4 @@
+import { execFile } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -150,17 +151,111 @@ function availableMb() {
   return line ? Number(line.split(/\s+/)[1]) / 1024 : Infinity
 }
 
+// Recursos a cada segundo, para achar algo anormal (CPU ociosa, placa parada no Máximo,
+// memória crescendo, temperatura alta): CPU do processo e do sistema, memória, NVIDIA
+// (nvidia-smi) e temperatura do processador (x86_pkg_temp). Gráfico integrado da Intel
+// precisaria do intel_gpu_top com permissão de administrador: não é medido.
+const cpuTempFile = (() => {
+  try {
+    const zone = fs
+      .readdirSync('/sys/class/thermal')
+      .find((name) => fs.readFileSync(`/sys/class/thermal/${name}/type`, 'utf8').trim() === 'x86_pkg_temp')
+    return zone ? `/sys/class/thermal/${zone}/temp` : null
+  } catch {
+    return null
+  }
+})()
+function systemCpu() {
+  const [, ...values] = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0].trim().split(/\s+/).map(Number)
+  const idle = values[3] + (values[4] || 0)
+  return { idle, total: values.reduce((a, b) => a + b, 0) }
+}
+function nvidia(): Promise<number[] | null> {
+  return new Promise((resolve) =>
+    execFile(
+      'nvidia-smi',
+      ['--query-gpu=utilization.gpu,memory.used,temperature.gpu,power.draw', '--format=csv,noheader,nounits'],
+      { timeout: 2000 },
+      (error, stdout) => resolve(error ? null : stdout.split('\n')[0].split(',').map(Number)),
+    ),
+  )
+}
+type Series = number[]
+const summary = (values: Series) =>
+  values.length ? { avg: Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10, peak: Math.max(...values) } : null
+
 function sampler() {
   const stats = { peakRssMb: 0, minAvailableMb: Infinity, maxLoad: 0, lowMemory: false }
+  const series = {
+    procCores: [] as Series,
+    systemCpu: [] as Series,
+    rssMb: [] as Series,
+    gpuUtil: [] as Series,
+    vramMb: [] as Series,
+    gpuTemp: [] as Series,
+    gpuWatts: [] as Series,
+    cpuTemp: [] as Series,
+  }
   const tick = () => {
     stats.peakRssMb = Math.max(stats.peakRssMb, process.memoryUsage.rss() / 1048576)
     stats.minAvailableMb = Math.min(stats.minAvailableMb, availableMb())
     stats.maxLoad = Math.max(stats.maxLoad, os.loadavg()[0])
     if (stats.minAvailableMb < 2048) stats.lowMemory = true
   }
+  let lastCpu = process.cpuUsage()
+  let lastAt = performance.now()
+  let lastSystem = systemCpu()
+  const second = async () => {
+    const now = performance.now()
+    const cpu = process.cpuUsage()
+    series.procCores.push(Math.round(((cpu.user - lastCpu.user + cpu.system - lastCpu.system) / 1000 / (now - lastAt)) * 100) / 100)
+    lastCpu = cpu
+    lastAt = now
+    const system = systemCpu()
+    const total = system.total - lastSystem.total
+    if (total > 0) series.systemCpu.push(Math.round((1 - (system.idle - lastSystem.idle) / total) * 1000) / 10)
+    lastSystem = system
+    series.rssMb.push(Math.round(process.memoryUsage.rss() / 1048576))
+    if (cpuTempFile)
+      try {
+        series.cpuTemp.push(Math.round(Number(fs.readFileSync(cpuTempFile, 'utf8')) / 1000))
+      } catch {
+        /* Sem sensor. */
+      }
+    const gpu = await nvidia()
+    if (gpu && gpu.every(Number.isFinite)) {
+      series.gpuUtil.push(gpu[0])
+      series.vramMb.push(gpu[1])
+      series.gpuTemp.push(gpu[2])
+      series.gpuWatts.push(gpu[3])
+    }
+  }
   tick()
   const timer = setInterval(tick, 250)
-  return { stats, stop: () => clearInterval(timer) }
+  const slow = setInterval(() => void second(), 1000)
+  const resources = () => ({
+    seconds: series.procCores.length,
+    processCores: summary(series.procCores),
+    systemCpuPercent: summary(series.systemCpu),
+    rssMb: summary(series.rssMb),
+    // Memória crescendo sem parar: diferença entre o fim e o primeiro quarto da rodada.
+    rssGrowthMb: series.rssMb.length > 4 ? series.rssMb[series.rssMb.length - 1] - series.rssMb[Math.floor(series.rssMb.length / 4)] : 0,
+    minAvailableMb: Math.round(stats.minAvailableMb),
+    gpuUtilPercent: summary(series.gpuUtil),
+    vramMb: summary(series.vramMb),
+    gpuTempC: summary(series.gpuTemp),
+    gpuWatts: summary(series.gpuWatts),
+    cpuTempC: summary(series.cpuTemp),
+    integratedGpu: 'não medido (intel_gpu_top indisponível sem administrador)',
+  })
+  return {
+    stats,
+    resources,
+    stop: () => {
+      clearInterval(timer)
+      clearInterval(slow)
+    },
+  }
 }
 
 async function pool<T>(count: number, slots: number, work: (index: number) => Promise<T>) {
@@ -330,11 +425,15 @@ it.skipIf(mode !== 'run')(
         peakRssMb: round(Math.max(guard.stats.peakRssMb, process.resourceUsage().maxRSS / 1024)),
         minAvailableMb: round(guard.stats.minAvailableMb),
         maxLoad1m: Number(guard.stats.maxLoad.toFixed(1)),
+        resources: guard.resources(),
       }
       writeJson(path.join(out, 'report.json'), report)
       const line = `${name} ${profile} ${label}: ${report.pages} págs · OCR ${report.ocr.msPerPage} ms/pág (${report.ocr.cpuCores} núcleos) · desenho ${report.render.msPerPage} ms/pág (máscara ${report.render.maskMs} + LaMa ${report.render.lamaMs} + desenho ${report.render.drawMs} ms somados) · total ${(report.totalMs / 1000).toFixed(1)} s · pico ${report.peakRssMb} MB · carga máx ${report.maxLoad1m}`
-      fs.appendFileSync(path.join(root, name, 'summary.txt'), `${line}\n`)
+      const r = report.resources
+      const resourceLine = `   recursos: CPU do processo ${r.processCores?.avg ?? '-'} núcleos (pico ${r.processCores?.peak ?? '-'}) · CPU do sistema ${r.systemCpuPercent?.avg ?? '-'}% (pico ${r.systemCpuPercent?.peak ?? '-'}%) · RAM pico ${r.rssMb?.peak ?? '-'} MB (cresceu ${r.rssGrowthMb} MB) · livre mín ${r.minAvailableMb} MB · GPU ${r.gpuUtilPercent?.avg ?? '-'}% (pico ${r.gpuUtilPercent?.peak ?? '-'}%) · VRAM pico ${r.vramMb?.peak ?? '-'} MB · GPU ${r.gpuTempC?.peak ?? '-'} °C · ${r.gpuWatts?.avg ?? '-'} W (pico ${r.gpuWatts?.peak ?? '-'}) · CPU ${r.cpuTempC?.peak ?? '-'} °C`
+      fs.appendFileSync(path.join(root, name, 'summary.txt'), `${line}\n${resourceLine}\n`)
       log(line)
+      log(resourceLine)
     } finally {
       guard.stop()
     }
@@ -360,7 +459,9 @@ it.skipIf(mode !== 'compare')(
         if (!fs.existsSync(path.join(left, 'report.json')) || !fs.existsSync(path.join(right, 'report.json'))) continue
         const a = readJson<PageOcr[]>(path.join(left, 'ocr.json'))
         const b = readJson<PageOcr[]>(path.join(right, 'ocr.json'))
-        const textDiff = a.filter((page, index) => JSON.stringify(page) !== JSON.stringify(b[index])).map((page) => page.file)
+        // Só as páginas desta rodada (pode ser um trecho do capítulo).
+        const baseByFile = new Map(a.map((page) => [page.file, page]))
+        const textDiff = b.filter((page) => JSON.stringify(page) !== JSON.stringify(baseByFile.get(page.file))).map((page) => page.file)
         let worst = 0
         let changedPixels = 0
         let anyPixels = 0
@@ -368,10 +469,10 @@ it.skipIf(mode !== 'compare')(
         let sameFiles = 0
         let total = 0
         const imageDiff: string[] = []
-        for (const file of fs.readdirSync(path.join(left, 'render'))) {
+        for (const file of fs.readdirSync(path.join(right, 'render'))) {
           const other = path.join(right, 'render', file)
-          if (!fs.existsSync(other)) {
-            imageDiff.push(`${file} (faltando)`)
+          if (!fs.existsSync(path.join(left, 'render', file))) {
+            imageDiff.push(`${file} (sem linha de base)`)
             continue
           }
           if (fs.readFileSync(path.join(left, 'render', file)).equals(fs.readFileSync(other))) {
