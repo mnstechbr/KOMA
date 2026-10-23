@@ -2,14 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/app/api/_shared/proxy'
 import { isTrustedOrigin } from '@/lib/security/request-guards'
 import { db } from '@/lib/backend/shared/database.module'
-import {
-  acceptCudaLicenses,
-  cancelCudaInstall,
-  cudaStatus,
-  installCuda,
-  removeCuda,
-  setCudaEnabled,
-} from '@/lib/backend/works/cuda-addon'
+import { acceptCudaLicenses, cancelCudaInstall, cudaStatus, installCuda, removeCuda, setCudaEnabled } from '@/lib/backend/works/cuda-addon'
 import { drawDeviceStatus } from '@/lib/server/ml'
 
 // Complemento CUDA (opcional): estado, download, cancelar, ligar/desligar e remover.
