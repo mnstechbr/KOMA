@@ -21,21 +21,29 @@ const LAMA_SIDE = 512
 // editor de balões desenha pela rota, com os modelos já carregados pela fila).
 const shared = ((
   globalThis as typeof globalThis & {
-    __komaInpaint?: { device: 'cpu' | 'webgpu'; detector: Promise<ort.InferenceSession> | null; lama: Promise<ort.InferenceSession> | null }
+    __komaInpaint?: {
+      device: 'cpu' | 'webgpu'
+      threads?: number
+      detector: Promise<ort.InferenceSession> | null
+      lama: Promise<ort.InferenceSession> | null
+    }
   }
-).__komaInpaint ||= { device: 'cpu', detector: null, lama: null })
-export function configureInpaint(next: 'cpu' | 'webgpu') {
-  if (next === shared.device) return
+).__komaInpaint ||= { device: 'cpu', threads: 0, detector: null, lama: null })
+/** Dispositivo e threads do ONNX no desenho (0 = padrão do onnxruntime), conforme o perfil. */
+export function configureInpaint(next: 'cpu' | 'webgpu', threads = 0) {
+  if (next === shared.device && threads === (shared.threads || 0)) return
   shared.device = next
+  shared.threads = threads
   shared.detector = null
   shared.lama = null
 }
+const intraThreads = () => Number(process.env.KOMA_INPAINT_THREADS) || shared.threads || 0
 const options = (): ort.InferenceSession.SessionOptions => ({
   executionProviders: shared.device === 'webgpu' ? ['webgpu', 'cpu'] : ['cpu'],
   graphOptimizationLevel: 'all',
   logSeverityLevel: 3,
-  // Só para medições (tests/pipeline-benchmark.real.test.ts); o app usa o padrão do onnxruntime.
-  ...(Number(process.env.KOMA_INPAINT_THREADS) > 0 ? { intraOpNumThreads: Number(process.env.KOMA_INPAINT_THREADS) } : {}),
+  // KOMA_INPAINT_THREADS só para medições (tests/pipeline-benchmark.real.test.ts).
+  ...(intraThreads() > 0 ? { intraOpNumThreads: intraThreads() } : {}),
 })
 
 export function inpaintAvailable() {

@@ -144,7 +144,7 @@ export function applyPerformance(database: WorksRepository['database']) {
   RENDER_TASKS = limits.render
   UPGRADE_TASKS = limits.upgrade
   ocrSlots = limits.ocrSlots
-  void configureMl({ device: limits.ocrDevice, threads: limits.ocrThreads })
+  void configureMl({ device: limits.ocrDevice, threads: limits.ocrThreads, drawThreads: limits.drawThreads })
   sharp.concurrency(limits.imageThreads)
   const key = `${profile}:${JSON.stringify(limits)}`
   if (key !== appliedProfile) {
