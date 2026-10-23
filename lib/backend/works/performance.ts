@@ -1,7 +1,7 @@
 import os from 'node:os'
 import type Database from 'better-sqlite3'
 import type { GpuProbe } from '@/lib/server/ocr-helpers'
-import { USAGE_LEVELS, usageState, type UsageLevel } from './usage-limit'
+import { HEAT_LIMITS, USAGE_LEVELS, usageState, type UsageLevel } from './usage-limit'
 
 // Perfis de desempenho, medidos com 30 páginas reais (tests/ocr-benchmark.real.test.ts):
 // - Leve (PC com até 4 núcleos ou até 8 GB): OCR com 2 páginas × 2 threads foi o
@@ -238,5 +238,6 @@ export function currentPerformance(database: Database.Database) {
     ...getUsageLimit(database),
     hot: usageState().hot,
     temps: usageState().temps,
+    heatLimits: { cpu: HEAT_LIMITS.cpu, gpu: HEAT_LIMITS.gpu },
   }
 }

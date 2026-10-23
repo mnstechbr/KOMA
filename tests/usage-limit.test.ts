@@ -15,12 +15,13 @@ describe('limite de uso', () => {
   })
 
   it('guarda com histerese: esquenta no limite e só esfria 5 graus abaixo', () => {
-    expect(nextHot(false, { cpu: 89, gpu: 70 })).toBe(false)
-    expect(nextHot(false, { cpu: 90, gpu: 70 })).toBe(true)
+    // 90-94 °C é normal em notebook trabalhando: não desacelera.
+    expect(nextHot(false, { cpu: 94, gpu: 70 })).toBe(false)
+    expect(nextHot(false, { cpu: 95, gpu: 70 })).toBe(true)
     expect(nextHot(false, { cpu: 60, gpu: 83 })).toBe(true)
-    expect(nextHot(true, { cpu: 87, gpu: 70 })).toBe(true)
-    expect(nextHot(true, { cpu: 85, gpu: 79 })).toBe(true)
-    expect(nextHot(true, { cpu: 85, gpu: 78 })).toBe(false)
+    expect(nextHot(true, { cpu: 91, gpu: 70 })).toBe(true)
+    expect(nextHot(true, { cpu: 90, gpu: 79 })).toBe(true)
+    expect(nextHot(true, { cpu: 90, gpu: 78 })).toBe(false)
     // Sem sensor (Windows sem administrador): só a placa conta.
     expect(nextHot(false, { cpu: null, gpu: null })).toBe(false)
     expect(nextHot(true, { cpu: null, gpu: 70 })).toBe(false)
@@ -36,7 +37,7 @@ describe('limite de uso', () => {
 
   it('quente: metade do ritmo e metade das tarefas, e volta ao normal ao esfriar', async () => {
     vi.spyOn(console, 'info').mockImplementation(() => undefined)
-    let temps = { cpu: 95, gpu: 70 }
+    let temps = { cpu: 97, gpu: 70 }
     configureUsage({ usage: 100, guard: true, slots: { ocr: 4 }, read: async () => temps })
     await refreshHeat(Date.now())
     expect(usageState().hot).toBe(true)
