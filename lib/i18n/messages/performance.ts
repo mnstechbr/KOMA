@@ -20,6 +20,9 @@ export const performanceMessages: Catalog = {
     'A placa de vídeo deste computador é mais lenta que o processador.': "This computer's graphics card is slower than the processor.",
     'placa de vídeo {n}× mais rápida que o processador': 'graphics card {n}× faster than the processor',
     'a placa de vídeo é mais lenta que o processador e fica sem uso': 'the graphics card is slower than the processor and is not used',
+    'A placa de vídeo deste computador dá resultados diferentes do processador e perderia falas.':
+      "This computer's graphics card gives results different from the processor and would miss speech bubbles.",
+    'a placa de vídeo dá resultados errados e fica sem uso': 'the graphics card gives wrong results and is not used',
     dedicada: 'dedicated',
     integrada: 'integrated',
     '{cores} núcleos · {memory} GB de memória': '{cores} cores · {memory} GB of memory',
@@ -87,6 +90,9 @@ export const performanceMessages: Catalog = {
       'La tarjeta gráfica de este equipo es más lenta que el procesador.',
     'placa de vídeo {n}× mais rápida que o processador': 'tarjeta gráfica {n}× más rápida que el procesador',
     'a placa de vídeo é mais lenta que o processador e fica sem uso': 'la tarjeta gráfica es más lenta que el procesador y no se usa',
+    'A placa de vídeo deste computador dá resultados diferentes do processador e perderia falas.':
+      'La tarjeta gráfica de este equipo da resultados distintos a los del procesador y perdería diálogos.',
+    'a placa de vídeo dá resultados errados e fica sem uso': 'la tarjeta gráfica da resultados erróneos y no se usa',
     dedicada: 'dedicada',
     integrada: 'integrada',
     '{cores} núcleos · {memory} GB de memória': '{cores} núcleos · {memory} GB de memoria',
