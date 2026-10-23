@@ -128,7 +128,13 @@ async function openvinoRunner(file: string): Promise<Runner | null> {
   const ov = await openvino
   if (!ov) return null
   const core = new ov.Core()
-  const compiled = await core.compileModel(file, 'CPU', intraThreads() > 0 ? { INFERENCE_NUM_THREADS: String(intraThreads()) } : {})
+  // KOMA_OPENVINO_DEVICE=GPU só para medir o gráfico integrado da Intel.
+  const device = process.env.KOMA_OPENVINO_DEVICE || 'CPU'
+  const compiled = await core.compileModel(
+    file,
+    device,
+    device === 'CPU' && intraThreads() > 0 ? { INFERENCE_NUM_THREADS: String(intraThreads()) } : {},
+  )
   return {
     inputNames: compiled.inputs.map((input) => input.getAnyName()),
     outputNames: compiled.outputs.map((output) => output.getAnyName()),
