@@ -21,11 +21,15 @@ export function clearEmptyRenders(database: Database.Database) {
 }
 
 // Páginas traduzidas cuja imagem final (texto apagado + PT-BR desenhado) ainda não existe.
+// Só depois que o capítulo termina de ser preparado: a junção das falas cortadas entre
+// imagens e a releitura das falas duvidosas mudam páginas já traduzidas, que seriam
+// desenhadas duas vezes (render_stale).
 export function nextPagesToRender(database: Database.Database, excluded: number[], limit: number) {
   return database
     .prepare(
       `SELECT i.id FROM work_pages p JOIN work_chapters c ON c.id=p.chapter_id JOIN works w ON w.id=c.work_id JOIN section_images i ON i.id=p.image_id
     WHERE p.state IN ('ready','review') AND p.upgrade_pending=0 AND p.ocr_json LIKE '%"lines"%' AND NOT ${SAME_LANGUAGE_SQL} AND (i.translated_path IS NULL OR p.render_stale=1)
+    AND c.state NOT IN ('downloading','ocr','translating')
     AND EXISTS(SELECT 1 FROM section_image_ocr_items o WHERE o.section_image_id=i.id AND TRIM(o.translated_text)<>'')
     ${excluded.length ? `AND i.id NOT IN (${excluded.map(() => '?').join(',')})` : ''}
     ORDER BY c.work_id, c.position, p.page_index LIMIT ?`,

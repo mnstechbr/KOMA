@@ -4,7 +4,7 @@ import { SQLITE_MIGRATIONS } from '../lib/backend/shared/migrations'
 vi.mock('server-only', () => ({}))
 vi.mock('../lib/backend/shared/database.module', () => ({ db: null }))
 import { WorksRepository } from '../lib/backend/works/repository'
-import { chaptersDoneRendering } from '../lib/backend/works/render'
+import { chaptersDoneRendering, nextPagesToRender } from '../lib/backend/works/render'
 
 describe('capítulo só fica pronto com as páginas traduzidas desenhadas', () => {
   it('espera o desenho e depois fica pronto', () => {
@@ -28,7 +28,10 @@ describe('capítulo só fica pronto com as páginas traduzidas desenhadas', () =
       `INSERT INTO section_image_ocr_items (section_image_id,det_id,cls_name,conf,x1,y1,x2,y2,ocr_text,translated_text,created_at) VALUES (9,0,'balloon',1,0,0,1,1,'Hi','Oi','d')`,
     ).run()
     const repository = new WorksRepository(db)
+    // Durante a preparação (junção de falas cortadas, releitura) a página ainda pode mudar: não desenha.
+    expect(nextPagesToRender(db, [], 4)).toEqual([])
     repository.completeChapter(repository.chapter(5)!)
+    expect(nextPagesToRender(db, [], 4)).toEqual([{ id: 9 }])
     expect(repository.chapter(5)!.state).toBe('rendering')
     expect(repository.nextChapter()).toBeUndefined()
     expect(chaptersDoneRendering(db)).toEqual([])
