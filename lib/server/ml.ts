@@ -100,9 +100,14 @@ export async function probeGpuDevice(): Promise<{ available: boolean; ms: number
   if (worker()) return call('probe', [])
   return (await import('./manga-ocr-node')).probeGpu()
 }
-export async function textMaskOf(image: Buffer): Promise<Uint8Array | null> {
-  if (worker()) return call('mask', [new Uint8Array(image)])
-  return (await import('./inpaint')).textMask(image)
+/** Máscara das letras por faixa de linhas: aqui só roda as janelas pedidas; no worker, a página inteira uma vez. */
+export function textMaskRows(image: Buffer): (top?: number, bottom?: number) => Promise<Uint8Array | null> {
+  if (worker()) {
+    let full: Promise<Uint8Array | null> | null = null
+    return () => (full ||= call('mask', [new Uint8Array(image)]))
+  }
+  let reader: Promise<(top?: number, bottom?: number) => Promise<Uint8Array | null>> | null = null
+  return async (top, bottom) => (await (reader ||= import('./inpaint').then((module) => module.textMaskReader(image))))(top, bottom)
 }
 /** Desenha a página traduzida (no worker, quando existe; senão com os modelos daqui). */
 export async function renderPage(

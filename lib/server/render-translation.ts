@@ -362,7 +362,7 @@ export async function renderTranslatedPage(original: Buffer, items: RenderItem[]
     // Fundo escuro "liso" costuma ter listras e granulado: lá entra a reconstrução.
     const plainLight = flat && !textured && luminance(background.rgb[0], background.rgb[1], background.rgb[2]) > 160
     if (models && !(interior && !textured)) {
-      const page = await models.mask()
+      const page = await models.mask(top, top + height)
       if (page) {
         // Só as letras desta fala: em volta das linhas dela, nunca o texto do balão vizinho.
         const reach = Math.max(linePad, Math.round(lineHeight * 0.25))

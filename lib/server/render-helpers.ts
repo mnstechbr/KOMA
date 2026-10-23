@@ -462,6 +462,7 @@ export function texturedInterior(
  * inteira (1 = letra); "inpaint" reconstrói os pixels marcados de uma região.
  */
 export interface EraseModels {
-  mask: () => Promise<Uint8Array | null>
+  /** Máscara das letras no tamanho da página; só as linhas de top a bottom precisam estar certas. */
+  mask: (top?: number, bottom?: number) => Promise<Uint8Array | null>
   inpaint: (data: Float32Array, width: number, height: number, mask: Uint8Array) => Promise<boolean>
 }

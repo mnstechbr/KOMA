@@ -43,29 +43,23 @@ export function inpaintAvailable() {
 }
 
 /**
- * Máscara das letras da página inteira (1 = letra), no tamanho original. Páginas
- * altas (webtoon) são lidas em janelas quadradas que se sobrepõem.
+ * Máscara das letras (1 = letra), no tamanho original, lida sob demanda: páginas
+ * altas (webtoon) são lidas em janelas quadradas que se sobrepõem, e só as janelas
+ * que cobrem as linhas pedidas rodam. Cada pixel das linhas pedidas sai igual ao da
+ * página inteira (é a união das mesmas janelas); fora delas pode ficar 0.
  */
-export async function textMask(image: Buffer): Promise<Uint8Array | null> {
-  if (!inpaintAvailable()) return null
-  shared.detector ||= ort.InferenceSession.create(detectorFile(), options())
-  const session = await shared.detector
-  const { data, info } = await sharp(image, { limitInputPixels: 50000000 })
-    .rotate()
-    .removeAlpha()
-    .toColourspace('srgb')
-    .raw()
-    .toBuffer({ resolveWithObject: true })
-  const W = info.width
-  const H = info.height
-  const mask = new Uint8Array(W * H)
-  const window = Math.min(H, Math.max(W, Math.round(W * 1.3)))
-  for (let top = 0; ; top += Math.max(1, Math.round(window * 0.8))) {
-    const start = Math.min(top, H - window)
+export function textMaskReader(image: Buffer) {
+  type Page = { data: Buffer; W: number; H: number; mask: Uint8Array; window: number; starts: number[] }
+  let page: Promise<Page> | null = null
+  const windows = new Map<number, Promise<void>>()
+  const read = async (p: Page, start: number) => {
+    shared.detector ||= ort.InferenceSession.create(detectorFile(), options())
+    const session = await shared.detector
+    const { data, W, mask, window } = p
     const scale = SIDE / Math.max(W, window)
     const w = Math.max(1, Math.round(W * scale))
     const h = Math.max(1, Math.round(window * scale))
-    const crop = await sharp(data, { raw: { width: W, height: H, channels: 3 } })
+    const crop = await sharp(data, { raw: { width: W, height: p.H, channels: 3 } })
       .extract({ left: 0, top: start, width: W, height: window })
       .resize(w, h)
       .raw()
@@ -85,9 +79,40 @@ export async function textMask(image: Buffer): Promise<Uint8Array | null> {
       for (let x = 0; x < W; x++) {
         if (seg[Math.min(h - 1, Math.floor(y * scale)) * SIDE + Math.min(w - 1, Math.floor(x * scale))] > 0.3) mask[(start + y) * W + x] = 1
       }
-    if (start + window >= H) break
   }
-  return mask
+  return async (top = 0, bottom = Infinity): Promise<Uint8Array | null> => {
+    if (!inpaintAvailable()) return null
+    page ||= (async () => {
+      const { data, info } = await sharp(image, { limitInputPixels: 50000000 })
+        .rotate()
+        .removeAlpha()
+        .toColourspace('srgb')
+        .raw()
+        .toBuffer({ resolveWithObject: true })
+      const W = info.width
+      const H = info.height
+      const window = Math.min(H, Math.max(W, Math.round(W * 1.3)))
+      const starts: number[] = []
+      for (let next = 0; ; next += Math.max(1, Math.round(window * 0.8))) {
+        const start = Math.min(next, H - window)
+        starts.push(start)
+        if (start + window >= H) break
+      }
+      return { data, W, H, mask: new Uint8Array(W * H), window, starts }
+    })()
+    const p = await page
+    for (const start of p.starts) {
+      if (start >= bottom || start + p.window <= top) continue
+      if (!windows.has(start)) windows.set(start, read(p, start))
+      await windows.get(start)
+    }
+    return p.mask
+  }
+}
+
+/** Máscara das letras da página inteira. */
+export function textMask(image: Buffer): Promise<Uint8Array | null> {
+  return textMaskReader(image)()
 }
 
 /**

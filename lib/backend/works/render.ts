@@ -4,7 +4,7 @@ import type Database from 'better-sqlite3'
 import type { OcrDetection } from '../sections/sections.types'
 import { type EraseModels, type RenderItem } from '@/lib/server/render-translation'
 import { inpaintAvailable } from '@/lib/server/inpaint'
-import { inpaintRegion, renderPage, textMaskOf } from '@/lib/server/ml'
+import { inpaintRegion, renderPage, textMaskRows } from '@/lib/server/ml'
 import { SAME_LANGUAGE_SQL } from '@/lib/languages'
 import { splitBalloons } from './split-balloons'
 import { repeatedMarks } from './watermark'
@@ -57,9 +57,9 @@ export function chaptersDoneRendering(database: Database.Database, excluded: num
 /** Modelos de apagamento para uma página; a máscara das letras só é calculada se alguma fala precisar. */
 export function eraseModels(original: Buffer): EraseModels | undefined {
   if (!inpaintAvailable()) return undefined
-  let mask: Promise<Uint8Array | null> | null = null
+  const rows = textMaskRows(original)
   return {
-    mask: () => (mask ||= textMaskOf(original).catch(() => null)),
+    mask: (top, bottom) => rows(top, bottom).catch(() => null),
     inpaint: (data, width, height, holes) => inpaintRegion(data, width, height, holes).catch(() => false),
   }
 }

@@ -3,7 +3,7 @@
 // as telas do app. Recebe pedidos do lib/server/ml.ts e devolve as respostas.
 import { parentPort } from 'node:worker_threads'
 import { configureOcr, extractTextBoxesNode, probeGpu, recognizeImageTextNode } from './manga-ocr-node'
-import { configureInpaint, inpaintAvailable, lamaInpaint, textMask } from './inpaint'
+import { configureInpaint, inpaintAvailable, lamaInpaint, textMask, textMaskReader } from './inpaint'
 import { renderTranslatedPage, type RenderItem } from './render-translation'
 import { setPromoNames } from '@/lib/promo-text'
 
@@ -24,10 +24,10 @@ const handlers: Record<string, (...args: never[]) => unknown> = {
   // Desenho da página traduzida: os laços de pixels também ficam fora da thread das telas.
   render: async (bytes: Uint8Array, items: RenderItem[]) => {
     const original = Buffer.from(bytes)
-    let mask: Promise<Uint8Array | null> | null = null
+    const rows = textMaskReader(original)
     const models = inpaintAvailable()
       ? {
-          mask: () => (mask ||= textMask(original).catch(() => null)),
+          mask: (top?: number, bottom?: number) => rows(top, bottom).catch(() => null),
           inpaint: (data: Float32Array, width: number, height: number, holes: Uint8Array) =>
             lamaInpaint(data, width, height, holes).catch(() => false),
         }
