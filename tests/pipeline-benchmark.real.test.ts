@@ -11,6 +11,7 @@ import { configureOcr, extractTextBoxesNode } from '../lib/server/manga-ocr-node
 import { configureInpaint, inpaintAvailable, lamaInpaint, textMaskReader } from '../lib/server/inpaint'
 import { renderTranslatedPage, type RenderItem } from '../lib/server/render-translation'
 import { limitsFor, type PerformanceProfile } from '../lib/backend/works/performance'
+import { configureUsage, paced, usageState, type UsageLevel } from '../lib/backend/works/usage-limit'
 import { workPageItems } from '../lib/backend/works/render'
 
 // Linha de base do processamento (OCR + máscara + LaMa + desenho) com capítulos reais,
@@ -312,6 +313,10 @@ it.skipIf(mode !== 'run')(
     const ocrOnly = process.env.KOMA_BENCH_ONLY === 'ocr'
     configureOcr({ device: limits.ocrDevice, threads: limits.ocrThreads })
     configureInpaint(limits.ocrDevice, limits.drawThreads)
+    // KOMA_BENCH_USAGE=75 (ou 50) e KOMA_BENCH_GUARD=1: limite de uso e guarda de temperatura do app.
+    const usage = (Number(process.env.KOMA_BENCH_USAGE) || 100) as UsageLevel
+    const heatGuard = process.env.KOMA_BENCH_GUARD === '1'
+    configureUsage({ usage, guard: heatGuard, gpu: limits.ocrDevice === 'webgpu', slots: { ocr: limits.ocrSlots, render: limits.render } })
     const bytes = manifest.pages.map((page) => fs.readFileSync(path.join(root, 'chapters', label, page.file)))
     const timing = (holder: { mask: number; inpaint: number }) => (original: Buffer) => {
       // Como o lib/server/ml-worker.ts monta os modelos do desenho.
@@ -348,7 +353,7 @@ it.skipIf(mode !== 'run')(
         stage(guard, () =>
           pool(bytes.length, limits.ocrSlots, async (index) => {
             const started = performance.now()
-            const result = await extractTextBoxesNode(bytes[index], manifest.language)
+            const result = await paced('ocr', () => extractTextBoxesNode(bytes[index], manifest.language))
             return { ms: performance.now() - started, detections: result.detections || [] }
           }),
         )
@@ -359,7 +364,7 @@ it.skipIf(mode !== 'run')(
             const parts = { mask: 0, inpaint: 0 }
             const started = performance.now()
             const image = page.items.length
-              ? await renderTranslatedPage(bytes[index], page.items, undefined, timing(parts)(bytes[index]))
+              ? await paced('render', () => renderTranslatedPage(bytes[index], page.items, undefined, timing(parts)(bytes[index])))
               : null
             const ms = performance.now() - started
             if (image) fs.writeFileSync(path.join(out, 'render', `${path.parse(page.file).name}.jpg`), image)
@@ -375,8 +380,15 @@ it.skipIf(mode !== 'run')(
       // KOMA_BENCH_MIXED=1: OCR e desenho ao mesmo tempo, como a fila do app com vários capítulos.
       const mixed = process.env.KOMA_BENCH_MIXED === '1'
       const wallStarted = performance.now()
+      // Segundos em que a guarda de temperatura estava desacelerando.
+      const heat = { seconds: 0, hot: 0 }
+      const heatTimer = setInterval(() => {
+        heat.seconds++
+        if (usageState().hot) heat.hot++
+      }, 1000)
       const [ocr, draw] = mixed ? await Promise.all([ocrStage(), drawStage()]) : [await ocrStage(), await drawStage()]
       const wallMs = performance.now() - wallStarted
+      clearInterval(heatTimer)
       guard.stop()
       const pagesOcr: PageOcr[] = manifest.pages.map((page, index) => ({
         file: page.file,
@@ -427,6 +439,9 @@ it.skipIf(mode !== 'run')(
           })),
         },
         mixed,
+        usage,
+        heatGuard,
+        hotPercent: heat.seconds ? round((heat.hot / heat.seconds) * 100) : 0,
         totalMs: round(wallMs),
         peakRssMb: round(Math.max(guard.stats.peakRssMb, process.resourceUsage().maxRSS / 1024)),
         minAvailableMb: round(guard.stats.minAvailableMb),
@@ -436,7 +451,7 @@ it.skipIf(mode !== 'run')(
       writeJson(path.join(out, 'report.json'), report)
       const line = `${name} ${profile} ${label}: ${report.pages} págs · OCR ${report.ocr.msPerPage} ms/pág (${report.ocr.cpuCores} núcleos) · desenho ${report.render.msPerPage} ms/pág (máscara ${report.render.maskMs} + LaMa ${report.render.lamaMs} + desenho ${report.render.drawMs} ms somados) · total ${(report.totalMs / 1000).toFixed(1)} s · pico ${report.peakRssMb} MB · carga máx ${report.maxLoad1m}`
       const r = report.resources
-      const resourceLine = `   recursos: CPU do processo ${r.processCores?.avg ?? '-'} núcleos (pico ${r.processCores?.peak ?? '-'}) · CPU do sistema ${r.systemCpuPercent?.avg ?? '-'}% (pico ${r.systemCpuPercent?.peak ?? '-'}%) · RAM pico ${r.rssMb?.peak ?? '-'} MB (cresceu ${r.rssGrowthMb} MB) · livre mín ${r.minAvailableMb} MB · GPU ${r.gpuUtilPercent?.avg ?? '-'}% (pico ${r.gpuUtilPercent?.peak ?? '-'}%) · VRAM pico ${r.vramMb?.peak ?? '-'} MB · GPU ${r.gpuTempC?.peak ?? '-'} °C · ${r.gpuWatts?.avg ?? '-'} W (pico ${r.gpuWatts?.peak ?? '-'}) · CPU ${r.cpuTempC?.peak ?? '-'} °C`
+      const resourceLine = `   recursos: CPU do processo ${r.processCores?.avg ?? '-'} núcleos (pico ${r.processCores?.peak ?? '-'}) · CPU do sistema ${r.systemCpuPercent?.avg ?? '-'}% (pico ${r.systemCpuPercent?.peak ?? '-'}%) · RAM pico ${r.rssMb?.peak ?? '-'} MB (cresceu ${r.rssGrowthMb} MB) · livre mín ${r.minAvailableMb} MB · GPU ${r.gpuUtilPercent?.avg ?? '-'}% (pico ${r.gpuUtilPercent?.peak ?? '-'}%) · VRAM pico ${r.vramMb?.peak ?? '-'} MB · GPU ${r.gpuTempC?.avg ?? '-'} °C (pico ${r.gpuTempC?.peak ?? '-'}) · ${r.gpuWatts?.avg ?? '-'} W (pico ${r.gpuWatts?.peak ?? '-'}) · CPU ${r.cpuTempC?.avg ?? '-'} °C (pico ${r.cpuTempC?.peak ?? '-'}) · uso ${usage}%${heatGuard ? ` · guarda ${report.hotPercent}% do tempo desacelerando` : ''}`
       fs.appendFileSync(path.join(root, name, 'summary.txt'), `${line}\n${resourceLine}\n`)
       log(line)
       log(resourceLine)

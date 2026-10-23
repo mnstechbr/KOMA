@@ -23,6 +23,15 @@ export const performanceMessages: Catalog = {
     'A placa de vídeo deste computador dá resultados diferentes do processador e perderia falas.':
       "This computer's graphics card gives results different from the processor and would miss speech bubbles.",
     'a placa de vídeo dá resultados errados e fica sem uso': 'the graphics card gives wrong results and is not used',
+    'Uso máximo': 'Maximum usage',
+    'Abaixo de 100%, o KOMA descansa entre as páginas: prepara mais devagar e o computador fica mais frio e silencioso.':
+      'Below 100%, KOMA rests between pages: it prepares more slowly and the computer stays cooler and quieter.',
+    'Desacelerar quando o computador esquentar': 'Slow down when the computer gets hot',
+    'Processador a partir de {cpu} °C ou placa de vídeo a partir de {gpu} °C: metade do ritmo até esfriar. Nunca para de vez.':
+      'Processor at {cpu} °C or more, or graphics card at {gpu} °C or more: half the pace until it cools down. It never stops completely.',
+    'processador {n} °C': 'processor {n} °C',
+    'placa de vídeo {n} °C': 'graphics card {n} °C',
+    'desacelerado para esfriar': 'slowed down to cool off',
     dedicada: 'dedicated',
     integrada: 'integrated',
     '{cores} núcleos · {memory} GB de memória': '{cores} cores · {memory} GB of memory',
@@ -93,6 +102,15 @@ export const performanceMessages: Catalog = {
     'A placa de vídeo deste computador dá resultados diferentes do processador e perderia falas.':
       'La tarjeta gráfica de este equipo da resultados distintos a los del procesador y perdería diálogos.',
     'a placa de vídeo dá resultados errados e fica sem uso': 'la tarjeta gráfica da resultados erróneos y no se usa',
+    'Uso máximo': 'Uso máximo',
+    'Abaixo de 100%, o KOMA descansa entre as páginas: prepara mais devagar e o computador fica mais frio e silencioso.':
+      'Por debajo del 100%, KOMA descansa entre páginas: prepara más despacio y el equipo queda más frío y silencioso.',
+    'Desacelerar quando o computador esquentar': 'Ir más despacio cuando el equipo se caliente',
+    'Processador a partir de {cpu} °C ou placa de vídeo a partir de {gpu} °C: metade do ritmo até esfriar. Nunca para de vez.':
+      'Procesador desde {cpu} °C o tarjeta gráfica desde {gpu} °C: la mitad del ritmo hasta que se enfríe. Nunca se detiene del todo.',
+    'processador {n} °C': 'procesador {n} °C',
+    'placa de vídeo {n} °C': 'tarjeta gráfica {n} °C',
+    'desacelerado para esfriar': 'más despacio para enfriarse',
     dedicada: 'dedicada',
     integrada: 'integrada',
     '{cores} núcleos · {memory} GB de memória': '{cores} núcleos · {memory} GB de memoria',
