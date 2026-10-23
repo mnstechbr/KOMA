@@ -33,6 +33,7 @@ import {
   applyPerformance,
 } from './worker-shared'
 import { WorkAutomation } from './work-automation'
+import { paced } from './usage-limit'
 
 export { WorkAutomation } from './work-automation'
 export { balloonColors, orderDetections } from './worker-shared'
@@ -287,7 +288,7 @@ export function startWorkAutomation() {
           RENDER_TASKS - state.rendering.size,
         )) {
           state.rendering.add(page.id)
-          void renderWorkPage(repository.database, page.id)
+          void paced('render', () => renderWorkPage(repository.database, page.id))
             .catch(() => {
               state.renderFailed.add(page.id)
               console.error('[KOMA] Falha ao gerar página traduzida', { imageId: page.id })

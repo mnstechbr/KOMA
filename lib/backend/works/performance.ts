@@ -1,6 +1,7 @@
 import os from 'node:os'
 import type Database from 'better-sqlite3'
 import type { GpuProbe } from '@/lib/server/ocr-helpers'
+import { USAGE_LEVELS, usageState, type UsageLevel } from './usage-limit'
 
 // Perfis de desempenho, medidos com 30 páginas reais (tests/ocr-benchmark.real.test.ts):
 // - Leve (PC com até 4 núcleos ou até 8 GB): OCR com 2 páginas × 2 threads foi o
@@ -75,25 +76,53 @@ export function autoProfile(gpuAvailable: boolean, machine = hardware()): Perfor
   return gpuAvailable ? 'maximo' : 'equilibrado'
 }
 
-export function getPerformanceMode(database: Database.Database): PerformanceMode {
+function readSettings(database: Database.Database): Record<string, unknown> {
   const row = database.prepare('SELECT value FROM kv_store WHERE key = ?').get(KEY) as { value: string } | undefined
   try {
-    const mode = row ? JSON.parse(row.value).mode : 'auto'
-    return mode === 'auto' || PROFILES.includes(mode) ? mode : 'auto'
+    const value = row ? JSON.parse(row.value) : {}
+    return value && typeof value === 'object' ? value : {}
   } catch {
-    return 'auto'
+    return {}
   }
 }
 
-export function savePerformanceMode(database: Database.Database, mode: unknown): PerformanceMode {
-  if (mode !== 'auto' && !PROFILES.includes(mode as PerformanceProfile)) throw new Error('Perfil de desempenho inválido.')
+function writeSettings(database: Database.Database, patch: Record<string, unknown>) {
   database
     .prepare(
       `INSERT INTO kv_store (key, value, expires_at) VALUES (?, ?, NULL)
     ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = NULL`,
     )
-    .run(KEY, JSON.stringify({ mode }))
+    .run(KEY, JSON.stringify({ ...readSettings(database), ...patch }))
+}
+
+export function getPerformanceMode(database: Database.Database): PerformanceMode {
+  const mode = readSettings(database).mode ?? 'auto'
+  return mode === 'auto' || PROFILES.includes(mode as PerformanceProfile) ? (mode as PerformanceMode) : 'auto'
+}
+
+export function savePerformanceMode(database: Database.Database, mode: unknown): PerformanceMode {
+  if (mode !== 'auto' && !PROFILES.includes(mode as PerformanceProfile)) throw new Error('Perfil de desempenho inválido.')
+  writeSettings(database, { mode })
   return mode as PerformanceMode
+}
+
+/** Limite de uso escolhido: "Uso máximo" (100, 75 ou 50%) e a guarda de temperatura (ligada por padrão). */
+export function getUsageLimit(database: Database.Database): { usage: UsageLevel; guard: boolean } {
+  const settings = readSettings(database)
+  return {
+    usage: USAGE_LEVELS.includes(settings.usage as UsageLevel) ? (settings.usage as UsageLevel) : 100,
+    guard: settings.guard !== false,
+  }
+}
+
+export function saveUsageLimit(database: Database.Database, next: { usage?: unknown; guard?: unknown }) {
+  if (next.usage !== undefined && !USAGE_LEVELS.includes(next.usage as UsageLevel)) throw new Error('Limite de uso inválido.')
+  if (next.guard !== undefined && typeof next.guard !== 'boolean') throw new Error('Limite de uso inválido.')
+  writeSettings(database, {
+    ...(next.usage !== undefined ? { usage: next.usage } : {}),
+    ...(next.guard !== undefined ? { guard: next.guard } : {}),
+  })
+  return getUsageLimit(database)
 }
 
 /** Perfil em uso: o escolhido, ou o automático. Máximo sem placa de vídeo vira Equilibrado. */
@@ -206,5 +235,8 @@ export function currentPerformance(database: Database.Database) {
     slowGpu: runtime.slowGpu,
     wrongGpu: runtime.wrongGpu,
     cards: graphicsCards(),
+    ...getUsageLimit(database),
+    hot: usageState().hot,
+    temps: usageState().temps,
   }
 }

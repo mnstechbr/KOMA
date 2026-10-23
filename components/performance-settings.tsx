@@ -7,6 +7,7 @@ import { CudaAddon } from './cuda-addon'
 
 type Profile = 'leve' | 'equilibrado' | 'maximo'
 type Mode = 'auto' | Profile
+type Usage = 100 | 75 | 50
 interface Snapshot {
   mode: Mode
   profile: Profile
@@ -15,6 +16,10 @@ interface Snapshot {
   gpuSpeedup?: number | null
   slowGpu?: boolean
   wrongGpu?: boolean
+  usage?: Usage
+  guard?: boolean
+  hot?: boolean
+  temps?: { cpu: number | null; gpu: number | null }
   cards?: Array<{ name: string; kind: 'dedicated' | 'integrated' | null; active: boolean }>
 }
 
@@ -30,14 +35,14 @@ export function PerformanceSettings() {
       .then(setData)
       .catch(() => setMessage(t('Não foi possível consultar o desempenho.')))
   }, [t])
-  async function choose(mode: Mode) {
+  async function choose(change: { mode?: Mode; usage?: Usage; guard?: boolean }) {
     setBusy(true)
     setMessage('')
     try {
       const response = await fetch('/api/local/performance', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode }),
+        body: JSON.stringify(change),
       })
       const body = await response.json()
       if (!response.ok) throw new Error()
@@ -110,7 +115,7 @@ export function PerformanceSettings() {
               id={`performance-${option.mode}`}
               checked={data.mode === option.mode}
               disabled={busy || option.disabled}
-              onChange={() => void choose(option.mode)}
+              onChange={() => void choose({ mode: option.mode })}
             />
             <span>
               {option.title}
@@ -121,6 +126,56 @@ export function PerformanceSettings() {
         ))}
       </div>
       <p className="koma-note">{t('Em qualquer perfil, o KOMA trabalha com prioridade baixa: o que você estiver usando vem primeiro.')}</p>
+      <p className="text-sm">{t('Uso máximo')}</p>
+      <div className="flex flex-wrap gap-4">
+        {([100, 75, 50] as const).map((usage) => (
+          <label key={usage} className="koma-switch">
+            <input
+              type="radio"
+              name="performance-usage"
+              id={`performance-usage-${usage}`}
+              checked={(data.usage ?? 100) === usage}
+              disabled={busy}
+              onChange={() => void choose({ usage })}
+            />
+            <span>{usage.toLocaleString(locale)}%</span>
+          </label>
+        ))}
+      </div>
+      <p className="koma-note">
+        {t('Abaixo de 100%, o KOMA descansa entre as páginas: prepara mais devagar e o computador fica mais frio e silencioso.')}
+      </p>
+      <label className="koma-switch">
+        <input
+          type="checkbox"
+          id="performance-guard"
+          checked={data.guard !== false}
+          disabled={busy}
+          onChange={(event) => void choose({ guard: event.target.checked })}
+        />
+        <span>
+          {t('Desacelerar quando o computador esquentar')}
+          <br />
+          <span className="koma-note">
+            {t('Processador a partir de {cpu} °C ou placa de vídeo a partir de {gpu} °C: metade do ritmo até esfriar. Nunca para de vez.', {
+              cpu: 90,
+              gpu: 83,
+            })}
+            {data.guard !== false && (data.temps?.cpu != null || data.temps?.gpu != null) ? (
+              <>
+                <br />
+                {[
+                  data.temps?.cpu != null ? t('processador {n} °C', { n: Math.round(data.temps.cpu) }) : null,
+                  data.temps?.gpu != null ? t('placa de vídeo {n} °C', { n: Math.round(data.temps.gpu) }) : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+                {data.hot ? ` · ${t('desacelerado para esfriar')}` : ''}
+              </>
+            ) : null}
+          </span>
+        </span>
+      </label>
       <CudaAddon />
       <p role="status" aria-live="polite" className="text-sm">
         {message}
