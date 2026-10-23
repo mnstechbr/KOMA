@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { verifyModels } from './desktop-models.mjs'
+import { packagedModel, verifyModels } from './desktop-models.mjs'
 import { buildMlWorker } from './build-ml-worker.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
@@ -23,7 +23,11 @@ for (const entry of ['.next', 'node_modules', 'package.json', 'server.js']) {
 }
 await fs.copyFile(path.join(root, 'package.json'), path.join(server, 'package.json'))
 for (const entry of ['public', 'models']) {
-  await fs.cp(path.join(root, entry), path.join(server, entry), { recursive: true, verbatimSymlinks: true })
+  await fs.cp(path.join(root, entry), path.join(server, entry), {
+    recursive: true,
+    verbatimSymlinks: true,
+    filter: (source) => packagedModel(path.basename(source)),
+  })
 }
 await fs.cp(path.join(root, '.next/static'), path.join(server, '.next/static'), { recursive: true, verbatimSymlinks: true })
 // OCR e apagamento num processo separado (worker thread), fora da thread das telas.

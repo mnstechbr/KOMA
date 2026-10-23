@@ -2,6 +2,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { execFileSync } from 'node:child_process'
+import { pruneOnnx } from './onnx-prune.mjs'
 
 const baseline = '9c7e2706d894a53df1a8bb0ccd6270a8196aaad5'
 const nodeVersion = '24.18.0'
@@ -77,6 +78,20 @@ for (const [name, url, hash] of inpaintModels) {
   validate(data, hash, name)
   await fs.writeFile(`${target}.partial`, data)
   await fs.rename(`${target}.partial`, target)
+}
+
+// O app só lê a máscara (saída "seg") do detector; o onnxruntime calcularia também as
+// outras duas cabeças. A versão podada dá os mesmos valores em metade do tempo na CPU.
+{
+  const target = path.join(root, 'models', 'comic-text-detector-seg.onnx')
+  const hash = '143f5aedd9d2f1362449852bf5d58718836ff16b87f3681b52ebd0bc7c8464d4'
+  const existing = await fs.readFile(target).catch(() => Buffer.alloc(0))
+  if (crypto.createHash('sha256').update(existing).digest('hex') !== hash) {
+    const data = pruneOnnx(await fs.readFile(path.join(root, 'models', 'comic-text-detector.onnx')), ['seg'])
+    validate(data, hash, 'comic-text-detector-seg.onnx')
+    await fs.writeFile(`${target}.partial`, data)
+    await fs.rename(`${target}.partial`, target)
+  }
 }
 
 // O runtime Node do pacote Linux; o do Windows vem em scripts/build-windows.mjs.

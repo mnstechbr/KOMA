@@ -41,7 +41,7 @@ jobs:
           path: |
             models
             artifacts/runtimes/win32-x64
-          key: windows-resources-${{ hashFiles('scripts/fetch-desktop-resources.mjs', 'scripts/build-windows.mjs', 'scripts/desktop-models.mjs') }}
+          key: windows-resources-${{ hashFiles('scripts/fetch-desktop-resources.mjs', 'scripts/build-windows.mjs', 'scripts/desktop-models.mjs', 'scripts/onnx-prune.mjs') }}
 
       - name: Download OCR models
         run: npm run desktop:resources
