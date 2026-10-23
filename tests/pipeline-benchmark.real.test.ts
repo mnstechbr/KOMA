@@ -33,11 +33,17 @@ const HOUR = 60 * 60 * 1000
 // KOMA_BENCH_EP=cuda (ou tensorrt) troca o dispositivo de todos os modelos só nesta medição,
 // para comparar com o WebGPU sem mudar o app. As bibliotecas da NVIDIA vêm por LD_LIBRARY_PATH.
 const benchEp = process.env.KOMA_BENCH_EP
-if (benchEp) {
+// KOMA_BENCH_NOSPIN=1: threads do onnxruntime dormem em vez de girar esperando trabalho.
+const noSpin = process.env.KOMA_BENCH_NOSPIN === '1'
+if (benchEp || noSpin) {
   const create = ort.InferenceSession.create.bind(ort.InferenceSession) as (...args: unknown[]) => Promise<ort.InferenceSession>
   const providers = benchEp === 'tensorrt' ? ['tensorrt', 'cuda', 'cpu'] : [benchEp, 'cpu']
   ;(ort.InferenceSession as unknown as { create: unknown }).create = (model: unknown, options?: ort.InferenceSession.SessionOptions) =>
-    create(model, { ...options, executionProviders: providers })
+    create(model, {
+      ...options,
+      ...(benchEp ? { executionProviders: providers } : {}),
+      ...(noSpin ? { extra: { session: { intra_op: { allow_spinning: '0' }, inter_op: { allow_spinning: '0' } } } } : {}),
+    })
 }
 
 interface Manifest {
@@ -186,11 +192,20 @@ it.skipIf(mode !== 'run')(
     const profile = (process.env.KOMA_BENCH_PROFILE || 'equilibrado') as PerformanceProfile
     const label = process.env.KOMA_BENCH_LABEL || 'manhwa'
     const manifest = readJson<Manifest>(path.join(root, 'chapters', label, 'manifest.json'))
+    // Ajuste fino (KOMA_BENCH_PAGES, KOMA_BENCH_RENDER): trecho do capítulo e páginas desenhadas ao mesmo tempo.
+    if (Number(process.env.KOMA_BENCH_PAGES) > 0) manifest.pages = manifest.pages.slice(0, Number(process.env.KOMA_BENCH_PAGES))
     const out = path.join(root, name, profile, label)
     fs.rmSync(out, { recursive: true, force: true })
     fs.mkdirSync(path.join(out, 'render'), { recursive: true })
     expect(inpaintAvailable()).toBe(true)
-    const limits = limitsFor(profile)
+    const [ocrSlots, ocrThreads] = (process.env.KOMA_BENCH_OCR || '').split(':').map(Number)
+    const limits = {
+      ...limitsFor(profile),
+      ...(Number(process.env.KOMA_BENCH_RENDER) > 0 ? { render: Number(process.env.KOMA_BENCH_RENDER) } : {}),
+      ...(ocrSlots > 0 && ocrThreads > 0 ? { ocrSlots, ocrThreads } : {}),
+    }
+    // KOMA_BENCH_ONLY=ocr mede só a leitura (ajuste dos threads do OCR).
+    const ocrOnly = process.env.KOMA_BENCH_ONLY === 'ocr'
     configureOcr({ device: limits.ocrDevice, threads: limits.ocrThreads })
     configureInpaint(limits.ocrDevice, limits.drawThreads)
     const bytes = manifest.pages.map((page) => fs.readFileSync(path.join(root, 'chapters', label, page.file)))
@@ -219,37 +234,45 @@ it.skipIf(mode !== 'run')(
     )
     const warmStarted = performance.now()
     await extractTextBoxesNode(bytes[warm], manifest.language)
-    await renderTranslatedPage(bytes[warm], manifest.pages[warm].items, undefined, timing({ mask: 0, inpaint: 0 })(bytes[warm]))
+    if (!ocrOnly)
+      await renderTranslatedPage(bytes[warm], manifest.pages[warm].items, undefined, timing({ mask: 0, inpaint: 0 })(bytes[warm]))
     const warmupMs = performance.now() - warmStarted
 
     const guard = sampler()
     try {
-      const ocr = await stage(guard, () =>
-        pool(bytes.length, limits.ocrSlots, async (index) => {
-          const started = performance.now()
-          const result = await extractTextBoxesNode(bytes[index], manifest.language)
-          return { ms: performance.now() - started, detections: result.detections || [] }
-        }),
-      )
-      const draw = await stage(guard, () =>
-        pool(bytes.length, limits.render, async (index) => {
-          const page = manifest.pages[index]
-          const parts = { mask: 0, inpaint: 0 }
-          const started = performance.now()
-          const image = page.items.length
-            ? await renderTranslatedPage(bytes[index], page.items, undefined, timing(parts)(bytes[index]))
-            : null
-          const ms = performance.now() - started
-          if (image) fs.writeFileSync(path.join(out, 'render', `${path.parse(page.file).name}.jpg`), image)
-          return {
-            ms,
-            maskMs: parts.mask,
-            lamaMs: parts.inpaint,
-            drawMs: Math.max(0, ms - parts.mask - parts.inpaint),
-            items: page.items.length,
-          }
-        }),
-      )
+      const ocrStage = () =>
+        stage(guard, () =>
+          pool(bytes.length, limits.ocrSlots, async (index) => {
+            const started = performance.now()
+            const result = await extractTextBoxesNode(bytes[index], manifest.language)
+            return { ms: performance.now() - started, detections: result.detections || [] }
+          }),
+        )
+      const drawStage = () =>
+        stage(guard, () =>
+          pool(ocrOnly ? 0 : bytes.length, limits.render, async (index) => {
+            const page = manifest.pages[index]
+            const parts = { mask: 0, inpaint: 0 }
+            const started = performance.now()
+            const image = page.items.length
+              ? await renderTranslatedPage(bytes[index], page.items, undefined, timing(parts)(bytes[index]))
+              : null
+            const ms = performance.now() - started
+            if (image) fs.writeFileSync(path.join(out, 'render', `${path.parse(page.file).name}.jpg`), image)
+            return {
+              ms,
+              maskMs: parts.mask,
+              lamaMs: parts.inpaint,
+              drawMs: Math.max(0, ms - parts.mask - parts.inpaint),
+              items: page.items.length,
+            }
+          }),
+        )
+      // KOMA_BENCH_MIXED=1: OCR e desenho ao mesmo tempo, como a fila do app com vários capítulos.
+      const mixed = process.env.KOMA_BENCH_MIXED === '1'
+      const wallStarted = performance.now()
+      const [ocr, draw] = mixed ? await Promise.all([ocrStage(), drawStage()]) : [await ocrStage(), await drawStage()]
+      const wallMs = performance.now() - wallStarted
       guard.stop()
       const pagesOcr: PageOcr[] = manifest.pages.map((page, index) => ({
         file: page.file,
@@ -299,7 +322,8 @@ it.skipIf(mode !== 'run')(
             items: page.items,
           })),
         },
-        totalMs: round(ocr.ms + draw.ms),
+        mixed,
+        totalMs: round(wallMs),
         peakRssMb: round(Math.max(guard.stats.peakRssMb, process.resourceUsage().maxRSS / 1024)),
         minAvailableMb: round(guard.stats.minAvailableMb),
         maxLoad1m: Number(guard.stats.maxLoad.toFixed(1)),
