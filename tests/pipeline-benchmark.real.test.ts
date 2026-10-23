@@ -324,6 +324,9 @@ it.skipIf(mode !== 'compare')(
         const textDiff = a.filter((page, index) => JSON.stringify(page) !== JSON.stringify(b[index])).map((page) => page.file)
         let worst = 0
         let changedPixels = 0
+        let anyPixels = 0
+        let maxDelta = 0
+        let sameFiles = 0
         let total = 0
         const imageDiff: string[] = []
         for (const file of fs.readdirSync(path.join(left, 'render'))) {
@@ -332,13 +335,23 @@ it.skipIf(mode !== 'compare')(
             imageDiff.push(`${file} (faltando)`)
             continue
           }
+          if (fs.readFileSync(path.join(left, 'render', file)).equals(fs.readFileSync(other))) {
+            sameFiles++
+            const { info } = await sharp(other).toBuffer({ resolveWithObject: true })
+            total += info.width * info.height
+            continue
+          }
           const x = await pixels(path.join(left, 'render', file))
           const y = await pixels(other)
           if (x.width !== y.width || x.height !== y.height) {
             imageDiff.push(`${file} (tamanho)`)
             continue
           }
+          // Diferença de cada pixel (maior canal): >24 conta como alterado; qualquer valor
+          // diferente de zero entra em anyPixels e na imagem de diferença (vermelho = mais).
           let changed = 0
+          let any = 0
+          const heat = Buffer.alloc(x.data.length)
           for (let i = 0; i < x.data.length; i += 3) {
             const delta = Math.max(
               Math.abs(x.data[i] - y.data[i]),
@@ -346,12 +359,23 @@ it.skipIf(mode !== 'compare')(
               Math.abs(x.data[i + 2] - y.data[i + 2]),
             )
             if (delta > 24) changed++
+            if (delta) {
+              any++
+              heat[i] = Math.min(255, 64 + delta * 4)
+            } else heat[i] = heat[i + 1] = heat[i + 2] = Math.round(y.data[i] * 0.3)
+            if (delta > maxDelta) maxDelta = delta
           }
+          if (any)
+            await sharp(heat, { raw: { width: x.width, height: x.height, channels: 3 } })
+              .png()
+              .toFile(path.join(right, `diff-${path.parse(file).name}.png`))
           const share = changed / (x.data.length / 3)
           worst = Math.max(worst, share)
           changedPixels += changed
+          anyPixels += any
           total += x.data.length / 3
-          if (share > 0.0005) imageDiff.push(`${file} (${(share * 100).toFixed(2)}%)`)
+          if (any)
+            imageDiff.push(`${file} (${((any / (x.data.length / 3)) * 100).toFixed(3)}% com diferença, ${(share * 100).toFixed(3)}% >24)`)
         }
         const r1 = readJson<{ totalMs: number; ocr: { msPerPage: number }; render: { msPerPage: number } }>(path.join(left, 'report.json'))
         const r2 = readJson<{ totalMs: number; ocr: { msPerPage: number }; render: { msPerPage: number } }>(path.join(right, 'report.json'))
@@ -361,6 +385,9 @@ it.skipIf(mode !== 'compare')(
           textIdentical: textDiff.length === 0,
           textDiff,
           changedPixelShare: total ? changedPixels / total : 0,
+          anyPixelShare: total ? anyPixels / total : 0,
+          maxDelta,
+          identicalFiles: sameFiles,
           worstPageShare: worst,
           imageDiff,
           ocrMsPerPage: [r1.ocr.msPerPage, r2.ocr.msPerPage],
@@ -369,7 +396,7 @@ it.skipIf(mode !== 'compare')(
         }
         result.push(entry)
         log(
-          `${profile} ${label}: texto ${entry.textIdentical ? 'idêntico' : `diferente em ${textDiff.length} págs`} · pixels alterados ${(entry.changedPixelShare * 100).toFixed(3)}% (pior pág ${(worst * 100).toFixed(2)}%) · total ${(r1.totalMs / 1000).toFixed(1)} s -> ${(r2.totalMs / 1000).toFixed(1)} s`,
+          `${profile} ${label}: texto ${entry.textIdentical ? 'idêntico' : `diferente em ${textDiff.length} págs`} · arquivos idênticos ${sameFiles} · pixels com diferença ${(entry.anyPixelShare * 100).toFixed(4)}% (máx ${maxDelta}; >24: ${(entry.changedPixelShare * 100).toFixed(3)}%) · total ${(r1.totalMs / 1000).toFixed(1)} s -> ${(r2.totalMs / 1000).toFixed(1)} s`,
         )
       }
     }
