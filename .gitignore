@@ -68,4 +68,5 @@ artifacts/
 
 # Modelos baixados por scripts/fetch-desktop-resources.mjs (hash fixado), grandes demais para o repositório.
 /models/comic-text-detector.onnx
+/models/comic-text-detector-seg.onnx
 /models/lama_fp32.onnx

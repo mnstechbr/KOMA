@@ -8,7 +8,10 @@ import sharp from 'sharp'
 // desenho por baixo delas. Os dois são opcionais: sem os arquivos, o desenho usa
 // o apagamento por cor de antes.
 const MODELS = process.env.KOMA_MODELS_DIR || path.join(/*turbopackIgnore: true*/ process.cwd(), 'models')
-const DETECTOR = path.join(MODELS, 'comic-text-detector.onnx')
+// Versão só com a saída da máscara (scripts/onnx-prune.mjs): mesmos valores, metade do
+// tempo na CPU. Sem ela (código-fonte sem npm run desktop:resources), o modelo completo.
+const DETECTOR = [path.join(MODELS, 'comic-text-detector-seg.onnx'), path.join(MODELS, 'comic-text-detector.onnx')]
+const detectorFile = () => DETECTOR.find((file) => fs.existsSync(file)) || DETECTOR[1]
 const LAMA = path.join(MODELS, 'lama_fp32.onnx')
 const SIDE = 1024
 const LAMA_SIDE = 512
@@ -36,7 +39,7 @@ const options = (): ort.InferenceSession.SessionOptions => ({
 })
 
 export function inpaintAvailable() {
-  return fs.existsSync(DETECTOR) && fs.existsSync(LAMA)
+  return fs.existsSync(detectorFile()) && fs.existsSync(LAMA)
 }
 
 /**
@@ -45,7 +48,7 @@ export function inpaintAvailable() {
  */
 export async function textMask(image: Buffer): Promise<Uint8Array | null> {
   if (!inpaintAvailable()) return null
-  shared.detector ||= ort.InferenceSession.create(DETECTOR, options())
+  shared.detector ||= ort.InferenceSession.create(detectorFile(), options())
   const session = await shared.detector
   const { data, info } = await sharp(image, { limitInputPixels: 50000000 })
     .rotate()

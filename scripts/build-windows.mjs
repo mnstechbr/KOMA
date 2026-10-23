@@ -3,7 +3,7 @@ import path from 'node:path'
 import crypto from 'node:crypto'
 import zlib from 'node:zlib'
 import { execFileSync } from 'node:child_process'
-import { verifyModels } from './desktop-models.mjs'
+import { packagedModel, verifyModels } from './desktop-models.mjs'
 import { buildMlWorker } from './build-ml-worker.mjs'
 
 // Monta o pacote do KOMA para Windows 11 (x64) e o instalador .exe (NSIS).
@@ -120,7 +120,11 @@ for (const entry of ['.next', 'node_modules', 'package.json', 'server.js']) {
   await fs.cp(path.join(standalone, entry), path.join(server, entry), { recursive: true, verbatimSymlinks: true })
 }
 await fs.copyFile(path.join(root, 'package.json'), path.join(server, 'package.json'))
-for (const entry of ['public', 'models']) await fs.cp(path.join(root, entry), path.join(server, entry), { recursive: true })
+for (const entry of ['public', 'models'])
+  await fs.cp(path.join(root, entry), path.join(server, entry), {
+    recursive: true,
+    filter: (source) => packagedModel(path.basename(source)),
+  })
 await fs.cp(path.join(root, '.next/static'), path.join(server, '.next/static'), { recursive: true })
 // OCR e apagamento num processo separado (worker thread), fora da thread das telas.
 await fs.cp(await buildMlWorker(), path.join(server, 'koma-ml'), { recursive: true })
