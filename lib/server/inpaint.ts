@@ -31,6 +31,8 @@ const options = (): ort.InferenceSession.SessionOptions => ({
   executionProviders: shared.device === 'webgpu' ? ['webgpu', 'cpu'] : ['cpu'],
   graphOptimizationLevel: 'all',
   logSeverityLevel: 3,
+  // Só para medições (tests/pipeline-benchmark.real.test.ts); o app usa o padrão do onnxruntime.
+  ...(Number(process.env.KOMA_INPAINT_THREADS) > 0 ? { intraOpNumThreads: Number(process.env.KOMA_INPAINT_THREADS) } : {}),
 })
 
 export function inpaintAvailable() {
