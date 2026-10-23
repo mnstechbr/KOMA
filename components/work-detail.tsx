@@ -43,6 +43,7 @@ function cell(chapter: WorkChapter, work: WorkSummary, t: Translate) {
     }
   }
   if (chapter.state === 'error') return { tone: 'is-error', tag: t('ERRO'), readable }
+  if (chapter.retryAt) return { tone: 'is-waiting', tag: t('AGUARDANDO'), readable }
   if (chapter.state === 'skipped' && chapter.phantom) return { tone: 'is-skipped', tag: t('IGNORADO'), readable }
   if (chapter.state === 'skipped') return { tone: 'is-skipped', tag: t('NÃO BAIXADO'), readable }
   return { tone: 'is-waiting', tag: t(waitingTags[chapter.state] || 'FILA'), readable }
@@ -319,7 +320,7 @@ export function WorkDetail({ id }: { id: number }) {
                   <span>{t('prontos')}</span>
                 </div>
                 <div className="koma-stat">
-                  <strong>{work.totalChapters - work.readyChapters}</strong>
+                  <strong>{work.activeChapters}</strong>
                   <span>{t('na fila')}</span>
                 </div>
                 <div className="koma-stat">
@@ -335,9 +336,11 @@ export function WorkDetail({ id }: { id: number }) {
               <p className="koma-note" data-work-stage={work.stage}>
                 {work.syncRequested
                   ? t('Buscando a lista de capítulos…')
-                  : work.stage === 'queued'
-                    ? t('Na fila, alternando entre suas obras')
-                    : t(preparationLabels[work.stage] || 'Na biblioteca')}{' '}
+                  : work.activeChapters === 0 && work.errorChapters + work.waitingChapters > 0
+                    ? t('Fora da fila: {n} capítulo(s) com pendência', { n: work.errorChapters + work.waitingChapters })
+                    : work.stage === 'queued'
+                      ? t('Na fila, alternando entre suas obras')
+                      : t(preparationLabels[work.stage] || 'Na biblioteca')}{' '}
                 · {t('{n} de {total} com originais baixados', { n: work.downloadedChapters, total: work.totalChapters })}
               </p>
               {sources.length ? (
@@ -385,7 +388,7 @@ export function WorkDetail({ id }: { id: number }) {
                   {t('Capítulos')}
                 </h2>
                 <p className="koma-note">
-                  {t('{n} catalogados', { n: work.totalChapters })} ·{' '}
+                  {t('{n} catalogados', { n: work.catalogedChapters })} ·{' '}
                   {work.lastSyncedAt
                     ? t('atualizado em {date}', { date: new Date(work.lastSyncedAt).toLocaleString(locale) })
                     : t('buscando capítulos')}

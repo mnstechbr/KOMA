@@ -148,7 +148,10 @@ export class WorksRepository {
   list(userId: number): WorkSummary[] {
     const rows = this.database
       .prepare(
-        `SELECT w.*, COALESCE(SUM(c.phantom<>1),0) AS total_chapters,
+        `SELECT w.*, COALESCE(SUM(c.state<>'skipped'),0) AS total_chapters, COALESCE(SUM(c.phantom<>1),0) AS cataloged_chapters,
+      COALESCE(SUM(c.state='error'),0) AS error_chapters,
+      COALESCE(SUM(c.state NOT IN ('ready','partial','error','skipped') AND c.state<>'blocked' AND c.retry_after>@now),0) AS waiting_chapters,
+      COALESCE(SUM(c.state NOT IN ('ready','partial','error','skipped') AND (c.state='blocked' OR c.retry_after<=@now)),0) AS active_chapters,
       COALESCE(SUM(c.state IN ('ready','partial')),0) AS ready_chapters, COALESCE(SUM(c.read_done),0) AS read_chapters,
       COALESCE(SUM(c.state IN ('ready','partial') AND c.read_done=0 AND c.position > (SELECT COALESCE(MAX(r.position),-1) FROM work_chapters r WHERE r.work_id=w.id AND r.read_done=1)),0) AS unread_ready,
       COALESCE(SUM(c.page_count),0) AS total_pages,
@@ -156,13 +159,17 @@ export class WorksRepository {
       (SELECT COUNT(*) FROM work_pages p JOIN work_chapters cp ON cp.id=p.chapter_id WHERE cp.work_id=w.id AND p.image_id IS NOT NULL) AS downloaded_pages,
       (SELECT COUNT(*) FROM work_chapters cp WHERE cp.work_id=w.id AND cp.page_count>0 AND (SELECT COUNT(*) FROM work_pages p WHERE p.chapter_id=cp.id AND p.image_id IS NOT NULL)=cp.page_count) AS downloaded_chapters,
       (SELECT COUNT(*) FROM work_pages p JOIN work_chapters cp ON cp.id=p.chapter_id WHERE cp.work_id=w.id AND (p.upgrade_pending=1 OR p.render_stale=1)) AS revision_pending
-      FROM works w LEFT JOIN work_chapters c ON c.work_id=w.id WHERE w.user_id=? GROUP BY w.id ORDER BY COALESCE(w.last_opened_at,w.created_at) DESC,w.id DESC`,
+      FROM works w LEFT JOIN work_chapters c ON c.work_id=w.id WHERE w.user_id=@userId GROUP BY w.id ORDER BY COALESCE(w.last_opened_at,w.created_at) DESC,w.id DESC`,
       )
-      .all(userId) as Array<
+      .all({ userId, now: Date.now() }) as Array<
       WorkRow & {
         favorite: number
         last_synced_at: string | null
         total_chapters: number
+        cataloged_chapters: number
+        error_chapters: number
+        waiting_chapters: number
+        active_chapters: number
         ready_chapters: number
         read_chapters: number
         total_pages: number
@@ -197,6 +204,10 @@ export class WorksRepository {
         syncRequested: Boolean(row.sync_requested),
         lastSyncedAt: row.last_synced_at,
         totalChapters: row.total_chapters,
+        catalogedChapters: row.cataloged_chapters,
+        errorChapters: row.error_chapters,
+        waitingChapters: row.waiting_chapters,
+        activeChapters: row.active_chapters,
         readyChapters: row.ready_chapters,
         readChapters: row.read_chapters,
         totalPages: row.total_pages,
@@ -206,7 +217,7 @@ export class WorksRepository {
         lastOpenedAt: row.last_opened_at,
         unreadReady: row.unread_ready,
         nextChapter: (next.get(row.id, row.id) as WorkSummary['nextChapter'] | undefined) ?? null,
-        translationWait: row.ready_chapters < row.total_chapters ? this.cooldown() : null,
+        translationWait: row.active_chapters > 0 ? this.cooldown() : null,
         targetLanguage: row.target_language || 'pt-br',
         revisionPending: row.revision_pending,
         coverUrl: metadata.coverFile
@@ -234,6 +245,7 @@ export class WorksRepository {
         read_done: number
         created_at: string
         phantom: number
+        retry_after: number
       }
     >
     const chapters: WorkChapter[] = rows.map((c) => ({
@@ -253,6 +265,7 @@ export class WorksRepository {
       read: Boolean(c.read_done),
       createdAt: c.created_at,
       phantom: c.phantom === 1,
+      retryAt: c.state === 'queued' && c.retry_after > Date.now() ? c.retry_after : null,
     }))
     const sources = this.database
       .prepare(

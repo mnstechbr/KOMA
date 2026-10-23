@@ -4,7 +4,7 @@ vi.mock('../lib/backend/shared/database.module', () => ({ db: null }))
 import { SQLITE_MIGRATIONS } from '../lib/backend/shared/migrations'
 import { WorksRepository } from '../lib/backend/works/repository'
 import { phantomChapters, sourceHost } from '../lib/backend/works/phantom-chapters'
-import type { CatalogWork, SourceChapter } from '../lib/works'
+import { workInQueue, workPendingChapters, workPreparing, type CatalogWork, type SourceChapter } from '../lib/works'
 
 // Fontes fictícias: a editora e três agregadores.
 const SITES = ['https://editora.example/obra', 'https://um.example/obra', 'https://dois.example/obra', 'https://tres.example/obra']
@@ -144,6 +144,59 @@ describe('capítulos fantasma na fila', () => {
       state: 'skipped',
       phantom: true,
       message: '',
+    })
+  })
+
+  describe('fila nunca presa por capítulo que não vai sair agora', () => {
+    const setup = () => {
+      const id = repository.add(1, work)
+      repository.syncChapters(id, catalog([]))
+      database.prepare("UPDATE work_chapters SET state='ready' WHERE work_id=?").run(id)
+      return id
+    }
+    const summary = () => repository.list(1)[0]
+    const set = (number: string, sql: string, ...args: unknown[]) =>
+      database.prepare(`UPDATE work_chapters SET ${sql} WHERE number=?`).run(...args, number)
+
+    it('tudo pronto: fora da fila', () => {
+      setup()
+      expect(summary()).toMatchObject({ totalChapters: 10, readyChapters: 10, activeChapters: 0 })
+      expect(workInQueue(summary())).toBe(false)
+    })
+    it('capítulo dispensado (inclusive não escolhido ao adicionar) sai do total', () => {
+      setup()
+      set('3', "state='skipped'")
+      expect(summary()).toMatchObject({ totalChapters: 9, catalogedChapters: 10, readyChapters: 9, activeChapters: 0 })
+      expect(workPreparing(summary())).toBe(false)
+      expect(workInQueue(summary())).toBe(false)
+    })
+    it('erro definitivo: pendência na obra, sem prender a fila', () => {
+      const id = setup()
+      set('3', "state='error',message='A fonte recusou'")
+      database.prepare("UPDATE works SET stage='error' WHERE id=?").run(id)
+      expect(summary()).toMatchObject({ totalChapters: 10, errorChapters: 1, activeChapters: 0 })
+      expect(workInQueue(summary())).toBe(false)
+      expect(workPendingChapters(summary())).toBe(1)
+      // "Tentar agora" devolve à fila.
+      const chapter = repository.detail(id, 1)!.chapters.find((c) => c.number === '3')!
+      expect(repository.chapterAction(id, chapter.id, 1, 'retry')).toBe(true)
+      expect(workInQueue(summary())).toBe(true)
+    })
+    it('esperando a fonte (6 h/24 h): aguardando, fora da fila até a hora', () => {
+      const id = setup()
+      set('3', "state='queued',retry_after=?,message='Só um site tem este capítulo'", Date.now() + 6 * 3600000)
+      expect(summary()).toMatchObject({ waitingChapters: 1, activeChapters: 0 })
+      expect(workInQueue(summary())).toBe(false)
+      expect(repository.detail(id, 1)!.chapters.find((c) => c.number === '3')!.retryAt).toBeGreaterThan(Date.now())
+      set('3', 'retry_after=?', Date.now() - 1000)
+      expect(summary()).toMatchObject({ waitingChapters: 0, activeChapters: 1 })
+      expect(workInQueue(summary())).toBe(true)
+    })
+    it('aguardando aprovação (bloqueado) continua na fila', () => {
+      setup()
+      set('3', "state='blocked',retry_after=?", Date.now() + 3600000)
+      expect(summary()).toMatchObject({ activeChapters: 1, waitingChapters: 0 })
+      expect(workInQueue(summary())).toBe(true)
     })
   })
 })
