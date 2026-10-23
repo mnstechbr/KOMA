@@ -41,7 +41,10 @@ if (benchEp || noSpin) {
   ;(ort.InferenceSession as unknown as { create: unknown }).create = (model: unknown, options?: ort.InferenceSession.SessionOptions) =>
     create(model, {
       ...options,
-      ...(benchEp ? { executionProviders: providers } : {}),
+      // KOMA_BENCH_EP_SCOPE=draw: só o detector de letras e o LaMa trocam de dispositivo.
+      ...(benchEp && (process.env.KOMA_BENCH_EP_SCOPE !== 'draw' || /comic-text-detector|lama/.test(String(model)))
+        ? { executionProviders: providers }
+        : {}),
       ...(noSpin ? { extra: { session: { intra_op: { allow_spinning: '0' }, inter_op: { allow_spinning: '0' } } } } : {}),
     })
 }
