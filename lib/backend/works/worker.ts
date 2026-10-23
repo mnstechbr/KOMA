@@ -148,6 +148,12 @@ export function startWorkAutomation() {
   // vídeo, para os modelos carregarem uma vez só, já no dispositivo certo.
   const warmUntil = Date.now() + Number(process.env.KOMA_WARMUP_MS ?? 120000)
   let gpuChecked = false
+  // Capítulos fantasma de obras sincronizadas antes desta verificação existir.
+  try {
+    for (const { id } of repository.database.prepare('SELECT id FROM works').all() as Array<{ id: number }>) repository.markPhantoms(id)
+  } catch {
+    /* Próxima sincronização da obra confere de novo. */
+  }
   void detectGpu(probeGpu)
     .then(() => applyPerformance(repository.database))
     .finally(() => {
