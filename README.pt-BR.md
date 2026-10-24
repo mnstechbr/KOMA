@@ -13,11 +13,13 @@ Funciona no Linux (x86_64) e no Windows 11. Projeto pessoal, software livre, sem
 - **Coleta rápida:** as páginas são baixadas várias ao mesmo tempo, e a procura diária por capítulos novos para no primeiro capítulo já conhecido.
 - **OCR local:** detecção de balões, de texto fora deles e leitura PP-OCRv5 para alfabeto latino e coreano, no seu computador (processador ou, no perfil Máximo, a placa de vídeo).
 - **Páginas traduzidas:** o texto original é apagado (com os modelos comic-text-detector e LaMa) e a tradução é desenhada dentro do balão. A página original fica a um clique.
+- **Desempenho:** em **Preferências → Desempenho**, o KOMA escolhe um perfil para o seu computador (Leve, Equilibrado ou Máximo). Ele só usa a placa de vídeo quando ela é mais rápida que o processador e dá o mesmo resultado. Dá para limitar o uso a 100%, 75% ou 50% e deixar o KOMA desacelerar quando o computador esquentar. No Linux com placa NVIDIA, um complemento CUDA opcional (download à parte, fora do instalador) acelera o desenho no perfil Máximo.
 - **Leitor:** rolagem contínua, rolagem automática com 15 velocidades (a barra de espaço pausa), rolagem com o botão do meio, "Refazer este capítulo", **editor de balões** (clique num balão, corrija o texto, só aquela página é desenhada de novo e a correção entra no glossário da obra) e **Reportar erro** (veja abaixo).
 - **Segundo plano:** fechar a janela deixa o KOMA no ícone da bandeja. Ele pode iniciar com o computador, procura capítulos novos todo dia no horário que você escolher e mostra um aviso que abre o capítulo novo no leitor.
 - **Ler no celular (opcional):** pelo Wi-Fi de casa, com QR code e código de acesso. No celular só dá para ler e marcar como lido; nada fica exposto na internet.
 - **AniList (opcional):** ao marcar um capítulo como lido, o seu progresso no AniList sobe, pela autorização oficial do AniList.
 - **Idiomas:** telas em português, inglês ou espanhol. Cada obra pode ser traduzida para português do Brasil, inglês, espanhol, francês, alemão ou italiano.
+- **Dispositivo externo (opcional):** guarde os capítulos antigos num HD, SSD, pendrive, cartão de memória ou pasta de rede. Em **Preferências → Armazenamento → Dispositivo externo**, escolha o dispositivo na lista. Cada capítulo vira um arquivo `.cbz` nele (abre em qualquer leitor de quadrinhos), conferido byte a byte antes de sair do computador. No computador ficam só os capítulos mais novos de cada obra e os seguintes ao último que você leu (3 + 3 por padrão, ajustável). Com o dispositivo conectado, um capítulo antigo abre em segundos; sem ele, o KOMA pede para conectar. O dispositivo é reconhecido por um arquivo `koma-disco.json`, mesmo que o caminho ou a letra da unidade mude.
 - **Armazenamento na nuvem (opcional):** Google Drive, OneDrive ou qualquer serviço do rclone. Cada capítulo vira um `.cbz`. Os capítulos podem ficar só na nuvem, com um cache limitado no computador.
 
 ## Quem traduz
@@ -65,6 +67,7 @@ Depois, abra o **KOMA** pelo menu de aplicativos. Para conferir tudo antes de in
 | Biblioteca, banco SQLite e páginas | `~/.local/share/koma/library` | `%LOCALAPPDATA%\KOMA\library` |
 | Aplicativo instalado | `~/.local/share/koma/app/current` | `%LOCALAPPDATA%\Programs\KOMA` |
 | Diagnóstico | `~/.local/state/koma/logs/backend.log` | `%LOCALAPPDATA%\KOMA\logs` |
+| Capítulos no dispositivo externo (opcional) | pasta `KOMA` no dispositivo | pasta `KOMA` no dispositivo |
 
 No Linux, `XDG_DATA_HOME`, `XDG_CONFIG_HOME` e `XDG_STATE_HOME` são respeitados. Para fazer backup, feche o KOMA (Sair, no menu do ícone da bandeja) e copie a pasta `library` inteira.
 

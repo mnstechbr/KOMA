@@ -13,11 +13,13 @@ Runs on Linux (x86_64) and Windows 11. Personal project, free software, no accou
 - **Fast collection:** pages are downloaded several at a time, and the daily check for new chapters stops at the first chapter it already knows.
 - **Local OCR:** balloon detection, free-text detection and PP-OCRv5 recognition for Latin script and Korean, on your computer (CPU or, in the Maximum profile, the graphics card).
 - **Translated pages:** the original text is erased (with the comic-text-detector and LaMa models) and the translation is drawn inside the balloon. The original page is one click away.
+- **Performance:** in **Settings → Performance**, KOMA picks a profile for your computer (Light, Balanced or Maximum). It only uses the graphics card when the card is faster than the processor and gives the same result. You can cap usage at 100%, 75% or 50% and let KOMA slow down when the computer gets hot. On Linux with an NVIDIA card, an optional CUDA add-on (a separate download, not in the installer) speeds up drawing in the Maximum profile.
 - **Reader:** continuous scrolling, auto-scroll with 15 speeds (space bar pauses), middle-click scrolling, "Redo this chapter", a **balloon editor** (click a balloon, fix the text, only that page is redrawn, and the fix goes into the series glossary) and **Report error** (see below).
 - **Background:** closing the window keeps KOMA in the system tray. It can start with the computer, checks for new chapters every day at the time you choose, and shows a notification that opens the new chapter in the reader.
 - **Read on your phone (optional):** over your home Wi-Fi, with a QR code and an access code. The phone only reads and marks chapters as read; nothing is exposed to the internet.
 - **AniList (optional):** when you mark a chapter as read, your AniList progress goes up, through AniList's official authorization.
 - **Languages:** interface in Portuguese, English or Spanish. Each series can be translated into Brazilian Portuguese, English, Spanish, French, German or Italian.
+- **External device (optional):** keep older chapters on an HDD, SSD, USB drive, memory card or network folder. In **Settings → Storage → External device**, pick the device from the list. Each chapter becomes a `.cbz` file on it (opens in any comic reader), checked byte by byte before it leaves the computer. Only the newest chapters of each series and the next ones after where you stopped stay on the computer (3 + 3 by default, adjustable). With the device connected, an old chapter opens in seconds; without it, KOMA asks you to connect it. The device is recognized by a `koma-disco.json` file, even if its path or drive letter changes.
 - **Cloud storage (optional):** Google Drive, OneDrive or any rclone service. Each chapter becomes a `.cbz` file. Chapters can live only in the cloud, with a size-limited local cache.
 
 ## Who translates
@@ -65,6 +67,7 @@ Then open **KOMA** from your applications menu. To check everything before insta
 | Library, SQLite database and pages | `~/.local/share/koma/library` | `%LOCALAPPDATA%\KOMA\library` |
 | Installed app | `~/.local/share/koma/app/current` | `%LOCALAPPDATA%\Programs\KOMA` |
 | Diagnostics | `~/.local/state/koma/logs/backend.log` | `%LOCALAPPDATA%\KOMA\logs` |
+| Chapters on an external device (optional) | `KOMA` folder on the device | `KOMA` folder on the device |
 
 On Linux, `XDG_DATA_HOME`, `XDG_CONFIG_HOME` and `XDG_STATE_HOME` are respected. To back up, close KOMA (Quit in the tray menu) and copy the whole `library` folder.
 
