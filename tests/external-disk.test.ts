@@ -173,6 +173,15 @@ describe('dispositivo externo', () => {
     expect(local(db)).not.toContain(1)
   })
 
+  it('os próximos contam a partir do último capítulo lido, não do capítulo 1', async () => {
+    const { db } = library(20)
+    // Começou a ler pelo meio: leu o 9 e o 10, o 1 ao 8 nunca foram marcados.
+    db.prepare('UPDATE work_chapters SET read_done=1 WHERE position IN (9,10)').run()
+    expect([...chaptersKeptLocal(db, 3)].sort((a, b) => a - b)).toEqual([11, 12, 13, 18, 19, 20])
+    await sync(db)
+    expect(local(db)).toEqual([11, 12, 13, 18, 19, 20])
+  })
+
   it('quando a leitura volta para um capítulo antigo, os próximos voltam para o computador', async () => {
     const { db } = library(10)
     db.prepare('UPDATE work_chapters SET read_done=1').run()

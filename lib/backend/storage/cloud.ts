@@ -195,15 +195,21 @@ export function chaptersToUpload(database: Database.Database, limit = 1, recheck
 
 /**
  * Dispositivo externo: capítulos que ficam no computador. De cada obra, os N
- * mais novos e os N próximos não lidos; além deles, os que a pessoa abriu há
- * menos de RESTORED_HOURS horas.
+ * mais novos e os N seguintes ao último lido; além deles, os que a pessoa
+ * abriu há menos de RESTORED_HOURS horas.
  */
 export const RESTORED_HOURS = 48
 export function chaptersKeptLocal(database: Database.Database, keep: number, now = Date.now()) {
   const kept = new Set<number>()
   for (const { work_id } of database.prepare('SELECT DISTINCT work_id FROM work_chapters').all() as Array<{ work_id: number }>) {
     const newest = database.prepare(`SELECT id FROM work_chapters WHERE work_id=? AND state IN ('ready','partial') ORDER BY position DESC LIMIT ?`).all(work_id, keep) as Array<{ id: number }>
-    const next = database.prepare(`SELECT id FROM work_chapters WHERE work_id=? AND read_done=0 AND state IN ('ready','partial') ORDER BY position LIMIT ?`).all(work_id, keep) as Array<{ id: number }>
+    // Os próximos a partir de onde a pessoa parou (o último lido), não do capítulo 1.
+    const next = database
+      .prepare(
+        `SELECT id FROM work_chapters WHERE work_id=? AND read_done=0 AND state IN ('ready','partial')
+         AND position > COALESCE((SELECT MAX(position) FROM work_chapters WHERE work_id=? AND read_done=1), -1e18) ORDER BY position LIMIT ?`,
+      )
+      .all(work_id, work_id, keep) as Array<{ id: number }>
     for (const row of [...newest, ...next]) kept.add(row.id)
   }
   const since = new Date(now - RESTORED_HOURS * 3600000).toISOString()
