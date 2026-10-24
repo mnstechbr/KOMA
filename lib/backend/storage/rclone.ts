@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { getDataDir } from '../shared/data-paths'
 import type { StorageSettings } from './settings'
+import { DISK_PREFIX } from './disk'
 
 // O KOMA usa o rclone (MIT) para falar com Google Drive, OneDrive e outros 70
 // serviços. O login acontece no navegador, pela página oficial de cada conta; o
@@ -31,6 +32,7 @@ function configArgs(settings: Pick<StorageSettings, 'provider'>) {
 }
 
 export function remoteRoot(settings: StorageSettings) {
+  if (settings.provider === 'disk') return `${DISK_PREFIX}${settings.folder}`
   const remote = settings.provider === 'gdrive' ? `${KOMA_REMOTES.gdrive}:` : settings.provider === 'onedrive' ? `${KOMA_REMOTES.onedrive}:` : settings.remote
   return `${remote}${settings.folder}`
 }

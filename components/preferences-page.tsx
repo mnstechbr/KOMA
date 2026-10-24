@@ -439,8 +439,8 @@ export function PreferencesPage() {
         </PrefSection>
         <PrefSection
           id="storage"
-          title={t('Armazenamento na nuvem')}
-          hint={t('Guardar os capítulos no Google Drive, OneDrive ou outra nuvem')}
+          title={t('Armazenamento')}
+          hint={t('Guardar os capítulos num dispositivo externo, no Google Drive, OneDrive ou outra nuvem')}
         >
           <StorageSettings />
         </PrefSection>

@@ -15,7 +15,7 @@ import {
   uploadChapter,
   type Runner,
 } from '../lib/backend/storage/cloud'
-import { parseStorageSettings, saveStorageSettings, type StorageSettings } from '../lib/backend/storage/settings'
+import { DEFAULT_STORAGE, parseStorageSettings, saveStorageSettings, type StorageSettings } from '../lib/backend/storage/settings'
 
 // "Nuvem" falsa: o remoto fake: vira uma pasta temporária.
 function fakeCloud(root: string): Runner {
@@ -69,7 +69,7 @@ function library(pages = 3) {
       Number(image.lastInsertRowid),
     )
   }
-  const settings: StorageSettings = { provider: 'rclone', remote: 'fake:', folder: 'KOMA', mode: 'cloud', cacheGb: 0.5 }
+  const settings: StorageSettings = { ...DEFAULT_STORAGE, provider: 'rclone', remote: 'fake:', folder: 'KOMA', mode: 'cloud', cacheGb: 0.5 }
   saveStorageSettings(db, settings)
   return { db, dir, section, settings, cloud: path.join(dir, 'nuvem') }
 }
