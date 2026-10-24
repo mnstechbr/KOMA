@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { personalAccess, numericId } from '../../../_shared'
 import { worksRepository } from '@/lib/backend/works/repository'
 import { ensureChapterLocal } from '@/lib/backend/storage/cloud'
+import { DiskMissingError } from '@/lib/backend/storage/disk'
+import { serverT } from '@/lib/i18n/server'
 import { startWorkAutomation } from '@/lib/backend/works/worker'
 import { syncAniListWork } from '@/lib/backend/works/anilist'
 
@@ -15,10 +17,21 @@ export async function GET(_request: Request, { params }: Context) {
   if (!detail || !chapter) return NextResponse.json({ message: 'Capítulo não encontrado.' }, { status: 404 })
   if (!['ready', 'partial'].includes(chapter.state))
     return NextResponse.json({ message: 'Este capítulo ainda está sendo preparado. Acompanhe o andamento na obra.' }, { status: 409 })
-  // Modo "só na nuvem": baixa as páginas antes de abrir.
+  // Modo "só na nuvem" ou dispositivo externo: traz as páginas antes de abrir.
   try {
     await ensureChapterLocal(worksRepository.database, chapter.id)
   } catch (error) {
+    if (error instanceof DiskMissingError) {
+      const t = await serverT()
+      return NextResponse.json(
+        {
+          message: t('Este capítulo está guardado no dispositivo {disk}. Conecte o dispositivo para ler.', {
+            disk: error.label || t('externo'),
+          }),
+        },
+        { status: 503 },
+      )
+    }
     return NextResponse.json(
       {
         message:
@@ -96,6 +109,24 @@ export async function PATCH(request: Request, { params }: Context) {
   const { action } = (await request.json().catch(() => ({}))) as { action?: string }
   if (action !== 'redo' && action !== 'download' && action !== 'skip' && action !== 'retry')
     return NextResponse.json({ message: 'Ação inválida.' }, { status: 400 })
+  // Refazer usa as páginas originais: um capítulo guardado fora precisa voltar antes.
+  if (action === 'redo')
+    try {
+      await ensureChapterLocal(worksRepository.database, numericId(chapterId))
+    } catch (error) {
+      const t = await serverT()
+      return NextResponse.json(
+        {
+          message:
+            error instanceof DiskMissingError
+              ? t('Este capítulo está guardado no dispositivo {disk}. Conecte o dispositivo para ler.', {
+                  disk: error.label || t('externo'),
+                })
+              : t('Não foi possível trazer o capítulo de volta para o computador.'),
+        },
+        { status: 503 },
+      )
+    }
   if (!worksRepository.chapterAction(numericId(id), numericId(chapterId), auth.user.id, action))
     return NextResponse.json({ message: 'Capítulo não encontrado.' }, { status: 404 })
   startWorkAutomation()

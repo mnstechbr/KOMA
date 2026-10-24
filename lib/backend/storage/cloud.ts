@@ -6,6 +6,7 @@ import type Database from 'better-sqlite3'
 import { buildZip, readZip, writeZipFile, type ZipInput } from '@/lib/server/cbz'
 import { getStorageSettings, type StorageSettings } from './settings'
 import { komaRemoteReady, remoteRoot, runRclone, type RcloneResult } from './rclone'
+import { DISK_MISSING, DiskMissingError, findDisk, runDisk, sha1File } from './disk'
 
 // Biblioteca na nuvem: cada capítulo pronto vira um .cbz com as páginas em
 // PT-BR na raiz (abre em qualquer leitor de quadrinhos), os originais dentro de
@@ -13,6 +14,8 @@ import { komaRemoteReady, remoteRoot, runRclone, type RcloneResult } from './rcl
 // O banco continua no computador; só as imagens vão para a nuvem.
 
 export type Runner = (settings: StorageSettings, args: string[]) => Promise<RcloneResult>
+/** Nuvem pelo rclone; dispositivo externo por cópia direta de arquivo. */
+export const runStorage: Runner = (settings, args) => (settings.provider === 'disk' ? runDisk(settings, args) : runRclone(settings, args))
 interface ChapterInfo { id: number; number: string | null; title: string; language: string; section_id: number; work_title: string }
 interface Manifest { format: 'koma-cbz/1'; work: string; chapter: string | null; title: string; language: string; pages: Array<{ name: string; file: string }>; files: string[] }
 
@@ -115,9 +118,15 @@ export async function uploadChapter(database: Database.Database, settings: Stora
     writeZipFile(file, packed.entries)
     const size = fs.statSync(file).size
     const result = await run(settings, ['copyto', file, remote])
-    if (!result.ok) throw new Error(cloudError(result))
+    if (!result.ok) throw cloudFailure(result, settings)
     // Só conta como guardado depois de conferir o tamanho na nuvem.
     if (await remoteSize(settings, run, remote) !== size) throw new Error('A nuvem não confirmou o envio do capítulo.')
+    // No dispositivo externo dá para ler de volta: confere byte a byte pelo hash.
+    if (settings.provider === 'disk') {
+      const check = await run(settings, ['sha1', remote])
+      if (!check.ok) throw cloudFailure(check, settings)
+      if (check.stdout !== sha1File(file)) throw new Error('A cópia no dispositivo externo não confere com o original.')
+    }
     database.prepare(`INSERT INTO work_chapter_cloud (chapter_id,remote_path,signature,size_bytes,local_bytes,uploaded_at,evicted) VALUES (?,?,?,?,?,?,0)
       ON CONFLICT(chapter_id) DO UPDATE SET remote_path=excluded.remote_path,signature=excluded.signature,size_bytes=excluded.size_bytes,local_bytes=excluded.local_bytes,uploaded_at=excluded.uploaded_at,evicted=0`)
       .run(chapterId, remote, packed.signature, size, packed.bytes, new Date().toISOString())
@@ -125,9 +134,15 @@ export async function uploadChapter(database: Database.Database, settings: Stora
   } finally { fs.rmSync(file, { force: true }) }
 }
 
+function cloudFailure(result: RcloneResult, settings: StorageSettings) {
+  return result.stderr === DISK_MISSING ? new DiskMissingError(settings.diskLabel) : new Error(cloudError(result))
+}
+
 function cloudError(result: RcloneResult) {
   if (result.missing) return 'O rclone não está instalado neste computador.'
   const text = result.stderr || result.stdout
+  if (text === 'read-only') return 'O dispositivo externo está protegido contra gravação.'
+  if (text === 'disk error') return 'Falha ao gravar no dispositivo externo.'
   if (/didn't find section in config file|not found in config/i.test(text)) return 'A conta da nuvem não está conectada.'
   if (/quota|storageQuotaExceeded|insufficient/i.test(text)) return 'Sem espaço na nuvem.'
   if (/token|unauthori[sz]ed|invalid_grant|401/i.test(text)) return 'O login da nuvem expirou. Conecte a conta de novo.'
@@ -138,7 +153,7 @@ function cloudError(result: RcloneResult) {
 const restoring = new Map<number, Promise<void>>()
 
 /** Garante as páginas no computador antes de abrir o capítulo. */
-export function ensureChapterLocal(database: Database.Database, chapterId: number, run: Runner = runRclone) {
+export function ensureChapterLocal(database: Database.Database, chapterId: number, run: Runner = runStorage) {
   const row = database.prepare('SELECT remote_path, evicted FROM work_chapter_cloud WHERE chapter_id=?').get(chapterId) as { remote_path: string; evicted: number } | undefined
   if (!row?.evicted) return Promise.resolve()
   const pending = restoring.get(chapterId)
@@ -151,9 +166,9 @@ export function ensureChapterLocal(database: Database.Database, chapterId: numbe
     const file = path.join(tempDir(), `${chapterId}-restore-${Date.now()}.cbz`)
     try {
       const result = await run(settings, ['copyto', row.remote_path, file])
-      if (!result.ok) throw new Error(cloudError(result))
+      if (!result.ok) throw cloudFailure(result, settings)
       unpackChapter(fs.readFileSync(file), directory)
-      database.prepare('UPDATE work_chapter_cloud SET evicted=0 WHERE chapter_id=?').run(chapterId)
+      database.prepare('UPDATE work_chapter_cloud SET evicted=0, restored_at=? WHERE chapter_id=?').run(new Date().toISOString(), chapterId)
     } finally { fs.rmSync(file, { force: true }) }
   })().finally(() => restoring.delete(chapterId))
   restoring.set(chapterId, task)
@@ -178,9 +193,55 @@ export function chaptersToUpload(database: Database.Database, limit = 1, recheck
   return out
 }
 
+/**
+ * Dispositivo externo: capítulos que ficam no computador. De cada obra, os N
+ * mais novos e os N próximos não lidos; além deles, os que a pessoa abriu há
+ * menos de RESTORED_HOURS horas.
+ */
+export const RESTORED_HOURS = 48
+export function chaptersKeptLocal(database: Database.Database, keep: number, now = Date.now()) {
+  const kept = new Set<number>()
+  for (const { work_id } of database.prepare('SELECT DISTINCT work_id FROM work_chapters').all() as Array<{ work_id: number }>) {
+    const newest = database.prepare(`SELECT id FROM work_chapters WHERE work_id=? AND state IN ('ready','partial') ORDER BY position DESC LIMIT ?`).all(work_id, keep) as Array<{ id: number }>
+    const next = database.prepare(`SELECT id FROM work_chapters WHERE work_id=? AND read_done=0 AND state IN ('ready','partial') ORDER BY position LIMIT ?`).all(work_id, keep) as Array<{ id: number }>
+    for (const row of [...newest, ...next]) kept.add(row.id)
+  }
+  const since = new Date(now - RESTORED_HOURS * 3600000).toISOString()
+  for (const row of database.prepare('SELECT chapter_id FROM work_chapter_cloud WHERE restored_at IS NOT NULL AND restored_at > ?').all(since) as Array<{ chapter_id: number }>) kept.add(row.chapter_id)
+  return kept
+}
+
+/** Dispositivo externo: tira do computador tudo o que já está conferido no dispositivo e não precisa ficar. */
+async function evictToDisk(database: Database.Database, settings: StorageSettings, run: Runner) {
+  if (!findDisk(settings)) return 0
+  const keep = chaptersKeptLocal(database, settings.keepChapters)
+  const rows = database.prepare(`SELECT c.id, c.section_id, k.signature, k.remote_path, k.size_bytes FROM work_chapter_cloud k
+    JOIN work_chapters c ON c.id=k.chapter_id WHERE k.evicted=0 AND c.state='ready' ORDER BY c.work_id, c.position`).all() as Array<{ id: number; section_id: number; signature: string; remote_path: string; size_bytes: number }>
+  let evicted = 0
+  for (const row of rows) {
+    if (keep.has(row.id)) continue
+    const directory = sectionDirectory(database, row.section_id)
+    const local = directory ? localSignature(directory) : null
+    if (!directory || !local || local.signature !== row.signature) continue
+    // A cópia precisa estar lá agora (alguém pode ter apagado a pasta no dispositivo).
+    if (await remoteSize(settings, run, row.remote_path) !== row.size_bytes) continue
+    for (const file of listFiles(directory)) fs.rmSync(file, { force: true })
+    database.prepare('UPDATE work_chapter_cloud SET evicted=1, local_bytes=?, restored_at=NULL WHERE chapter_id=?').run(local.bytes, row.id)
+    evicted++
+  }
+  return evicted
+}
+
+/** Dispositivo externo: traz de volta capítulos que passaram a ficar no computador (ex.: a pessoa voltou a leitura). */
+async function restoreKeptFromDisk(database: Database.Database, settings: StorageSettings, run: Runner, limit = 3) {
+  const keep = chaptersKeptLocal(database, settings.keepChapters)
+  const ids = (database.prepare('SELECT chapter_id FROM work_chapter_cloud WHERE evicted=1').all() as Array<{ chapter_id: number }>).map((row) => row.chapter_id).filter((id) => keep.has(id)).slice(0, limit)
+  for (const id of ids) await ensureChapterLocal(database, id, run)
+}
+
 /** Modo "só na nuvem": libera espaço apagando páginas já conferidas na nuvem. */
 export function evictChapters(database: Database.Database, settings: StorageSettings) {
-  if (settings.mode !== 'cloud' || settings.provider === 'local') return 0
+  if (settings.mode !== 'cloud' || settings.provider === 'local' || settings.provider === 'disk') return 0
   const rows = database.prepare(`SELECT c.id, c.section_id, c.work_id, c.read_done, k.signature, w.last_opened_at FROM work_chapter_cloud k
     JOIN work_chapters c ON c.id=k.chapter_id JOIN works w ON w.id=c.work_id
     WHERE k.evicted=0 AND c.state='ready' ORDER BY c.read_done DESC, COALESCE(w.last_opened_at,'') ASC, c.position DESC`).all() as Array<{ id: number; section_id: number; work_id: number; read_done: number; signature: string }>
@@ -204,20 +265,22 @@ export function evictChapters(database: Database.Database, settings: StorageSett
   return evicted
 }
 
-export interface CloudStatus { uploaded: number; pending: number; evicted: number; ready: number; uploading: number | null; lastError: string; lastSyncAt: string | null }
+export interface CloudStatus { uploaded: number; pending: number; evicted: number; ready: number; uploading: number | null; lastError: string; lastSyncAt: string | null; localBytes: number }
 const state: { uploading: number | null; lastError: string; lastSyncAt: string | null; retryAt: number; timer: NodeJS.Timeout | null; lastFullScan: number } = { uploading: null, lastError: '', lastSyncAt: null, retryAt: 0, timer: null, lastFullScan: 0 }
 
 export function cloudStatus(database: Database.Database): CloudStatus {
   const counts = database.prepare(`SELECT
       (SELECT COUNT(*) FROM work_chapters WHERE state='ready' AND section_id IS NOT NULL) AS ready,
       (SELECT COUNT(*) FROM work_chapter_cloud k JOIN work_chapters c ON c.id=k.chapter_id) AS uploaded,
-      (SELECT COUNT(*) FROM work_chapter_cloud k JOIN work_chapters c ON c.id=k.chapter_id WHERE k.evicted=1) AS evicted`).get() as { ready: number; uploaded: number; evicted: number }
+      (SELECT COUNT(*) FROM work_chapter_cloud k JOIN work_chapters c ON c.id=k.chapter_id WHERE k.evicted=1) AS evicted,
+      (SELECT COALESCE(SUM(k.local_bytes),0) FROM work_chapter_cloud k JOIN work_chapters c ON c.id=k.chapter_id WHERE k.evicted=1) AS localBytes`).get() as { ready: number; uploaded: number; evicted: number; localBytes: number }
   return { ...counts, pending: Math.max(0, counts.ready - counts.uploaded), uploading: state.uploading, lastError: state.lastError, lastSyncAt: state.lastSyncAt }
 }
 
-export async function syncOnce(database: Database.Database, run: Runner = runRclone) {
+export async function syncOnce(database: Database.Database, run: Runner = runStorage) {
   const settings = getStorageSettings(database)
   if (settings.provider === 'local' || state.uploading !== null || Date.now() < state.retryAt) return
+  if (settings.provider === 'disk') return syncDisk(database, settings, run)
   if ((settings.provider === 'gdrive' || settings.provider === 'onedrive') && !komaRemoteReady(settings.provider)) { state.lastError = 'A conta da nuvem não está conectada. Conecte de novo em Preferências.'; return }
   const full = Date.now() - state.lastFullScan > 10 * 60000
   if (full) state.lastFullScan = Date.now()
@@ -235,6 +298,40 @@ export async function syncOnce(database: Database.Database, run: Runner = runRcl
     } finally { state.uploading = null }
   }
   evictChapters(database, settings)
+}
+
+/**
+ * Dispositivo externo: só trabalha com ele conectado. Copia vários capítulos
+ * por rodada (é um disco local, não uma API com limite), mas para a cada ~20 s
+ * para não segurar o KOMA.
+ */
+async function syncDisk(database: Database.Database, settings: StorageSettings, run: Runner) {
+  if (!findDisk(settings)) { state.lastError = ''; return }
+  const started = Date.now()
+  const full = Date.now() - state.lastFullScan > 10 * 60000
+  if (full) state.lastFullScan = Date.now()
+  try {
+    for (const chapterId of chaptersToUpload(database, 200, full)) {
+      if (Date.now() - started > 20000) break
+      state.uploading = chapterId
+      try {
+        await uploadChapter(database, settings, chapterId, run)
+      } finally { state.uploading = null }
+      state.lastSyncAt = new Date().toISOString()
+      await new Promise((resolve) => setImmediate(resolve))
+    }
+    if (settings.mode === 'cloud') {
+      await restoreKeptFromDisk(database, settings, run)
+      await evictToDisk(database, settings, run)
+    }
+    state.lastError = ''
+  } catch (error) {
+    // Dispositivo removido no meio: nada a registrar, continua quando voltar.
+    if (error instanceof DiskMissingError) { state.lastError = ''; return }
+    state.lastError = error instanceof Error ? error.message : 'Falha ao copiar para o dispositivo externo.'
+    state.retryAt = Date.now() + 5 * 60000
+    console.error('[KOMA] Falha ao copiar capítulo para o dispositivo externo')
+  }
 }
 
 export function retryCloudNow() { state.retryAt = 0 }
