@@ -3,6 +3,36 @@
 Histórico das entregas, mantido do antigo README. O README atual está em [README.pt-BR.md](../../README.pt-BR.md).
 
 
+## 1.0.5 — versão estável
+
+**Dispositivo externo**
+- Nova opção em Preferências → Armazenamento: guardar os capítulos antigos num HD, SSD, pendrive, cartão de memória ou pasta de rede. Funciona com qualquer dispositivo, no Linux e no Windows.
+- O KOMA lista os dispositivos conectados e cria neles a pasta `KOMA`, com um `koma-disco.json` que identifica o dispositivo mesmo se o caminho ou a letra da unidade mudar.
+- Cada capítulo vira um `.cbz`, gravado primeiro como `.partial` e conferido por tamanho e SHA-1 antes de contar como guardado. Só então as páginas saem do computador.
+- No computador ficam os capítulos mais novos de cada obra e os seguintes ao último lido (3 + 3 por padrão, de 1 a 50). Um capítulo antigo aberto volta do dispositivo em segundos e fica 48 horas no computador. Sem o dispositivo, o leitor pede para conectar.
+- Dispositivo removido no meio da cópia não apaga nada; a cópia continua quando ele voltar. Depois de reconhecido, o KOMA só consulta a tabela de montagem, para que um HD parado possa dormir.
+- Testado numa biblioteca real: 1.719 capítulos (43 GB) copiados e conferidos, e a pasta de capítulos no computador caiu de cerca de 45 GB para 2,5 GB.
+
+**Desempenho**
+- Desenho das páginas traduzidas muito mais rápido, com resultado idêntico byte a byte: máscara do texto só nas áreas de fala, detector podado, laços por pixel sem alocação e desenho num worker próprio, separado do OCR. Exemplo no perfil Equilibrado: capítulo de tiras de 40 para 10 minutos.
+- Detector de letras com OpenVINO no processador (cerca de 30 vezes mais rápido, mesma máscara), com volta ao ONNX Runtime se não estiver disponível.
+- Perfil automático: o KOMA escolhe Leve, Equilibrado ou Máximo pelo computador e só usa a placa de vídeo se ela for mais rápida que o processador e der o mesmo resultado.
+- Complemento CUDA opcional para o perfil Máximo (Linux com NVIDIA), baixado à parte em Preferências → Desempenho.
+- Limite de uso (100%, 75% ou 50%) e guarda de temperatura: com o processador a partir de 95 °C ou a placa de vídeo a partir de 83 °C, o KOMA prepara na metade do ritmo até esfriar.
+
+**Correções**
+- Preferências da janela (fundo animado e outras) persistem entre aberturas.
+- Capítulo listado por uma só fonte e pulado pelas outras ("fantasma") não prende mais a fila nem conta no total; volta se outra fonte listar.
+- Erros definitivos e esperas de nova tentativa aparecem como pendência e não seguram a fila.
+
+## 1.0.1 a 1.0.4
+
+- 1.0.1: telas não travam mais ao abrir; OCR, apagar e desenhar fora da thread das telas; "Iniciar com o computador" desliga de verdade.
+- 1.0.2: capítulo que falha procura a obra em outras fontes antes de virar erro; a busca junta a mesma obra de várias fontes num cartão só; tela de busca com as obras mais seguidas do MangaDex.
+- 1.0.3: código de OCR, desenho e fila dividido em arquivos menores.
+- 1.0.4: o instalador do Windows vai direto para a release; capítulo com volume do MangaDex não vira capítulo repetido.
+
+
 ## 1.0.0 — versão estável
 
 Primeira versão estável do repositório público.
