@@ -32,8 +32,9 @@ function subdirectories(root: string) {
   try { return fs.readdirSync(root, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => path.join(root, entry.name)) } catch { return [] }
 }
 
-/** Onde o sistema costuma montar dispositivos removíveis. */
+/** Onde o sistema costuma montar dispositivos removíveis. KOMA_DISK_ROOTS troca a lista (testes). */
 export function candidateMounts(): string[] {
+  if (process.env.KOMA_DISK_ROOTS) return process.env.KOMA_DISK_ROOTS.split(path.delimiter).filter(Boolean).flatMap(subdirectories)
   if (process.platform === 'win32') {
     const system = (process.env.SystemDrive || 'C:').toUpperCase()
     return 'DEFGHIJKLMNOPQRSTUVWXYZ'.split('').map((letter) => `${letter}:\\`).filter((root) => !root.startsWith(system) && isDirectory(root))
@@ -52,10 +53,32 @@ export function readMarker(mount: string, folder: string): Marker | null {
 
 const found = new Map<string, { mount: string | null; at: number }>()
 
-/** Caminho atual do dispositivo escolhido, ou null se ele não está conectado. */
+/** Pontos de montagem atuais pela tabela do sistema (Linux), sem tocar no disco. */
+function mountedPaths(): Set<string> | null {
+  if (process.platform !== 'linux') return null
+  try {
+    return new Set(
+      fs
+        .readFileSync('/proc/self/mounts', 'utf8')
+        .split('\n')
+        .map((line) => line.split(' ')[1])
+        .filter(Boolean)
+        .map((field) => field.replace(/\\([0-7]{3})/g, (_, octal: string) => String.fromCharCode(parseInt(octal, 8)))),
+    )
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Caminho atual do dispositivo escolhido, ou null se ele não está conectado.
+ * Depois de conferido o koma-disco.json, o KOMA só olha a tabela de montagem
+ * enquanto o dispositivo continuar montado: assim um HD parado pode dormir.
+ */
 export function findDisk(settings: Pick<StorageSettings, 'diskId' | 'diskPath' | 'folder'>): string | null {
   if (!settings.diskId) return null
   const cached = found.get(settings.diskId)
+  if (cached?.mount && mountedPaths()?.has(cached.mount)) return cached.mount
   if (cached && Date.now() - cached.at < 5000) return cached.mount
   const places = [settings.diskPath, cached?.mount, ...candidateMounts()].filter((place): place is string => Boolean(place))
   const mount = places.find((place) => readMarker(place, settings.folder)?.id === settings.diskId) ?? null
@@ -63,7 +86,10 @@ export function findDisk(settings: Pick<StorageSettings, 'diskId' | 'diskPath' |
   return mount
 }
 
-export function forgetDiskCache() { found.clear() }
+export function forgetDiskCache() {
+  found.clear()
+  listed = null
+}
 
 export function diskSpace(mount: string) {
   try {
@@ -74,12 +100,19 @@ export function diskSpace(mount: string) {
 
 export interface DiskChoice { path: string; label: string; total: number | null; free: number | null; hasKoma: boolean }
 
-/** Dispositivos conectados agora, para a pessoa escolher em Preferências. */
+let listed: { folder: string; at: number; disks: DiskChoice[] } | null = null
+
+/** Dispositivos conectados agora, para a pessoa escolher em Preferências (guardado por 1 min para não acordar HDs). */
 export function listDisks(folder: string): DiskChoice[] {
-  return candidateMounts().map((mount) => {
+  const mounts = candidateMounts()
+  if (listed && listed.folder === folder && Date.now() - listed.at < 60000 && listed.disks.length === mounts.length && listed.disks.every((disk, i) => disk.path === mounts[i]))
+    return listed.disks
+  const disks = mounts.map((mount) => {
     const space = diskSpace(mount)
     return { path: mount, label: diskLabel(mount), total: space?.total ?? null, free: space?.free ?? null, hasKoma: Boolean(readMarker(mount, folder)) }
   })
+  listed = { folder, at: Date.now(), disks }
+  return disks
 }
 
 export function diskLabel(mount: string) {
