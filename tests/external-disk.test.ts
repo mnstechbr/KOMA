@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { SQLITE_MIGRATIONS } from '../lib/backend/shared/migrations'
 vi.mock('../lib/backend/shared/database.module', () => ({ db: null }))
 import { chaptersKeptLocal, ensureChapterLocal, retryCloudNow, runStorage, syncOnce, type Runner } from '../lib/backend/storage/cloud'
-import { DISK_MARKER, DiskMissingError, findDisk, forgetDiskCache, setupDisk } from '../lib/backend/storage/disk'
+import { DISK_MARKER, DiskMissingError, findDisk, forgetDiskCache, listDisks, setupDisk } from '../lib/backend/storage/disk'
 import { DEFAULT_STORAGE, parseStorageSettings, saveStorageSettings, type StorageSettings } from '../lib/backend/storage/settings'
 
 // Obra com 10 capítulos prontos, de 2 páginas cada, e um "dispositivo externo"
@@ -94,7 +94,11 @@ async function sync(db: Database.Database, run: Runner = runStorage) {
   await syncOnce(db, run)
 }
 
-beforeEach(() => forgetDiskCache())
+// Nunca varre os pontos de montagem de verdade: um HD dormindo deixaria o teste lento.
+beforeEach(() => {
+  vi.stubEnv('KOMA_DISK_ROOTS', fs.mkdtempSync(path.join(os.tmpdir(), 'koma-disk-roots-')))
+  forgetDiskCache()
+})
 
 describe('dispositivo externo', () => {
   it('reconhece o dispositivo pelo koma-disco.json, não pelo caminho', () => {
@@ -109,6 +113,17 @@ describe('dispositivo externo', () => {
     expect(findDisk(settings)).toBe(mount)
     // Preparar de novo reaproveita o código (reinstalação, outro computador).
     expect(setupDisk(mount, 'KOMA').id).toBe(settings.diskId)
+  })
+
+  it('lista os dispositivos montados e acha o escolhido num caminho novo', () => {
+    const { dir, mount, settings } = library(1)
+    vi.stubEnv('KOMA_DISK_ROOTS', dir)
+    forgetDiskCache()
+    expect(listDisks('KOMA').find((disk) => disk.path === mount)).toMatchObject({ label: 'PENDRIVE', hasKoma: true })
+    // Montado com outro nome (outra letra no Windows): reconhecido pelo código.
+    fs.renameSync(mount, path.join(dir, 'OUTRO-NOME'))
+    forgetDiskCache()
+    expect(findDisk(settings)).toBe(path.join(dir, 'OUTRO-NOME'))
   })
 
   it('valida a escolha do dispositivo e o número de capítulos', () => {
