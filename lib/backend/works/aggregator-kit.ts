@@ -2,6 +2,7 @@ import { parseDocument, DomUtils } from 'htmlparser2'
 import type { AnyNode, Element } from 'domhandler'
 import { seoTitles, type CatalogWork, type SourceChapter } from '@/lib/works'
 import { checkedSourceUrl, sourceBytes, SourceError } from './source-http'
+import type { WorkIdentity } from './same-work'
 
 // Peças comuns aos conectores de sites (o modelo Madara e os conectores locais
 // que o usuário mantém fora do repositório, que recebem este módulo como "kit").
@@ -23,6 +24,8 @@ export interface AggregatorConnector {
   /** "known": capítulos já conhecidos; índices do mais novo ao mais antigo param neles. */
   chapters: (url: string, signal?: AbortSignal, known?: Set<string>) => Promise<SourceChapter[]>
   pages: (chapterId: string, signal?: AbortSignal) => Promise<PageRef[]>
+  /** Ficha da obra no site (gêneros, sinopse), para conferir que é a mesma obra. Opcional. */
+  about?: (url: string, signal?: AbortSignal) => Promise<WorkIdentity>
 }
 
 export const hasClass = (node: Element, name: string) => (node.attribs?.class || '').split(/\s+/).includes(name)
@@ -142,6 +145,8 @@ export function madara(site: MadaraSite) {
       if (!connector.owns(chapterId)) throw new SourceError(`Capítulo inválido para ${name}.`)
       return parsePages(await html(chapterId, signal), chapterId)
     },
+    // "Manga" nos gêneros desses sites vale para qualquer quadrinho; a origem sai só de "manhwa"/"manhua".
+    about: async (url, signal) => ({ ...(await catalogWork(`${site.id}:${slugOf(url)}`, signal)), originalLanguage: undefined }),
   }
   function parseChapters(doc: ReturnType<typeof parseDocument>, url: string) {
     return DomUtils.findAll((node) => node.name === 'li' && hasClass(node, 'wp-manga-chapter'), doc.children).flatMap((item) => {

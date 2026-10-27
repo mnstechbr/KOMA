@@ -7,7 +7,8 @@ import { kuaikanChapters, kuaikanPages } from './kuaikan'
 import { jumpChapters, jumpPages } from './jump-plus'
 import { identifySource, sourceConnectors } from './source-registry'
 import { officialIndex } from './official-index'
-import { aggregatorFor, aggregators, findOnAggregator, searchTitles, versionRank } from './aggregators'
+import { aggregatorFor, aggregators, findOnAggregator, searchTitles, titleMatch, versionRank } from './aggregators'
+import { sameWork, type WorkIdentity } from './same-work'
 import { findNaverOriginal } from './naver'
 import type { WorksRepository, WorkRow } from './repository'
 
@@ -201,9 +202,17 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
     const bound = boundSources.find((source) => source.provider === 'mangadex')
     let found: CatalogWork | null = null
     try {
-      if (bound) found = await catalogWork(bound.url.split('/').pop() || '', signal)
-      else if (!recentSearch('search:mangadex')) {
-        found = await findOnMangaDex(titles, signal)
+      if (bound) {
+        found = await catalogWork(bound.url.split('/').pop() || '', signal)
+        // Ligação antiga com outra obra de mesmo nome (origem diferente e nenhum personagem
+        // em comum): desfeita, e a pesquisa fica para a próxima procura.
+        if (!sameWork(metadata, found, 'exact')) {
+          repository.database.prepare('DELETE FROM work_catalog_sources WHERE work_id=? AND url=?').run(work.id, bound.url)
+          record('alternative', bound.url, 'not_found', 'MangaDex: a obra ligada era outra com o mesmo nome; ligação desfeita.')
+          found = null
+        }
+      } else if (!recentSearch('search:mangadex')) {
+        found = await findOnMangaDex(titles, signal, metadata)
         if (found) {
           repository.database
             .prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)')
@@ -256,7 +265,7 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
       if (!links.length && !boundSources.some((source) => source.provider === connector.id)) {
         if (recentSearch(`search:${connector.id}`)) return []
         try {
-          const match = await findOnAggregator(connector, titles, signal)
+          const match = await findOnAggregator(connector, titles, signal, metadata)
           if (!match) {
             record('alternative', `search:${connector.id}`, 'not_found', `${connector.name}: obra não encontrada pelo título.`)
             return []
@@ -312,19 +321,27 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
   const existing = repository.detail(work.id, work.user_id)!.chapters
   return mergeChapterSources(groups, existing, work.target_language)
 }
-/** A mesma obra no MangaDex: algum nome (principal ou alternativo) idêntico a um dos conhecidos. */
-export async function findOnMangaDex(titles: string[], signal?: AbortSignal) {
-  const known = new Set(titles.map((title) => normalizeTitle(title).replace(/^the /, '')))
+/**
+ * A mesma obra no MangaDex: algum nome (principal ou alternativo) idêntico a um dos
+ * conhecidos e, com a ficha da obra ("work"), origem e personagens sem contradição.
+ */
+export async function findOnMangaDex(titles: string[], signal?: AbortSignal, work?: WorkIdentity) {
   for (const title of titles.slice(0, 3)) {
     const results = await searchCatalog(title, signal, false)
-    const match = results.find((work) =>
-      [work.title, work.originalTitle, ...work.aliases.map((alias) => alias.title)].some(
-        (name) => name && known.has(normalizeTitle(name).replace(/^the /, '')),
-      ),
-    )
+    const match = results.find((result) => {
+      const kind = workMatch(result, titles)
+      return kind && (!work || sameWork(work, result, kind))
+    })
     if (match) return match
   }
   return null
+}
+/** Como algum nome da obra (principal ou alternativo) bate com os títulos conhecidos. */
+function workMatch(work: CatalogWork, titles: string[]) {
+  const kinds = [work.title, work.originalTitle, ...work.aliases.map((alias) => alias.title)]
+    .filter(Boolean)
+    .map((name) => titleMatch(name, titles))
+  return kinds.includes('exact') ? 'exact' : kinds.includes('article') ? 'article' : null
 }
 export async function chapterPages(id: string, signal?: AbortSignal) {
   const aggregator = aggregatorFor(id)

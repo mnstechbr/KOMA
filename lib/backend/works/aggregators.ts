@@ -2,6 +2,7 @@ import { DomUtils } from 'htmlparser2'
 import { sameLanguage } from '@/lib/languages'
 import { normalizeTitle, seoTitles, type SourceChapter } from '@/lib/works'
 import { SourceError } from './source-http'
+import { sameWork, type WorkIdentity } from './same-work'
 import { allowedImage, chapter, chapterNumber, hasClass, html, ordered, pageList, text, type AggregatorConnector } from './aggregator-kit'
 
 export type { AggregatorConnector, PageRef } from './aggregator-kit'
@@ -123,17 +124,43 @@ export function searchTitles(metadata: {
     ).values(),
   ]
 }
+/**
+ * Como um nome bate com os títulos conhecidos: "exact" (ignorando pontuação) ou
+ * "article" (só depois de tirar o "The" inicial, como "The Demon God" e "Demon God").
+ */
+export function titleMatch(name: string, titles: string[]): 'exact' | 'article' | null {
+  const value = normalizeTitle(name)
+  const known = titles.map((title) => normalizeTitle(title))
+  if (known.includes(value)) return 'exact'
+  const bare = (item: string) => item.replace(/^the /, '')
+  return known.some((item) => bare(item) === bare(value)) ? 'article' : null
+}
 /** Correspondência exata (ignorando artigo inicial e pontuação) com algum título conhecido. */
 export function matchingResult(results: Array<{ title: string; url: string }>, titles: string[]) {
-  const known = new Set(titles.map((title) => normalizeTitle(title).replace(/^the /, '')))
-  return results.find((result) => known.has(normalizeTitle(result.title).replace(/^the /, '')))
+  return results.find((result) => titleMatch(result.title, titles))
 }
-export async function findOnAggregator(connector: AggregatorConnector, titles: string[], signal?: AbortSignal) {
+/**
+ * Mesmo nome não basta: com a ficha da obra ("work"), cada resultado também precisa
+ * não contradizer a origem e os personagens; o que só bate sem o "The" precisa de
+ * um sinal que confirme.
+ */
+export async function findOnAggregator(connector: AggregatorConnector, titles: string[], signal?: AbortSignal, work?: WorkIdentity) {
   let lastError: unknown
   for (const title of titles.slice(0, 4)) {
     try {
-      const match = matchingResult(await connector.search(title, signal), titles)
-      if (match) return match
+      for (const result of await connector.search(title, signal)) {
+        const kind = titleMatch(result.title, titles)
+        if (!kind) continue
+        if (!work) return result
+        let about: WorkIdentity = { title: result.title }
+        if (connector.about)
+          try {
+            about = await connector.about(result.url, signal)
+          } catch (error) {
+            if (signal?.aborted) throw error
+          }
+        if (sameWork(work, about, kind)) return result
+      }
     } catch (error) {
       if (signal?.aborted) throw error
       lastError = error
