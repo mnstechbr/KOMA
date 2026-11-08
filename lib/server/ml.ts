@@ -28,9 +28,75 @@ const shared = globalThis as typeof globalThis & {
     pending: Map<number, Pending & { role: Role }>
     config: MlConfig | null
     promo: string[]
+    idle?: Record<Role, ReturnType<typeof setTimeout> | null>
+    keep?: (() => boolean) | null
   }
 }
-const state = (shared.__komaMl2 ||= { workers: { ocr: null, draw: null }, next: 1, pending: new Map(), config: null, promo: [] })
+const state: NonNullable<(typeof shared)['__komaMl2']> = (shared.__komaMl2 ||= {
+  workers: { ocr: null, draw: null },
+  next: 1,
+  pending: new Map(),
+  config: null,
+  promo: [],
+})
+const idleTimers = (state.idle ||= { ocr: null, draw: null })
+
+// Fila parada: um worker sem nenhum pedido por IDLE_MS é encerrado, e com ele saem da memória
+// os modelos (ONNX, OpenVINO, CUDA) e o heap dele: medido ~1,3 GB de RAM no Equilibrado e a VRAM
+// no Máximo (671 MB no WebGPU; com CUDA ficam só as bibliotecas da NVIDIA). O próximo pedido cria
+// outro, que recebe a mesma configuração e as marcas d'água ao nascer (como depois de uma queda).
+// Nunca com pedido em andamento nem enquanto a fila disser que há capítulo em preparo ou desenho.
+// KOMA_ML_IDLE_MS muda o tempo (0 desliga).
+const IDLE_MS = 10 * 60 * 1000
+function idleMs() {
+  const value = process.env.KOMA_ML_IDLE_MS
+  if (value === undefined || value === '') return IDLE_MS
+  const ms = Number(value)
+  return Number.isFinite(ms) && ms >= 0 ? ms : IDLE_MS
+}
+const busyRole = (role: Role) => [...state.pending.values()].some((pending) => pending.role === role)
+function queueBusy() {
+  try {
+    return Boolean(state.keep?.())
+  } catch {
+    return true
+  }
+}
+function armIdle(role: Role) {
+  const created = state.workers[role]
+  const ms = idleMs()
+  if (idleTimers[role]) clearTimeout(idleTimers[role]!)
+  idleTimers[role] = null
+  if (!created || !ms) return
+  const timer = setTimeout(() => {
+    idleTimers[role] = null
+    if (state.workers[role] !== created) return
+    if (busyRole(role) || queueBusy()) return armIdle(role)
+    state.workers[role] = null
+    console.info('[KOMA] Modelos liberados da memória (fila parada)', { worker: role === 'ocr' ? 'leitura' : 'desenho' })
+    void created.terminate()
+  }, ms)
+  timer.unref()
+  idleTimers[role] = timer
+}
+/** A fila diz se há capítulo em preparo ou desenho; enquanto houver, os modelos ficam carregados. */
+export function keepMlWhile(busy: (() => boolean) | null) {
+  state.keep = busy
+}
+/** Quais workers estão abertos (com os modelos na memória). */
+export function mlWorkers(): Record<Role, boolean> {
+  return { ocr: Boolean(state.workers.ocr), draw: Boolean(state.workers.draw) }
+}
+
+// Bibliotecas nativas dos workers (sharp, onnxruntime, OpenVINO) carregadas também nesta thread,
+// só o código, sem modelos: quando o último worker que as usa termina, o Node as solta e um worker
+// novo não consegue registrá-las de novo ("Module did not self-register"). Com uma referência
+// aqui elas nunca são soltas e o worker recriado volta a usá-las. Sem o pacote (OpenVINO é
+// opcional), o worker também não o usa.
+let nativeKept: Promise<unknown> | null = null
+function keepNativeLoaded() {
+  nativeKept ||= Promise.allSettled([import('sharp'), import('onnxruntime-node'), import('openvino-node')])
+}
 
 function workerFile() {
   const file = process.env.KOMA_ML_WORKER || path.join(/*turbopackIgnore: true*/ process.cwd(), 'koma-ml', 'ml-worker.mjs')
@@ -42,6 +108,7 @@ function worker(role: Role = 'ocr') {
   if (state.workers[role]) return state.workers[role]
   const file = workerFile()
   if (!file) return null
+  keepNativeLoaded()
   const created = new Worker(file)
   created.unref()
   created.on('message', ({ id, value, error }: { id: number; value?: unknown; error?: string }) => {
@@ -50,6 +117,7 @@ function worker(role: Role = 'ocr') {
     state.pending.delete(id)
     if (error !== undefined) pending.reject(new Error(error))
     else pending.resolve(value)
+    if (!busyRole(role)) armIdle(role)
   })
   // Worker caiu (falta de memória, erro nativo): os pedidos em andamento falham e o próximo cria outro.
   const fail = (reason: string) => {
@@ -73,6 +141,8 @@ function worker(role: Role = 'ocr') {
 }
 function call<T>(role: Role, method: string, args: unknown[], transfer: Transferable[] = []): Promise<T> {
   const target = worker(role)!
+  if (idleTimers[role]) clearTimeout(idleTimers[role]!)
+  idleTimers[role] = null
   const id = state.next++
   return new Promise<T>((resolve, reject) => {
     state.pending.set(id, { resolve: resolve as (value: unknown) => void, reject, role })

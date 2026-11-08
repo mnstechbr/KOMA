@@ -3,7 +3,7 @@ import os from 'node:os'
 import crypto from 'node:crypto'
 import { recoverOcr } from '@/lib/server/ocr-recovery'
 import { inspectPublicationSources } from './publication-sources'
-import { extractText as extractTextBoxesNode, probeGpuDevice as probeGpu } from '@/lib/server/ml'
+import { extractText as extractTextBoxesNode, keepMlWhile, probeGpuDevice as probeGpu } from '@/lib/server/ml'
 import { contextualTranslation } from '../kpassword/translation'
 import { getTranslationSettings } from '../kpassword/repository'
 import { SectionsRepository } from '../sections/sections.repository'
@@ -100,6 +100,14 @@ export function startWorkAutomation() {
     synopsisRetryAt: 0,
   }
   globals.__komaAutomation = state
+  // Modelos ficam carregados enquanto houver capítulo em preparo, página desenhando ou relendo.
+  keepMlWhile(
+    () =>
+      [...state.active.values()].some((task) => task.phase === 'prepare') ||
+      state.rendering.size > 0 ||
+      state.upgrading.size > 0 ||
+      state.joining.size > 0,
+  )
   const engineSections = new SectionsRepository()
   const engine = new WorkAutomation({
     repository,
