@@ -264,10 +264,13 @@ export function madara(site: MadaraSite) {
         })
       }
     // Página de verificação ou erro no lugar da busca: a fonte não respondeu.
+    // Busca sem resultado é resposta válida: o tema marca a página com "search-no-results".
+    const body = DomUtils.findOne((node) => node.name === 'body', doc.children)
     if (
       !entries.length &&
       !results.size &&
-      !/no posts|no results|nothing found|not found|no-posts|no manga/i.test(DomUtils.textContent(doc))
+      !(body && hasClass(body, 'search-no-results')) &&
+      !/no posts|no results|no matches|nothing found|not found|no-posts|no manga/i.test(DomUtils.textContent(doc))
     )
       throw new SourceError(`${name} não retornou uma página de busca válida.`, true)
     return [...results.values()]

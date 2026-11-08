@@ -1,6 +1,7 @@
 import https from 'node:https'
 import dns from 'node:dns/promises'
 import { isIP } from 'node:net'
+import packageInfo from '@/package.json'
 
 export class SourceError extends Error {
   constructor(
@@ -58,6 +59,14 @@ const dynamicRule = (host: string) =>
       return false
     }
   })
+// O MangaDex manda para uma verificação anti-robô quem se apresenta como navegador
+// ("Mozilla/5.0 ...") na API; programas devem se identificar pelo próprio nome.
+// Os outros sites recebem o formato de navegador, que alguns exigem.
+const BROWSER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) KOMA/0.4 (personal desktop reader)'
+const OWN_AGENT = `KOMA/${packageInfo.version} (personal desktop reader; +https://github.com/mnstechbr/KOMA)`
+export function userAgentFor(host: string) {
+  return host === 'mangadex.org' || host.endsWith('.mangadex.org') || host.endsWith('.mangadex.network') ? OWN_AGENT : BROWSER_AGENT
+}
 export function isPublicAddress(address: string) {
   if (isIP(address) === 4) {
     const [a, b, c] = address.split('.').map(Number)
@@ -225,7 +234,7 @@ async function requestBytes(
         agent: network.agent,
         signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
         headers: {
-          'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) KOMA/0.4 (personal desktop reader)',
+          'User-Agent': userAgentFor(url.hostname),
           Accept: image ? 'image/*' : 'application/json,text/html',
           'Accept-Encoding': 'identity',
           ...(referer ? { Referer: referer } : {}),

@@ -53,6 +53,9 @@ describe('modelo Madara para fontes personalizadas', () => {
       site.parseSearch(doc(entry.replace(`${origin}/wp-content/uploads/cover.jpg`, 'https://evil.invalid/ad.jpg')))[0].coverFile,
     ).toBeNull()
     expect(site.parseSearch(doc('<main>No results found</main>'))).toEqual([])
+    // Tema que só marca a página vazia na classe do body ("No matches found").
+    expect(site.parseSearch(doc('<body class="archive search search-no-results"><main>Nada</main></body>'))).toEqual([])
+    expect(site.parseSearch(doc('<main>No matches found. Try a different search...</main>'))).toEqual([])
     expect(() => site.parseSearch(doc('<main>Verifique seu navegador</main>'))).toThrow('busca válida')
   })
 })
