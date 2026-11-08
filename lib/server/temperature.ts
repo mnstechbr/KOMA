@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+import { execFile, spawn, type ChildProcess } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 
@@ -55,25 +55,107 @@ function awake(device: string) {
   return status === null || status === 'active'
 }
 
+const NVIDIA_QUERY = ['--query-gpu=temperature.gpu', '--format=csv,noheader,nounits']
+const NVIDIA_TIMEOUT_MS = 3000
+const hottestValue = (lines: string[]) => {
+  const values = lines.map(Number).filter((value) => Number.isFinite(value) && value > 0)
+  return values.length ? Math.max(...values) : null
+}
+
 let nvidiaSmiMissing = false
-/** Temperatura da placa NVIDIA mais quente pelo nvidia-smi (Linux e Windows). */
-export function queryNvidiaSmi(): Promise<number | null> {
+function execNvidiaSmi(): Promise<number | null> {
   if (nvidiaSmiMissing) return Promise.resolve(null)
   return new Promise((resolve) => {
-    execFile(
-      'nvidia-smi',
-      ['--query-gpu=temperature.gpu', '--format=csv,noheader,nounits'],
-      { timeout: 3000, windowsHide: true },
-      (error, stdout) => {
-        if ((error as NodeJS.ErrnoException | null)?.code === 'ENOENT') nvidiaSmiMissing = true
-        const values = String(stdout || '')
-          .split(/\r?\n/)
-          .map(Number)
-          .filter((value) => Number.isFinite(value) && value > 0)
-        resolve(error || !values.length ? null : Math.max(...values))
-      },
-    )
+    execFile('nvidia-smi', NVIDIA_QUERY, { timeout: NVIDIA_TIMEOUT_MS, windowsHide: true }, (error, stdout) => {
+      if ((error as NodeJS.ErrnoException | null)?.code === 'ENOENT') nvidiaSmiMissing = true
+      resolve(error ? null : hottestValue(String(stdout || '').split(/\r?\n/)))
+    })
   })
+}
+
+/**
+ * Consulta ao nvidia-smi por um shell pequeno que fica aberto (Linux). Abrir um processo a
+ * partir do servidor, que passa de 2 GB com os modelos carregados, prendia a thread dele por
+ * ~110 ms a cada leitura (o kernel copia o mapa de memória inteiro); a partir do shell custa
+ * quase nada. Mesma consulta, mesmo prazo de 3 s e o mesmo resultado; o shell só roda o
+ * comando quando recebe um pedido e fecha junto com o KOMA.
+ */
+export function nvidiaSmiShell(command = 'nvidia-smi', timeout = NVIDIA_TIMEOUT_MS) {
+  type Pending = { resolve: (value: number | null) => void; lines: string[]; timer: ReturnType<typeof setTimeout> }
+  const pending: Pending[] = []
+  let shell: ChildProcess | null = null
+  let buffer = ''
+  let missing = false
+  // Sem /bin/sh (não deve acontecer no Linux): volta para a consulta direta.
+  let direct = false
+  const reset = () => {
+    shell?.kill()
+    shell = null
+    buffer = ''
+    for (const entry of pending.splice(0)) {
+      clearTimeout(entry.timer)
+      entry.resolve(null)
+    }
+  }
+  const start = () => {
+    const child = spawn('/bin/sh', ['-c', `while read -r _; do "$0" ${NVIDIA_QUERY.join(' ')} 2>/dev/null; echo "fim $?"; done`, command], {
+      stdio: ['pipe', 'pipe', 'ignore'],
+    })
+    child.stdout!.setEncoding('utf8')
+    child.stdout!.on('data', (chunk: string) => {
+      buffer += chunk
+      for (let end = buffer.indexOf('\n'); end >= 0; end = buffer.indexOf('\n')) {
+        const line = buffer.slice(0, end).trim()
+        buffer = buffer.slice(end + 1)
+        const current = pending[0]
+        if (!current) continue
+        const done = /^fim (\d+)$/.exec(line)
+        if (!done) {
+          current.lines.push(line)
+          continue
+        }
+        pending.shift()
+        clearTimeout(current.timer)
+        // 127: o shell não achou o comando (nvidia-smi não instalado), como o ENOENT de antes.
+        if (done[1] === '127') missing = true
+        current.resolve(done[1] === '0' ? hottestValue(current.lines) : null)
+      }
+    })
+    child.on('error', (error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') direct = true
+      if (shell === child) reset()
+    })
+    child.on('exit', () => {
+      if (shell === child) reset()
+    })
+    child.stdin!.on('error', () => undefined)
+    // O shell não segura o KOMA aberto; ao sair, a entrada fecha e ele termina sozinho.
+    child.unref()
+    for (const stream of [child.stdin, child.stdout]) (stream as unknown as { unref?: () => void }).unref?.()
+    return child
+  }
+  return (): Promise<number | null> => {
+    if (missing) return Promise.resolve(null)
+    if (direct) return execNvidiaSmi()
+    shell ||= start()
+    const child = shell
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        if (shell === child) reset()
+      }, timeout)
+      pending.push({ resolve, lines: [], timer })
+      child.stdin!.write('\n')
+    })
+  }
+}
+
+// Um shell só para o servidor inteiro (o Next carrega uma cópia do módulo por rota).
+const sharedSmi = globalThis as typeof globalThis & { __komaNvidiaSmi?: () => Promise<number | null> }
+/** Temperatura da placa NVIDIA mais quente pelo nvidia-smi (Linux e Windows). */
+export function queryNvidiaSmi(): Promise<number | null> {
+  if (process.platform !== 'linux') return execNvidiaSmi()
+  sharedSmi.__komaNvidiaSmi ||= nvidiaSmiShell()
+  return sharedSmi.__komaNvidiaSmi()
 }
 
 export async function readTemperatures({
