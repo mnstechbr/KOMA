@@ -269,7 +269,7 @@ export class WorksRepository {
     }))
     const sources = this.database
       .prepare(
-        `SELECT kind,url,status,message,checked_at AS checkedAt FROM work_source_checks WHERE work_id=? ORDER BY CASE kind WHEN 'original' THEN 0 ELSE 1 END`,
+        `SELECT kind,url,status,message,checked_at AS checkedAt FROM work_source_checks WHERE work_id=? AND kind<>'identity' ORDER BY CASE kind WHEN 'original' THEN 0 ELSE 1 END`,
       )
       .all(id)
     return { work, chapters, sources }
@@ -279,6 +279,12 @@ export class WorksRepository {
     const { provider, url } = identifySource(value)
     this.database.transaction(() => {
       this.database.prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)').run(id, provider, url)
+      // Escolhido pela pessoa: a conferência automática de identidade não o desfaz.
+      this.database
+        .prepare(
+          "INSERT INTO work_source_checks VALUES(?,'identity',?,'same','Escolhido pela pessoa.',?) ON CONFLICT(work_id,kind,url) DO NOTHING",
+        )
+        .run(id, url, now())
       this.database.prepare('UPDATE works SET sync_requested=1,sync_attempts=0,sync_retry_after=0 WHERE id=?').run(id)
     })()
     return true
@@ -625,6 +631,68 @@ export class WorksRepository {
    * na fila do zero, pelo mesmo caminho de uma obra nova. Os originais baixados ficam.
    * "download": capítulo não escolhido ao adicionar a obra entra na fila.
    */
+  /**
+   * Desfaz a ligação com um site que era outra obra de mesmo nome: tira o vínculo e as
+   * versões dele ("sourceIds"). Capítulo que outra fonte também lista passa para a versão
+   * dela e, se tinha sido baixado desse site, volta para a fila; capítulo que só ele
+   * listava sai da obra, baixado ou não, porque é de outra obra. Devolve as seções
+   * (pastas de imagens) para quem chamou apagar os arquivos.
+   */
+  dropWrongSource(workId: number, url: string, sourceIds: Set<string>): number[] {
+    return this.database.transaction(() => {
+      const ids = [...sourceIds]
+      const versions = this.database
+        .prepare('SELECT chapter_key,source_id,metadata_json FROM work_source_versions WHERE work_id=?')
+        .all(workId) as Array<{ chapter_key: string; source_id: string; metadata_json: string }>
+      const rows = this.database
+        .prepare('SELECT id,chapter_key,source_id,section_id FROM work_chapters WHERE work_id=?')
+        .all(workId) as Array<{ id: number; chapter_key: string; source_id: string; section_id: number | null }>
+      const sections = new Set<number>()
+      const clear = (chapterId: number) => {
+        for (const row of this.database
+          .prepare('SELECT section_id FROM work_chapter_attempts WHERE chapter_id=? AND section_id IS NOT NULL')
+          .all(chapterId) as Array<{ section_id: number }>)
+          sections.add(row.section_id)
+        for (const table of ['work_pages', 'work_chapter_attempts', 'work_chapter_cloud'])
+          this.database.prepare(`DELETE FROM ${table} WHERE chapter_id=?`).run(chapterId)
+      }
+      for (const row of rows) {
+        if (!sourceIds.has(row.source_id)) continue
+        if (row.section_id !== null) sections.add(row.section_id)
+        clear(row.id)
+        const others = versions
+          .filter((version) => version.chapter_key === row.chapter_key && !sourceIds.has(version.source_id))
+          .map((version) => ({ ...(JSON.parse(version.metadata_json) as SourceChapter), sourceId: version.source_id }))
+          .sort((a, b) => versionRank(a) - versionRank(b))
+        if (!others.length) {
+          this.database.prepare('DELETE FROM work_chapters WHERE id=?').run(row.id)
+          continue
+        }
+        this.database
+          .prepare(
+            "UPDATE work_chapters SET source_id=?,title=?,language=?,page_count=?,section_id=NULL,state=CASE WHEN state='skipped' THEN 'skipped' ELSE 'queued' END,message='',attempts=0,retry_after=0,version_attempts=0,updated_at=? WHERE id=?",
+          )
+          .run(others[0].sourceId, others[0].title || '', others[0].language || 'en', others[0].pageCount || 0, now(), row.id)
+      }
+      if (ids.length)
+        for (let index = 0; index < ids.length; index += 500) {
+          const chunk = ids.slice(index, index + 500)
+          this.database
+            .prepare(`DELETE FROM work_source_versions WHERE work_id=? AND source_id IN (${chunk.map(() => '?').join(',')})`)
+            .run(workId, ...chunk)
+        }
+      this.database.prepare('DELETE FROM work_catalog_sources WHERE work_id=? AND url=?').run(workId, url)
+      for (const sectionId of sections) {
+        this.database
+          .prepare('DELETE FROM section_image_ocr_items WHERE section_image_id IN (SELECT id FROM section_images WHERE section_id=?)')
+          .run(sectionId)
+        this.database.prepare('DELETE FROM section_images WHERE section_id=?').run(sectionId)
+        this.database.prepare('DELETE FROM sections WHERE id=?').run(sectionId)
+      }
+      this.database.prepare('UPDATE works SET updated_at=? WHERE id=?').run(now(), workId)
+      return [...sections]
+    })()
+  }
   /**
    * Remove a obra da biblioteca: capítulos, versões, vínculos e o registro da obra.
    * Devolve as seções (pastas de imagens) para quem chamou apagar os arquivos.

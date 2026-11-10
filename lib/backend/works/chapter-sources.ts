@@ -11,6 +11,9 @@ import { aggregatorFor, aggregators, findOnAggregator, searchTitles, titleMatch,
 import { sameWork, type WorkIdentity } from './same-work'
 import { findNaverOriginal } from './naver'
 import type { WorksRepository, WorkRow } from './repository'
+import fs from 'node:fs'
+import path from 'node:path'
+import { getDataDir } from '../shared/data-paths'
 
 // Só consolidar números entre fontes quando há uma correspondência única.
 // Volumes com numeração reiniciada e especiais preservam sua identidade.
@@ -87,6 +90,16 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
     const age = Date.now() - new Date(row.checked_at).getTime()
     return (row.status === 'not_found' && age < 5 * 86400000) || (row.status === 'unavailable' && age < 86400000)
   }
+  // Site ligado que se revelou outra obra: sai o vínculo, as versões dele e os capítulos
+  // que só ele trazia (com as imagens já baixadas).
+  const dropWrongSource = (url: string, owns: (sourceId: string) => boolean, listed: SourceChapter[] = []) => {
+    const ids = new Set([...known].filter(owns))
+    for (const chapter of listed) ids.add(chapter.sourceId)
+    for (const sectionId of repository.dropWrongSource(work.id, url, ids))
+      fs.rmSync(path.join(getDataDir(), 'sections', String(sectionId)), { recursive: true, force: true })
+  }
+  const checked = (url: string) =>
+    Boolean(repository.database.prepare("SELECT 1 FROM work_source_checks WHERE work_id=? AND kind='identity' AND url=?").get(work.id, url))
   const originals = new Map<string, { provider: string; url: string }>()
   for (const link of metadata.publicationLinks || [])
     if (link.kind === 'original') {
@@ -206,11 +219,19 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
         found = await catalogWork(bound.url.split('/').pop() || '', signal)
         // Ligação antiga com outra obra de mesmo nome (origem diferente e nenhum personagem
         // em comum): desfeita, e a pesquisa fica para a próxima procura.
-        if (!sameWork(metadata, found, 'exact')) {
-          repository.database.prepare('DELETE FROM work_catalog_sources WHERE work_id=? AND url=?').run(work.id, bound.url)
-          record('alternative', bound.url, 'not_found', 'MangaDex: a obra ligada era outra com o mesmo nome; ligação desfeita.')
+        if (checked(bound.url)) {
+          /* Já conferida (ou escolhida pela pessoa). */
+        } else if (!sameWork(metadata, found, 'exact')) {
+          // Capítulos do MangaDex não são endereços; nesta obra, só ele os traz.
+          dropWrongSource(bound.url, (id) => !id.startsWith('https://'))
+          record(
+            'alternative',
+            bound.url,
+            'not_found',
+            'MangaDex: a obra ligada era outra com o mesmo nome; ligação desfeita e capítulos dela removidos.',
+          )
           found = null
-        }
+        } else record('identity', bound.url, 'same', 'MangaDex: ficha conferida.')
       } else if (!recentSearch('search:mangadex')) {
         found = await findOnMangaDex(titles, signal, metadata)
         if (found) {
@@ -218,6 +239,7 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
             .prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)')
             .run(work.id, 'mangadex', `https://mangadex.org/title/${found.sourceId}`)
           repository.database.prepare("DELETE FROM work_source_checks WHERE work_id=? AND url='search:mangadex'").run(work.id)
+          record('identity', `https://mangadex.org/title/${found.sourceId}`, 'same', 'MangaDex: ficha conferida.')
         } else record('alternative', 'search:mangadex', 'not_found', 'MangaDex: obra não encontrada pelo título.')
       }
       if (found) {
@@ -274,6 +296,7 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
             .prepare('INSERT OR IGNORE INTO work_catalog_sources(work_id,provider,url) VALUES(?,?,?)')
             .run(work.id, connector.id, match.url)
           repository.database.prepare('DELETE FROM work_source_checks WHERE work_id=? AND url=?').run(work.id, `search:${connector.id}`)
+          if (connector.about) record('identity', match.url, 'same', `${connector.name}: ficha conferida.`)
           links = [match.url]
         } catch (error) {
           if (signal.aborted) throw error
@@ -289,6 +312,26 @@ export async function discoverWorkChapters(repository: WorksRepository, work: Wo
       const found: SourceChapter[][] = []
       for (const url of links) {
         try {
+          // Ligação feita antes da conferência de identidade: confere uma vez pela ficha do site.
+          if (connector.about && !checked(url)) {
+            const about = await connector.about(url, signal).catch((error) => {
+              if (signal.aborted) throw error
+              return null
+            })
+            if (about && !sameWork(metadata, about, 'exact')) {
+              const listed = await connector.chapters(url, signal).catch(() => [])
+              dropWrongSource(url, (id) => connector.owns(id) && id.startsWith(url), listed)
+              record(
+                'alternative',
+                url,
+                'not_found',
+                `${connector.name}: a obra ligada era outra com o mesmo nome; ligação desfeita e capítulos dela removidos.`,
+              )
+              record('alternative', `search:${connector.id}`, 'not_found', `${connector.name}: obra não encontrada pelo título.`)
+              continue
+            }
+            if (about) record('identity', url, 'same', `${connector.name}: ficha conferida.`)
+          }
           const chapters = await connector.chapters(url, signal, known)
           found.push(chapters)
           repository.database
