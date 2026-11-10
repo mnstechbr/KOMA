@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
-import { searchAllCatalogs, validateCatalogId } from '../lib/backend/works/catalog'
+import { nameOverlap, otherNames, searchAllCatalogs, validateCatalogId } from '../lib/backend/works/catalog'
+import { userAgentFor } from '../lib/backend/works/source-http'
 import type { CatalogWork } from '../lib/works'
 
 const work = { source: 'site', sourceId: 'site:obra', title: 'Obra' } as CatalogWork
@@ -91,5 +92,80 @@ describe('mesma obra em várias fontes', () => {
     expect(grouped).toHaveLength(2)
     expect(grouped[0].source).toBe('mangadex')
     expect(grouped[0].alsoIn?.map((item) => item.source)).toEqual(['manhwatop', 'mangaread'])
+  })
+})
+
+describe('obra com outra grafia no catálogo', () => {
+  const official = {
+    source: 'mangadex',
+    sourceId: '355f1324-f302-48fe-98e7-26b321102db4',
+    title: 'Magic Repo Man: Dumped by My Party',
+    originalTitle: 'Kashita Maryoku wa "Ribobarai" de Kyousei Choushuu',
+    aliases: [{ language: 'ja-ro', title: 'Kashita Maryoku wa "Ribobarai" de Kyousei Choushuu' }],
+  } as CatalogWork
+  const other = {
+    source: 'mangadex',
+    sourceId: 'outra',
+    title: 'Revolution Barbarian',
+    originalTitle: '',
+    aliases: [],
+  } as unknown as CatalogWork
+  const site = [
+    { title: 'Kashita Maryoku wa "Revo Barai" de Kyousei Choushuu', url: 'https://local.example/10156' },
+    { title: 'Magic Repo Man: Dumped by My Party', url: 'https://local.example/10156' },
+    { title: 'Revo Something Else', url: 'https://local.example/2' },
+  ]
+  it('acha pelo nome que outro site dá à obra quando o catálogo não conhece a grafia', async () => {
+    const catalog = vi.fn(async (query: string) => (/ribobarai|kashita|magic repo/i.test(query) ? [official, other] : []))
+    const result = await searchAllCatalogs(
+      'Revo Barai',
+      undefined,
+      [{ name: 'MangaDex', search: catalog }],
+      [{ name: 'Local', search: vi.fn().mockResolvedValue(site) }],
+    )
+    expect(result.results.map((work) => work.sourceId)).toEqual([official.sourceId])
+    expect(catalog).toHaveBeenCalledWith('Kashita Maryoku wa "Revo Barai" de Kyousei Choushuu', undefined)
+  })
+  it('não faz a segunda busca quando o catálogo já tem o nome procurado', async () => {
+    const catalog = vi.fn().mockResolvedValue([official])
+    await searchAllCatalogs(
+      'Kashita Maryoku wa',
+      undefined,
+      [{ name: 'MangaDex', search: catalog }],
+      [{ name: 'Local', search: vi.fn().mockResolvedValue(site) }],
+    )
+    expect(catalog).toHaveBeenCalledTimes(1)
+  })
+  it('um conector local fora do ar não derruba a busca', async () => {
+    const result = await searchAllCatalogs(
+      'Kashita',
+      undefined,
+      [{ name: 'MangaDex', search: vi.fn().mockResolvedValue([official]) }],
+      [{ name: 'Local', search: vi.fn().mockRejectedValue(new Error('offline')) }],
+    )
+    expect(result.results).toHaveLength(1)
+  })
+  it('usa todos os nomes do endereço que bate, no máximo dois, e corta nomes longos sem partir palavra', () => {
+    expect(otherNames('revo barai', [], site)).toEqual([
+      'Kashita Maryoku wa "Revo Barai" de Kyousei Choushuu',
+      'Magic Repo Man: Dumped by My Party',
+    ])
+    expect(otherNames('revo barai', [official], site)).toEqual(['Kashita Maryoku wa "Revo Barai" de Kyousei Choushuu'])
+    const long = `${'palavra '.repeat(25)}revo barai`
+    const [cut] = otherNames('palavra', [], [{ title: long, url: 'x' }])
+    expect(cut.length).toBeLessThanOrEqual(160)
+    expect(cut.endsWith('palavra')).toBe(true)
+  })
+  it('mede quanto do nome aparece na obra', () => {
+    expect(nameOverlap(official, 'Kashita Maryoku wa "Revo Barai" de Kyousei Choushuu')).toBeGreaterThanOrEqual(0.6)
+    expect(nameOverlap(other, 'Kashita Maryoku wa "Revo Barai" de Kyousei Choushuu')).toBeLessThan(0.6)
+  })
+})
+
+describe('identificação nas fontes', () => {
+  it('o MangaDex recebe o nome do KOMA, não o de um navegador (que ele manda para verificação)', () => {
+    for (const host of ['api.mangadex.org', 'uploads.mangadex.org', 'abc.mangadex.network']) expect(userAgentFor(host)).toMatch(/^KOMA\/\d/)
+    expect(userAgentFor('www.leitor.example.com')).toMatch(/^Mozilla\/5\.0/)
+    expect(userAgentFor('mangadex.org.evil.invalid')).toMatch(/^Mozilla/)
   })
 })

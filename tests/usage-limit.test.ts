@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SQLITE_MIGRATIONS } from '../lib/backend/shared/migrations'
 import { getPerformanceMode, getUsageLimit, savePerformanceMode, saveUsageLimit } from '../lib/backend/works/performance'
 import { configureUsage, nextHot, paced, refreshHeat, restMs, usageShare, usageState } from '../lib/backend/works/usage-limit'
-import { readTemperatures } from '../lib/server/temperature'
+import { nvidiaSmiShell, readTemperatures } from '../lib/server/temperature'
 
 describe('limite de uso', () => {
   afterEach(() => {
@@ -154,6 +154,51 @@ describe('temperaturas', () => {
   it('Windows: só a placa (a CPU exige administrador)', async () => {
     expect(await readTemperatures({ gpu: true, platform: 'win32', nvidiaSmi: async () => 70 })).toEqual({ cpu: null, gpu: 70 })
     expect(await readTemperatures({ gpu: false, platform: 'win32', nvidiaSmi: async () => 70 })).toEqual({ cpu: null, gpu: null })
+  })
+})
+
+describe.skipIf(process.platform !== 'linux')('nvidia-smi por um shell aberto', () => {
+  const dirs: string[] = []
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true })
+  })
+  // nvidia-smi falso: conta as chamadas num arquivo e responde o que o teste mandar.
+  const fake = (body: string) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'koma-smi-'))
+    dirs.push(dir)
+    const file = path.join(dir, 'nvidia-smi')
+    fs.writeFileSync(file, `#!/bin/sh\necho x >> "${dir}/calls"\n[ "$1" = --query-gpu=temperature.gpu ] || exit 9\n${body}\n`, {
+      mode: 0o755,
+    })
+    return { file, calls: () => fs.readFileSync(path.join(dir, 'calls'), 'utf8').split('\n').filter(Boolean).length }
+  }
+
+  it('responde a placa mais quente, uma consulta por pedido, inclusive simultâneos', async () => {
+    const smi = fake('echo 61; echo 74')
+    const query = nvidiaSmiShell(smi.file)
+    expect(await query()).toBe(74)
+    expect(await Promise.all([query(), query()])).toEqual([74, 74])
+    expect(smi.calls()).toBe(3)
+  })
+
+  it('falha do comando vira null e o próximo pedido ainda funciona', async () => {
+    const smi = fake('[ -e "$(dirname "$0")/ok" ] || { touch "$(dirname "$0")/ok"; exit 3; }; echo 70')
+    const query = nvidiaSmiShell(smi.file)
+    expect(await query()).toBeNull()
+    expect(await query()).toBe(70)
+  })
+
+  it('sem o nvidia-smi: null e nunca mais tenta', async () => {
+    const query = nvidiaSmiShell('/caminho/que/nao/existe/nvidia-smi')
+    expect(await query()).toBeNull()
+    expect(await query()).toBeNull()
+  })
+
+  it('passou do prazo: null e um shell novo no pedido seguinte', async () => {
+    const smi = fake('[ -e "$(dirname "$0")/ok" ] || { touch "$(dirname "$0")/ok"; sleep 5; }; echo 66')
+    const query = nvidiaSmiShell(smi.file, 300)
+    expect(await query()).toBeNull()
+    expect(await query()).toBe(66)
   })
 })
 

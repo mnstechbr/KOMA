@@ -3,6 +3,14 @@
 Histórico das entregas, mantido do antigo README. O README atual está em [README.pt-BR.md](../../README.pt-BR.md).
 
 
+## 1.0.6 — versão estável
+
+**Memória**
+- Com a fila parada por 10 minutos, os modelos de leitura e desenho saem da memória e voltam sozinhos no próximo pedido. No perfil Equilibrado o KOMA devolve cerca de 1,3 GB ao computador; no Máximo, libera a memória da placa de vídeo (671 MB no teste). A primeira página depois da pausa leva cerca de 2 s a mais; texto e páginas saem idênticos.
+
+**Correções**
+- A leitura da temperatura da placa NVIDIA não trava mais o servidor (antes, cerca de 110 ms a cada 5 s durante o processamento), evitando pequenos soluços na tela. Os limites de temperatura e de uso continuam iguais.
+
 ## 1.0.5 — versão estável
 
 **Dispositivo externo**
